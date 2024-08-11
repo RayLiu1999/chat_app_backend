@@ -4,9 +4,15 @@ import (
 	"log"
 	"net/http"
 
+	"chat_app_backend/models"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"go.mongodb.org/mongo-driver/mongo"
 )
+
+var clients = make(map[*websocket.Conn]string)
+var broadcast = make(chan models.Message)
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
@@ -14,36 +20,42 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-var connections = []*websocket.Conn{}
+func HandleConnections(db *mongo.Database) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer ws.Close()
 
-func HandleWebSocket(c *gin.Context) {
-	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
-	if err != nil {
-		log.Println("Failed to set websocket upgrade: ", err)
-		return
-	}
+		username := c.GetString("username")
+		clients[ws] = username
 
-	connections = append(connections, conn)
-	defer func() {
-		for i, c := range connections {
-			if c == conn {
-				connections = append(connections[:i], connections[i+1:]...)
+		for {
+			var msg models.Message
+			err := ws.ReadJSON(&msg)
+			if err != nil {
+				log.Printf("error: %v", err)
+				delete(clients, ws)
 				break
 			}
+			msg.Username = username
+			broadcast <- msg
 		}
-		conn.Close()
-	}()
+	}
+}
 
+func HandleMessages(db *mongo.Database) {
 	for {
-		_, msg, err := conn.ReadMessage()
-		if err != nil {
-			log.Println("Error reading message: ", err)
-			break
-		}
+		msg := <-broadcast
+		msg.Save(db)
 
-		for _, c := range connections {
-			if err := c.WriteMessage(websocket.TextMessage, msg); err != nil {
-				log.Println("Error writing message: ", err)
+		for client := range clients {
+			err := client.WriteJSON(msg)
+			if err != nil {
+				log.Printf("error: %v", err)
+				client.Close()
+				delete(clients, client)
 			}
 		}
 	}
