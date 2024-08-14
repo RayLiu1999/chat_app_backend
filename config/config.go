@@ -2,7 +2,7 @@ package config
 
 const (
 	MongoURI = "mongodb://localhost:27017"
-	DBName   = "chatapp"
+	DBName   = "chat_app"
 	Port     = "8080"
 )
 

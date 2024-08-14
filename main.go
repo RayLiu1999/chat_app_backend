@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 
 	"chat_app_backend/config"
@@ -16,7 +17,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer db.Client().Disconnect(db.Context())
+	defer db.Client().Disconnect(context.TODO())
 
 	// 初始化 Gin
 	r := gin.Default()
