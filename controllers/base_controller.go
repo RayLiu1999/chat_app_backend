@@ -1,7 +1,10 @@
 package controllers
 
-import "go.mongodb.org/mongo-driver/mongo"
+import (
+	"chat_app_backend/providers"
+)
+
+var MongoConnect = providers.MongoConnect
 
 type BaseController struct {
-	DB *mongo.Database
 }

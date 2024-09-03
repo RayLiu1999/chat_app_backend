@@ -1,6 +1,7 @@
 package models
 
 import (
+	"chat_app_backend/providers"
 	"context"
 	"time"
 
@@ -9,14 +10,14 @@ import (
 )
 
 type Message struct {
-	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
-	Content   string             `bson:"content" json:"content"`
-	Username  string             `bson:"username" json:"username"`
-	CreatedAt time.Time          `bson:"created_at" json:"created_at"`
+	ID        primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+	Content   string             `json:"content" bson:"content"`
+	Username  string             `json:"username" bson:"username"`
+	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
 }
 
 func (m *Message) Save(db *mongo.Database) error {
 	m.CreatedAt = time.Now()
-	_, err := db.Collection("messages").InsertOne(context.Background(), m)
+	_, err := providers.MongoConnect.Collection("messages").InsertOne(context.Background(), m)
 	return err
 }

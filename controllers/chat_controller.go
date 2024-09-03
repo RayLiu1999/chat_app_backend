@@ -20,7 +20,7 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func HandleConnections(db *mongo.Database) gin.HandlerFunc {
+func HandleConnections() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 		if err != nil {

@@ -25,10 +25,10 @@ func (gc *BaseController) Register(c *gin.Context) {
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	user.Password = string(hashedPassword)
 
-	collection := gc.DB.Collection("users")
+	collection := MongoConnect.Collection("users")
 	_, err := collection.InsertOne(context.Background(), user)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error creating user"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error creating user!"})
 		return
 	}
 
@@ -42,7 +42,7 @@ func (gc *BaseController) Login(c *gin.Context) {
 		return
 	}
 
-	collection := gc.DB.Collection("users")
+	collection := MongoConnect.Collection("users")
 	var user models.User
 	err := collection.FindOne(context.Background(), bson.M{"username": loginUser.Username}).Decode(&user)
 	if err != nil {

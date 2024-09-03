@@ -5,12 +5,11 @@ import (
 	"chat_app_backend/middlewares"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func SetupRoutes(r *gin.Engine, db *mongo.Database) {
+func SetupRoutes(r *gin.Engine) {
 	// 创建 Controller 实例并传入数据库连接
-	baseController := &controllers.BaseController{DB: db}
+	baseController := &controllers.BaseController{}
 
 	r.POST("/register", baseController.Register)
 	r.POST("/login", baseController.Login)
@@ -18,6 +17,6 @@ func SetupRoutes(r *gin.Engine, db *mongo.Database) {
 	auth := r.Group("/")
 	auth.Use(middlewares.Auth())
 	{
-		auth.GET("/ws", controllers.HandleConnections(db))
+		auth.GET("/ws", controllers.HandleConnections())
 	}
 }
