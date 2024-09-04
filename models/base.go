@@ -1,4 +1,4 @@
-package controllers
+package models
 
 import (
 	"chat_app_backend/providers"
@@ -6,5 +6,5 @@ import (
 
 var MongoConnect = providers.DBConnect()
 
-type BaseController struct {
+type Base struct {
 }

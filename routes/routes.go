@@ -4,8 +4,12 @@ import (
 	"chat_app_backend/controllers"
 	"chat_app_backend/middlewares"
 
+	"chat_app_backend/providers"
+
 	"github.com/gin-gonic/gin"
 )
+
+var MongoConnect = providers.DBConnect()
 
 func SetupRoutes(r *gin.Engine) {
 	// 创建 Controller 实例并传入数据库连接

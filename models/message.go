@@ -1,7 +1,6 @@
 package models
 
 import (
-	"chat_app_backend/providers"
 	"context"
 	"time"
 
@@ -18,6 +17,6 @@ type Message struct {
 
 func (m *Message) Save(db *mongo.Database) error {
 	m.CreatedAt = time.Now()
-	_, err := providers.MongoConnect.Collection("messages").InsertOne(context.Background(), m)
+	_, err := MongoConnect.Collection("messages").InsertOne(context.Background(), m)
 	return err
 }
