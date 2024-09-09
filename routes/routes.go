@@ -16,31 +16,32 @@ var MongoConnect = providers.DBConnect()
 func SetupRoutes(r *gin.Engine) {
 	// 設定 CORS 中介軟體
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173"},                   // 允許的來源
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},            // 允許的方法
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"}, // 允許的標頭
-		ExposeHeaders:    []string{"Content-Length"},                          // 允許暴露的標頭
-		AllowCredentials: true,                                                // 是否允許憑證
-		MaxAge:           12 * time.Hour,                                      // 預檢請求的緩存時間
+		AllowOrigins:     []string{"http://localhost:5173"},                                                  // 允許的來源
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},                                           // 允許的方法
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-CSRF-NAME", "X-CSRF-TOKEN"}, // 允許的標頭
+		ExposeHeaders:    []string{"Content-Length"},                                                         // 允許暴露的標頭
+		AllowCredentials: true,                                                                               // 是否允許憑證
+		MaxAge:           12 * time.Hour,                                                                     // 預檢請求的緩存時間
 	}))
 
 	// 创建 Controller 实例并传入数据库连接
 	baseController := &controllers.BaseController{}
 
-	r.Group("/").Use(middlewares.VerifyCsrfToken())
+	auth := r.Group("/")
+
+	auth.Use(middlewares.VerifyCsrfToken())
 	{
-		r.POST("/register", baseController.Register)
-		r.POST("/login", baseController.Login)
+		auth.POST("/register", baseController.Register)
+		auth.POST("/login", baseController.Login)
 	}
 
 	// 將多個中介軟體組合成一個切片
 	middlewareArr := []gin.HandlerFunc{
-		middlewares.Auth(),
+		// middlewares.Auth(),
 		middlewares.VerifyCsrfToken(),
 		// 其他中介軟體
 	}
 
-	auth := r.Group("/")
 	auth.Use(middlewareArr...)
 	{
 		auth.GET("/ws", controllers.HandleConnections())
