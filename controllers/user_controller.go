@@ -3,9 +3,11 @@ package controllers
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"chat_app_backend/models"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"golang.org/x/crypto/bcrypt"
@@ -14,6 +16,9 @@ import (
 type UserController struct {
 	*BaseController
 }
+
+// JWT secret key
+var jwtSecret = []byte("your_secret_key")
 
 func (gc *BaseController) Register(c *gin.Context) {
 	var user models.User
@@ -56,6 +61,29 @@ func (gc *BaseController) Login(c *gin.Context) {
 		return
 	}
 
-	// 這裡應該生成一個 JWT token，但為了簡化，我們只返回用戶 ID
-	c.JSON(http.StatusOK, gin.H{"user_id": user.ID.Hex()})
+	// c.JSON(http.StatusOK, gin.H{"message": "Login successful"})
+
+	// Generate JWT token
+	token, err := GenerateJWT(user.ID.Hex())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"token": token})
+}
+
+// GenerateJWT generates a JWT token
+func GenerateJWT(userID string) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id": userID,
+		"exp":     time.Now().Add(time.Hour * 72).Unix(), // Token expires after 72 hours
+	})
+
+	tokenString, err := token.SignedString(jwtSecret)
+	if err != nil {
+		return "", err
+	}
+
+	return tokenString, nil
 }
