@@ -61,29 +61,43 @@ func (gc *BaseController) Login(c *gin.Context) {
 		return
 	}
 
-	// c.JSON(http.StatusOK, gin.H{"message": "Login successful"})
-
-	// Generate JWT token
-	token, err := GenerateJWT(user.ID.Hex())
+	// Generate JWT tokens
+	accessToken, refreshToken, err := GenerateJWT(user.ID.Hex())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tokens"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"token": token})
+	// 將 refresh token 寫入 cookie
+	c.SetCookie("refresh_token", refreshToken, 3600*72, "/", "yourdomain.com", false, true)
+
+	// 返回 access token 給客戶端
+	c.JSON(http.StatusOK, gin.H{"access_token": accessToken})
 }
 
 // GenerateJWT generates a JWT token
-func GenerateJWT(userID string) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+func GenerateJWT(userID string) (string, string, error) {
+	// 生成 access token
+	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": userID,
-		"exp":     time.Now().Add(time.Hour * 72).Unix(), // Token expires after 72 hours
+		"exp":     time.Now().Add(time.Minute * 15).Unix(), // Access token expires after 15 minutes
 	})
 
-	tokenString, err := token.SignedString(jwtSecret)
+	accessTokenString, err := accessToken.SignedString(jwtSecret)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	return tokenString, nil
+	// 生成 refresh token
+	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id": userID,
+		"exp":     time.Now().Add(time.Hour * 72).Unix(), // Refresh token expires after 72 hours
+	})
+
+	refreshTokenString, err := refreshToken.SignedString(jwtSecret)
+	if err != nil {
+		return "", "", err
+	}
+
+	return accessTokenString, refreshTokenString, nil
 }
