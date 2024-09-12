@@ -15,6 +15,7 @@ import (
 var (
 	mongoConnect *mongo.Database
 	once         sync.Once
+	cfg          = config.GetConfig()
 )
 
 type Database struct {
@@ -35,12 +36,12 @@ func InitDB() (*mongo.Database, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		client, err := mongo.Connect(ctx, options.Client().ApplyURI(config.MongoURI))
+		client, err := mongo.Connect(ctx, options.Client().ApplyURI(cfg.MongoURI))
 		if err != nil {
 			return
 		}
 
-		mongoConnect = client.Database(config.DBName)
+		mongoConnect = client.Database(cfg.DBName)
 
 		log.Println("Connected to MongoDB!")
 	})

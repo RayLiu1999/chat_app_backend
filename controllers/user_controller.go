@@ -69,7 +69,7 @@ func (gc *BaseController) Login(c *gin.Context) {
 	}
 
 	// 將 refresh token 寫入 cookie
-	c.SetCookie("refresh_token", refreshToken, 3600*72, "/", "yourdomain.com", false, true)
+	c.SetCookie("refresh_token", refreshToken, 3600*72, "/", "localhost", false, true)
 
 	// 返回 access token 給客戶端
 	c.JSON(http.StatusOK, gin.H{"access_token": accessToken})
