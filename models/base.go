@@ -1,10 +1,10 @@
 package models
 
 import (
-	"chat_app_backend/providers"
+	"chat_app_backend/database"
 )
 
-var MongoConnect = providers.DBConnect()
+var MongoConnect = database.MongoDBConnect()
 
 type Base struct {
 }

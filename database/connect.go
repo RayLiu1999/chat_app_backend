@@ -18,13 +18,19 @@ var (
 	mongoOnce     sync.Once
 )
 
-func DBConnect() interface{} {
-	db, err := ConnectDatabase()
-	if err != nil {
-		panic(err)
+func MongoDBConnect() *mongo.Database {
+	dbType := cfg.Database.Type
+
+	if dbType == "mongodb" {
+		db, err := connectMongoDB()
+		if err != nil {
+			panic(err)
+		}
+
+		return db
 	}
 
-	return db
+	return nil
 }
 
 func ConnectDatabase() (interface{}, error) {
@@ -48,15 +54,24 @@ func connectMongoDB() (*mongo.Database, error) {
 
 	mongoOnce.Do(func() {
 		DBcfg := cfg.Database.MongoDB
+		isDebug := cfg.Server.Mode
 
-		mongoURI := fmt.Sprintf("mongodb://%s:%s@%s:%s/%s?authSource=%s",
-			DBcfg.Username,
-			DBcfg.Password,
-			DBcfg.Host,
-			DBcfg.Port,
-			DBcfg.DBName,
-			DBcfg.AuthSource,
-		)
+		var mongoURI string
+		if isDebug == "debug" {
+			mongoURI = fmt.Sprintf("mongodb://%s:%s",
+				DBcfg.Host,
+				DBcfg.Port,
+			)
+		} else {
+			mongoURI = fmt.Sprintf("mongodb://%s:%s@%s:%s/%s?authSource=%s",
+				DBcfg.Username,
+				DBcfg.Password,
+				DBcfg.Host,
+				DBcfg.Port,
+				DBcfg.DBName,
+				DBcfg.AuthSource,
+			)
+		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()

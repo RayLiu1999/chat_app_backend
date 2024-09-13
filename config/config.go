@@ -2,6 +2,7 @@ package config
 
 import (
 	"log"
+	"os"
 	"sync"
 
 	"github.com/spf13/viper"
@@ -52,7 +53,13 @@ type Config struct {
 // GetConfig 使用单例模式加载配置
 func GetConfig() *Config {
 	once.Do(func() {
-		viper.SetConfigFile("config.yaml")
+		// 獲取當前工作目錄
+		workingDir, err := os.Getwd()
+		if err != nil {
+			log.Fatalf("Error getting working directory: %v", err)
+		}
+
+		viper.SetConfigFile(workingDir + "/config.yaml")
 		if err := viper.ReadInConfig(); err != nil {
 			log.Fatalf("Error loading config file: %v", err)
 		}

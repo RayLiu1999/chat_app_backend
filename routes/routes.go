@@ -5,13 +5,13 @@ import (
 	"chat_app_backend/middlewares"
 	"time"
 
-	"chat_app_backend/providers"
+	"chat_app_backend/database"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
-var MongoConnect = providers.DBConnect()
+var MongoConnect = database.MongoDBConnect()
 
 func SetupRoutes(r *gin.Engine) {
 	// 設定 CORS 中介軟體
