@@ -18,7 +18,8 @@ type Config struct {
 		Port string `mapstructure:"port"`
 		Mode string `mapstructure:"mode"`
 	} `mapstructure:"server"`
-	Database struct {
+	AllowedOrigins []string `mapstructure:"allowed_origins"`
+	Database       struct {
 		Type    string `mapstructure:"type"` // 数据库类型
 		MongoDB struct {
 			Host       string `mapstructure:"host"`
@@ -28,25 +29,32 @@ type Config struct {
 			DBName     string `mapstructure:"dbname"`
 			AuthSource string `mapstructure:"authSource"`
 		} `mapstructure:"mongodb"`
-		MySQL struct {
-			Host     string `mapstructure:"host"`
-			Port     string `mapstructure:"port"`
-			Username string `mapstructure:"username"`
-			Password string `mapstructure:"password"`
-			DBName   string `mapstructure:"dbname"`
-		} `mapstructure:"mysql"`
+		// MySQL struct {
+		// 	Host     string `mapstructure:"host"`
+		// 	Port     string `mapstructure:"port"`
+		// 	Username string `mapstructure:"username"`
+		// 	Password string `mapstructure:"password"`
+		// 	DBName   string `mapstructure:"dbname"`
+		// } `mapstructure:"mysql"`
 
-		PostgreSQL struct {
-			Host     string `mapstructure:"host"`
-			Port     string `mapstructure:"port"`
-			Username string `mapstructure:"username"`
-			Password string `mapstructure:"password"`
-			DBName   string `mapstructure:"dbname"`
-		} `mapstructure:"postgresql"`
+		// PostgreSQL struct {
+		// 	Host     string `mapstructure:"host"`
+		// 	Port     string `mapstructure:"port"`
+		// 	Username string `mapstructure:"username"`
+		// 	Password string `mapstructure:"password"`
+		// 	DBName   string `mapstructure:"dbname"`
+		// } `mapstructure:"postgresql"`
 	} `mapstructure:"database"`
 	JWT struct {
-		Secret      string `mapstructure:"secret"`
-		ExpireHours int    `mapstructure:"expire_hours"`
+		AccessToken struct {
+			Secret      string `mapstructure:"secret"`
+			ExpireHours int    `mapstructure:"expire_hours"`
+		} `mapstructure:"access_token"`
+
+		RefreshToken struct {
+			Secret      string `mapstructure: "secret"`
+			ExpireHours int    `mapstructure:"expire_hours"`
+		} `mapstructure:"refresh_token"`
 	} `mapstructure:"jwt"`
 }
 

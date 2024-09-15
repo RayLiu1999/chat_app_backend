@@ -1,10 +1,7 @@
 package models
 
-import (
-	"chat_app_backend/database"
-)
-
-var MongoConnect = database.MongoDBConnect()
+import "go.mongodb.org/mongo-driver/mongo"
 
 type Base struct {
+	MongoConnect *mongo.Database
 }

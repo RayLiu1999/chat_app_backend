@@ -8,7 +8,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var clients = make(map[*websocket.Conn]string)
@@ -45,18 +44,18 @@ func HandleConnections() gin.HandlerFunc {
 	}
 }
 
-func HandleMessages(db *mongo.Database) {
-	for {
-		msg := <-broadcast
-		msg.Save(db)
+// func HandleMessages(db *mongo.Database) {
+// 	for {
+// 		msg := <-broadcast
+// 		msg.Save(db)
 
-		for client := range clients {
-			err := client.WriteJSON(msg)
-			if err != nil {
-				log.Printf("error: %v", err)
-				client.Close()
-				delete(clients, client)
-			}
-		}
-	}
-}
+// 		for client := range clients {
+// 			err := client.WriteJSON(msg)
+// 			if err != nil {
+// 				log.Printf("error: %v", err)
+// 				client.Close()
+// 				delete(clients, client)
+// 			}
+// 		}
+// 	}
+// }
