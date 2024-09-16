@@ -140,11 +140,14 @@ func GenerateJWT(userID string) (string, string, error) {
 	accessTokenJwtSecret := []byte(cfg.JWT.AccessToken.Secret)
 	accessTokenExpireHours := cfg.JWT.AccessToken.ExpireHours
 
+	// 將小時轉換為分鐘
+	accessTokenExpireDuration := time.Duration(accessTokenExpireHours*60) * time.Minute
+
 	// 設置 access token 的聲明
 	accessTokenClaims := models.AccessTokenClaims{
 		UserID: userID,
 		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(time.Duration(accessTokenExpireHours) * time.Hour).Unix(),
+			ExpiresAt: time.Now().Add(accessTokenExpireDuration).Unix(),
 		},
 	}
 
@@ -159,11 +162,14 @@ func GenerateJWT(userID string) (string, string, error) {
 	refreshTokenJwtSecret := []byte(cfg.JWT.RefreshToken.Secret)
 	refreshTokenExpireHours := cfg.JWT.RefreshToken.ExpireHours
 
+	// 將小時轉換為分鐘
+	refreshTokenExpireDuration := time.Duration(refreshTokenExpireHours*60) * time.Minute
+
 	// 設置 refresh token 的聲明
 	refreshTokenClaims := models.RefreshTokenClaims{
 		UserID: userID,
 		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(time.Duration(refreshTokenExpireHours) * time.Hour).Unix(),
+			ExpiresAt: time.Now().Add(refreshTokenExpireDuration).Unix(),
 		},
 	}
 

@@ -47,13 +47,13 @@ type Config struct {
 	} `mapstructure:"database"`
 	JWT struct {
 		AccessToken struct {
-			Secret      string `mapstructure:"secret"`
-			ExpireHours int    `mapstructure:"expire_hours"`
+			Secret      string  `mapstructure:"secret"`
+			ExpireHours float32 `mapstructure:"expire_hours"`
 		} `mapstructure:"access_token"`
 
 		RefreshToken struct {
-			Secret      string `mapstructure: "secret"`
-			ExpireHours int    `mapstructure:"expire_hours"`
+			Secret      string  `mapstructure: "secret"`
+			ExpireHours float32 `mapstructure:"expire_hours"`
 		} `mapstructure:"refresh_token"`
 	} `mapstructure:"jwt"`
 }
