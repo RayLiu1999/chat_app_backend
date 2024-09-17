@@ -18,6 +18,11 @@ type UserController struct {
 	*BaseController
 }
 
+type TokenResponse struct {
+	Token     string
+	ExpiresAt int64
+}
+
 // 註冊
 func (bc *BaseController) Register(c *gin.Context) {
 	var user models.User
@@ -70,54 +75,73 @@ func (bc *BaseController) Login(c *gin.Context) {
 	}
 
 	// Generate JWT tokens
-	accessToken, refreshToken, err := GenerateJWT(user.ID.Hex())
+	refreshTokenResponse, err := GenRefreshToken(user.ID.Hex())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tokens"})
+		return
+	}
+
+	// 將 refresh token 寫入 資料庫
+	refreshTokenCollection := bc.MongoConnect.Collection("refresh_tokens")
+	var refreshTokenDoc = models.RefreshToken{
+		UserID:    user.ID,
+		Token:     refreshTokenResponse.Token,
+		ExpiresAt: refreshTokenResponse.ExpiresAt,
+		Revoked:   false,
+		CreatedAt: time.Now().Unix(),
+		UpdateAt:  time.Now().Unix(),
+	}
+	_, err = refreshTokenCollection.InsertOne(context.Background(), refreshTokenDoc)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tokens"})
 		return
 	}
 
 	// 將 refresh token 寫入 cookie
-	c.SetCookie("refresh_token", refreshToken, 3600*72, "/", "localhost", false, true)
+	c.SetCookie("refresh_token", refreshTokenResponse.Token, 3600*72, "/", "localhost", false, true)
 
-	// 返回 access token 給客戶端
-	c.JSON(http.StatusOK, gin.H{"access_token": accessToken})
-}
-
-// 刷新 refresh token
-func (bc *BaseController) RefreshToken(c *gin.Context) {
-	refreshToken, err := c.Cookie("refresh_token")
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "No refresh token provided"})
-		return
-	}
-
-	claims := models.RefreshTokenClaims{}
-	_, err = jwt.ParseWithClaims(refreshToken, &claims, func(token *jwt.Token) (interface{}, error) {
-		return []byte(config.GetConfig().JWT.RefreshToken.Secret), nil
-	})
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
-		return
-	}
-
-	// Generate new access and refresh tokens
-	accessToken, newRefreshToken, err := GenerateJWT(claims.UserID)
+	// Generate JWT tokens
+	accessTokenResponse, err := GenAccessToken(user.ID.Hex())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tokens"})
 		return
 	}
 
-	// 將新的 refresh token 寫入 cookie
-	c.SetCookie("refresh_token", newRefreshToken, 3600*72, "/", "localhost", false, true)
-
-	// 返回新的 access token 給客戶端
-	c.JSON(http.StatusOK, gin.H{"access_token": accessToken})
+	// 返回 access token 給客戶端
+	c.JSON(http.StatusOK, gin.H{"access_token": accessTokenResponse.Token})
 }
 
 // 登出
 func (bc *BaseController) Logout(c *gin.Context) {
 	c.SetCookie("refresh_token", "", -1, "/", "localhost", false, true)
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
+}
+
+// 刷新 access token
+func (bc *BaseController) Refresh(c *gin.Context) {
+	token, err := c.Cookie("refresh_token")
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "No refresh token provided"})
+		return
+	}
+
+	// 資料庫檢查 refresh token 是否有效
+	refreshTokenCollection := bc.MongoConnect.Collection("refresh_tokens")
+	var refreshTokenDoc models.RefreshToken
+	err = refreshTokenCollection.FindOne(context.Background(), bson.M{"token": token, "expireAt": bson.M{"$gt": time.Now().Unix()}}).Decode(&refreshTokenDoc)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
+		return
+	}
+
+	// Generate new access
+	accessTokenResponse, err := GenAccessToken(refreshTokenDoc.UserID.Hex())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tokens"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"access_token": accessTokenResponse.Token})
 }
 
 // 取得用戶資訊
@@ -134,20 +158,21 @@ func (bc *BaseController) GetUserInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
-// 生成 JWT tokens
-func GenerateJWT(userID string) (string, string, error) {
+// 生成 access token
+func GenAccessToken(userID string) (TokenResponse, error) {
 	cfg := config.GetConfig()
 	accessTokenJwtSecret := []byte(cfg.JWT.AccessToken.Secret)
 	accessTokenExpireHours := cfg.JWT.AccessToken.ExpireHours
 
 	// 將小時轉換為分鐘
 	accessTokenExpireDuration := time.Duration(accessTokenExpireHours*60) * time.Minute
+	expiresAt := time.Now().Add(accessTokenExpireDuration).Unix()
 
 	// 設置 access token 的聲明
 	accessTokenClaims := models.AccessTokenClaims{
 		UserID: userID,
 		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(accessTokenExpireDuration).Unix(),
+			ExpiresAt: expiresAt,
 		},
 	}
 
@@ -156,20 +181,30 @@ func GenerateJWT(userID string) (string, string, error) {
 
 	accessTokenString, err := accessToken.SignedString(accessTokenJwtSecret)
 	if err != nil {
-		return "", "", err
+		return TokenResponse{}, err
 	}
 
+	return TokenResponse{
+		Token:     accessTokenString,
+		ExpiresAt: expiresAt,
+	}, nil
+}
+
+// 生成 refresh token
+func GenRefreshToken(userID string) (TokenResponse, error) {
+	cfg := config.GetConfig()
 	refreshTokenJwtSecret := []byte(cfg.JWT.RefreshToken.Secret)
 	refreshTokenExpireHours := cfg.JWT.RefreshToken.ExpireHours
 
 	// 將小時轉換為分鐘
 	refreshTokenExpireDuration := time.Duration(refreshTokenExpireHours*60) * time.Minute
+	expiresAt := time.Now().Add(refreshTokenExpireDuration).Unix()
 
 	// 設置 refresh token 的聲明
 	refreshTokenClaims := models.RefreshTokenClaims{
 		UserID: userID,
 		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(refreshTokenExpireDuration).Unix(),
+			ExpiresAt: expiresAt,
 		},
 	}
 
@@ -178,8 +213,11 @@ func GenerateJWT(userID string) (string, string, error) {
 
 	refreshTokenString, err := refreshToken.SignedString(refreshTokenJwtSecret)
 	if err != nil {
-		return "", "", err
+		return TokenResponse{}, err
 	}
 
-	return accessTokenString, refreshTokenString, nil
+	return TokenResponse{
+		Token:     refreshTokenString,
+		ExpiresAt: expiresAt,
+	}, nil
 }

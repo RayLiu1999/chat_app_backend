@@ -38,6 +38,7 @@ func SetupRoutes(r *gin.Engine) {
 	{
 		auth.POST("/register", baseController.Register)
 		auth.POST("/login", baseController.Login)
+		auth.POST("/auth/refresh", baseController.Refresh)
 	}
 
 	// 將多個中介軟體組合成一個切片
