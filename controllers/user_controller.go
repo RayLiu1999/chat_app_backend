@@ -128,7 +128,7 @@ func (bc *BaseController) Refresh(c *gin.Context) {
 	// 資料庫檢查 refresh token 是否有效
 	refreshTokenCollection := bc.MongoConnect.Collection("refresh_tokens")
 	var refreshTokenDoc models.RefreshToken
-	err = refreshTokenCollection.FindOne(context.Background(), bson.M{"token": token, "expireAt": bson.M{"$gt": time.Now().Unix()}}).Decode(&refreshTokenDoc)
+	err = refreshTokenCollection.FindOne(context.Background(), bson.M{"token": token, "expires_at": bson.M{"$gt": time.Now().Unix()}}).Decode(&refreshTokenDoc)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
 		return
