@@ -21,15 +21,19 @@ var upgrader = websocket.Upgrader{
 
 func HandleConnections() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// 升級初始 HTTP 連接為 WebSocket
 		ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 		if err != nil {
 			log.Fatal(err)
 		}
 		defer ws.Close()
 
-		username := c.GetString("username")
+		// 獲取用戶名並將其添加到 clients map 中
+		username := c.Query("username")
+		log.Printf("User %s connected", username)
 		clients[ws] = username
 
+		// 持續接收來自前端的訊息
 		for {
 			var msg models.Message
 			err := ws.ReadJSON(&msg)
@@ -38,24 +42,26 @@ func HandleConnections() gin.HandlerFunc {
 				delete(clients, ws)
 				break
 			}
-			msg.Username = username
 			broadcast <- msg
 		}
 	}
 }
 
-// func HandleMessages(db *mongo.Database) {
-// 	for {
-// 		msg := <-broadcast
-// 		msg.Save(db)
+func SendMessage(c *gin.Context) {
+	var msg models.Message
+	if err := c.ShouldBindJSON(&msg); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-// 		for client := range clients {
-// 			err := client.WriteJSON(msg)
-// 			if err != nil {
-// 				log.Printf("error: %v", err)
-// 				client.Close()
-// 				delete(clients, client)
-// 			}
-// 		}
-// 	}
-// }
+	// 將訊息發送到 broadcast 通道
+	broadcast <- msg
+}
+
+func HandleMessages() {
+	for {
+		// 從 broadcast 通道中讀取訊息
+		msg := <-broadcast
+		log.Printf("Message received: %v", msg)
+	}
+}

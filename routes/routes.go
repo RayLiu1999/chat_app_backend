@@ -32,24 +32,21 @@ func SetupRoutes(r *gin.Engine) {
 		MaxAge:           12 * time.Hour,                                                                     // 預檢請求的緩存時間
 	}))
 
-	auth := r.Group("/")
-
-	auth.Use(middlewares.VerifyCsrfToken())
-	{
-		auth.POST("/register", baseController.Register)
-		auth.POST("/login", baseController.Login)
-		auth.POST("/auth/refresh", baseController.Refresh)
-	}
-
 	// 將多個中介軟體組合成一個切片
-	middlewareArr := []gin.HandlerFunc{
-		middlewares.Auth(),
-		middlewares.VerifyCsrfToken(),
-		// 其他中介軟體
-	}
+	// middlewareArr := []gin.HandlerFunc{
+	// 	middlewares.Auth(),
+	// 	middlewares.VerifyCsrfToken(),
+	// 	// 其他中介軟體
+	// }
 
-	auth.Use(middlewareArr...)
-	{
-		auth.GET("/ws", controllers.HandleConnections())
-	}
+	csrf := r.Group("/")
+	csrf.Use(middlewares.VerifyCsrfToken())
+	csrf.POST("/register", baseController.Register)
+	csrf.POST("/login", baseController.Login)
+	csrf.POST("/auth/refresh", baseController.Refresh)
+
+	auth := r.Group("/auth")
+	auth.Use(middlewares.Auth())
+	auth.GET("/ws", controllers.HandleConnections())
+	auth.POST("/message", controllers.SendMessage)
 }
