@@ -11,19 +11,18 @@ import (
 func Auth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var accessToken string
+		var err error
+
 		if websocket.IsWebSocketUpgrade(c.Request) {
 			accessToken = c.Query("token")
 		} else {
 			// 判斷是否帶bearer token
-			authHeader := c.GetHeader("Authorization")
-			if authHeader == "" {
+			accessToken, err = services.GetAccessTokenByHeader(c)
+			if err != nil {
 				c.JSON(401, gin.H{"error": "Unauthorized"})
 				c.Abort()
 				return
 			}
-
-			// 驗證 token
-			accessToken = authHeader[len("Bearer "):]
 		}
 		log.Printf("accessToken: %s", accessToken)
 

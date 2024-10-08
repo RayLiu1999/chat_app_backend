@@ -43,10 +43,13 @@ func SetupRoutes(r *gin.Engine) {
 	csrf.Use(middlewares.VerifyCsrfToken())
 	csrf.POST("/register", baseController.Register)
 	csrf.POST("/login", baseController.Login)
-	csrf.POST("/auth/refresh", baseController.Refresh)
+	csrf.POST("/refresh_token", baseController.Refresh)
 
 	auth := r.Group("/auth")
 	auth.Use(middlewares.Auth())
-	auth.GET("/ws", controllers.HandleConnections())
-	auth.POST("/message", controllers.SendMessage)
+	auth.GET("/ws", baseController.HandleConnections)
+
+	auth.Use(middlewares.VerifyCsrfToken())
+	auth.POST("/message", baseController.SendMessage)
+	auth.GET("/user", baseController.GetUser)
 }

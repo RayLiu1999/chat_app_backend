@@ -8,6 +8,7 @@ import (
 	"chat_app_backend/models"
 
 	"github.com/dgrijalva/jwt-go"
+	"github.com/gin-gonic/gin"
 )
 
 // ValidateJWT 解析和驗證 JWT token
@@ -38,4 +39,32 @@ func ValidateAccessToken(tokenString string) (bool, error) {
 	}
 
 	return false, errors.New("invalid token")
+}
+
+func GetUserFromToken(tokenString string) (string, error) {
+	// 解析和驗證 JWT token
+	token, err := jwt.ParseWithClaims(tokenString, &models.AccessTokenClaims{}, func(token *jwt.Token) (interface{}, error) {
+		return []byte(config.GetConfig().JWT.AccessToken.Secret), nil
+	})
+	if err != nil {
+		return "", err
+	}
+
+	claims, ok := token.Claims.(*models.AccessTokenClaims)
+	if !ok {
+		return "", errors.New("invalid token")
+	}
+
+	return claims.UserID, nil
+}
+
+func GetAccessTokenByHeader(c *gin.Context) (string, error) {
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		return "", errors.New("no authorization header")
+	}
+
+	// 驗證 token
+	accessToken := authHeader[len("Bearer "):]
+	return accessToken, nil
 }

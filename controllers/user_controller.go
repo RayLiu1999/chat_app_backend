@@ -7,6 +7,7 @@ import (
 
 	"chat_app_backend/config"
 	"chat_app_backend/models"
+	"chat_app_backend/services"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
@@ -145,11 +146,16 @@ func (bc *BaseController) Refresh(c *gin.Context) {
 }
 
 // 取得用戶資訊
-func (bc *BaseController) GetUserInfo(c *gin.Context) {
-	userID := c.GetString("userID")
-	collection := bc.MongoConnect.Collection("users")
+func (bc *BaseController) GetUser(c *gin.Context) {
 	var user models.User
-	err := collection.FindOne(context.Background(), bson.M{"_id": userID}).Decode(&user)
+	var userID string
+	var err error
+
+	accessToken, _ := services.GetAccessTokenByHeader(c)
+	userID, err = services.GetUserFromToken(accessToken)
+	collection := bc.MongoConnect.Collection("users")
+
+	err = collection.FindOne(context.Background(), bson.M{"_id": userID}).Decode(&user)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
