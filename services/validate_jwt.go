@@ -9,6 +9,7 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // ValidateJWT 解析和驗證 JWT token
@@ -67,4 +68,24 @@ func GetAccessTokenByHeader(c *gin.Context) (string, error) {
 	// 驗證 token
 	accessToken := authHeader[len("Bearer "):]
 	return accessToken, nil
+}
+
+func GetUserIDFromHeader(c *gin.Context) (string, primitive.ObjectID, error) {
+	accessToken, err := GetAccessTokenByHeader(c)
+	if err != nil {
+		return "", primitive.NilObjectID, err
+	}
+
+	userID, err := GetUserFromToken(accessToken)
+	if err != nil {
+		return "", primitive.NilObjectID, err
+	}
+
+	// 將 userID 從字符串轉換為 ObjectID
+	objectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return "", primitive.NilObjectID, errors.New("invalid user ID")
+	}
+
+	return userID, objectID, nil
 }

@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"time"
 
@@ -22,6 +23,11 @@ type UserController struct {
 type TokenResponse struct {
 	Token     string
 	ExpiresAt int64
+}
+
+type APIUser struct {
+	Username string `json:"username"`
+	Email    string `json:"email"`
 }
 
 // 註冊
@@ -147,21 +153,23 @@ func (bc *BaseController) Refresh(c *gin.Context) {
 
 // 取得用戶資訊
 func (bc *BaseController) GetUser(c *gin.Context) {
-	var user models.User
-	var userID string
-	var err error
-
-	accessToken, _ := services.GetAccessTokenByHeader(c)
-	userID, err = services.GetUserFromToken(accessToken)
-	collection := bc.MongoConnect.Collection("users")
-
-	err = collection.FindOne(context.Background(), bson.M{"_id": userID}).Decode(&user)
+	userID, objectID, err := services.GetUserIDFromHeader(c)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	log.Printf("userID: %s", userID)
+	collection := bc.MongoConnect.Collection("users")
+
+	var apiUser APIUser
+	err = collection.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&apiUser)
+	if err != nil {
+		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: "User not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, apiUser)
 }
 
 // 生成 access token

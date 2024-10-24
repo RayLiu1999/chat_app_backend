@@ -13,6 +13,8 @@ func Auth() gin.HandlerFunc {
 		var accessToken string
 		var err error
 
+		log.Printf("Request URL: %s", c.Request.URL.Path)
+
 		if websocket.IsWebSocketUpgrade(c.Request) {
 			accessToken = c.Query("token")
 		} else {

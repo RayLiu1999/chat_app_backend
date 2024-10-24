@@ -45,11 +45,13 @@ func SetupRoutes(r *gin.Engine) {
 	csrf.POST("/login", baseController.Login)
 	csrf.POST("/refresh_token", baseController.Refresh)
 
-	auth := r.Group("/auth")
+	auth := r.Group("/")
 	auth.Use(middlewares.Auth())
 	auth.GET("/ws", baseController.HandleConnections)
+	auth.GET("/user", baseController.GetUser)
+	auth.GET("/servers", baseController.GetServerList)
 
+	// GET以外的請求需要驗證 CSRF Token
 	auth.Use(middlewares.VerifyCsrfToken())
 	auth.POST("/message", baseController.SendMessage)
-	auth.GET("/user", baseController.GetUser)
 }

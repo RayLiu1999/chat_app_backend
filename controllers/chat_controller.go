@@ -1,6 +1,9 @@
 package controllers
 
 import (
+	"chat_app_backend/models"
+	"chat_app_backend/services"
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -8,6 +11,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // 定義消息結構
@@ -144,4 +149,76 @@ func (room *Room) start() {
 		}
 		room.Lock.Unlock()
 	}
+}
+
+// 取得伺服器列表
+func (bc *BaseController) GetServerList(c *gin.Context) {
+	_, objectID, err := services.GetUserIDFromHeader(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	// 先把資料加到server和user_server表中
+	// serverCollection := bc.MongoConnect.Collection("servers")
+	// userServerCollection := bc.MongoConnect.Collection("user_server")
+
+	// var server models.Server
+	// server.ID = primitive.NewObjectID()
+	// server.Name = "server1"
+	// server.Picture = "https://via.placeholder.com/150"
+	// _, err = serverCollection.InsertOne(context.Background(), server)
+	// if err != nil {
+	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Error inserting server"})
+	// 	return
+	// }
+
+	// var userServer models.UserServer
+	// userServer.ID = primitive.NewObjectID()
+	// userServer.UserID = objectID
+	// userServer.ServerID = server.ID
+	// _, err = userServerCollection.InsertOne(context.Background(), userServer)
+	// if err != nil {
+	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Error inserting user server"})
+	// 	return
+	// }
+
+	// 取得伺服器ID清單
+	userServerCollection := bc.MongoConnect.Collection("user_server")
+	var userServerList []models.UserServer
+	cursor, err := userServerCollection.Find(context.Background(), bson.M{"user_id": objectID})
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "Error fetching user servers"})
+		return
+	}
+	if err := cursor.All(context.Background(), &userServerList); err != nil {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "Error decoding user servers"})
+		return
+	}
+
+	// 取得伺服器列表
+	serverCollection := bc.MongoConnect.Collection("servers")
+
+	// 提取所有的 server_id
+	var serverIDs []primitive.ObjectID
+	for _, userServer := range userServerList {
+		serverIDs = append(serverIDs, userServer.ServerID)
+	}
+
+	// 使用 $in 運算符一次性查詢所有的伺服器
+	filter := bson.M{"_id": bson.M{"$in": serverIDs}}
+	cursor, err = serverCollection.Find(context.Background(), filter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Error fetching servers"})
+		return
+	}
+	defer cursor.Close(context.Background())
+
+	var serverList []models.Server
+	if err = cursor.All(context.Background(), &serverList); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Error decoding servers"})
+		return
+	}
+
+	c.JSON(http.StatusOK, serverList)
 }

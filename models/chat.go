@@ -69,3 +69,20 @@ type FriendRequest struct {
 	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
 	UpdateAt  time.Time          `json:"update_at" bson:"update_at"`
 }
+
+// 聊天室
+type ChatRoom struct {
+	ID        primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+	Name      string             `json:"name" bson:"name"`
+	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
+	UpdateAt  time.Time          `json:"update_at" bson:"update_at"`
+}
+
+// 聊天室與使用者關聯
+type ChatRoomParticipants struct {
+	ID         primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+	UserID     primitive.ObjectID `json:"user_id" bson:"user_id"`
+	ChatRoomID primitive.ObjectID `json:"chat_room_id" bson:"chat_room_id"`
+	CreatedAt  time.Time          `json:"created_at" bson:"created_at"`
+	UpdateAt   time.Time          `json:"update_at" bson:"update_at"`
+}
