@@ -53,5 +53,5 @@ func SetupRoutes(r *gin.Engine) {
 
 	// GET以外的請求需要驗證 CSRF Token
 	auth.Use(middlewares.VerifyCsrfToken())
-	auth.POST("/message", baseController.SendMessage)
+	// auth.POST("/message", baseController.SendMessage)
 }

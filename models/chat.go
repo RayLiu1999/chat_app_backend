@@ -8,20 +8,33 @@ import (
 
 // 伺服器
 type Server struct {
-	ID          primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-	Name        string             `json:"name" bson:"name"`
-	Picture     string             `json:"picture" bson:"picture"`
-	Description string             `json:"description" bson:"description"`
-	OwnerID     primitive.ObjectID `json:"owner_id" bson:"owner_id"`
-	CreatedAt   time.Time          `json:"created_at" bson:"created_at"`
-	UpdateAt    time.Time          `json:"update_at" bson:"update_at"`
+	ID          primitive.ObjectID   `json:"id,omitempty" bson:"_id,omitempty"`
+	Name        string               `json:"name" bson:"name"`
+	Picture     string               `json:"picture" bson:"picture"`
+	Description string               `json:"description" bson:"description"`
+	OwnerID     primitive.ObjectID   `json:"owner_id" bson:"owner_id"`
+	Channels    []primitive.ObjectID `json:"channels" bson:"channels"`
+	Members     []Member             `json:"members" bson:"members"` // 伺服器成員
+	CreatedAt   time.Time            `json:"created_at" bson:"created_at"`
+	UpdateAt    time.Time            `json:"update_at" bson:"update_at"`
 }
 
-// 頻道
-type Channel struct {
+type Member struct {
+	UserID   primitive.ObjectID `json:"user_id" bson:"user_id"`
+	JoinedAt time.Time          `json:"joined_at" bson:"joined_at"`
+	// RoleID       primitive.ObjectID `json:"role_id,omitempty" bson:"role_id,omitempty"`
+	Nickname     string    `json:"nickname" bson:"nickname"`
+	LastActiveAt time.Time `json:"last_active_at" bson:"last_active_at"`
+}
+
+// 聊天室(頻道或私聊)
+type ChatRoom struct {
 	ID          primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-	Name        string             `json:"name" bson:"name"`
-	Description string             `json:"description" bson:"description"`
+	Name        string             `json:"name,omitempty" bson:"name,omitempty"` // 頻道名稱或對話名稱（私聊可選）
+	Type        string             `json:"type" bson:"type"`                     // "channel" 或 "dm"
+	channelType string             `json:"channel_type" bson:"channel_type"`     // "text" 或 "voice"
+	CreatedAt   time.Time          `json:"created_at" bson:"created_at"`
+	UpdatedAt   time.Time          `json:"updated_at" bson:"updated_at"`
 }
 
 // 訊息
@@ -39,41 +52,6 @@ type UserServer struct {
 	ID        primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
 	UserID    primitive.ObjectID `json:"user_id" bson:"user_id"`
 	ServerID  primitive.ObjectID `json:"server_id" bson:"server_id"`
-	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
-	UpdateAt  time.Time          `json:"update_at" bson:"update_at"`
-}
-
-// 使用者與頻道關聯
-// type UserChannel struct {
-// 	ID        primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-// 	UserID    primitive.ObjectID `json:"user_id" bson:"user_id"`
-// 	ChannelID primitive.ObjectID `json:"channel_id" bson:"channel_id"`
-// 	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
-// 	UpdateAt  time.Time          `json:"update_at" bson:"update_at"`
-// }
-
-// 好友
-type Friend struct {
-	ID        primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-	UserID    primitive.ObjectID `json:"user_id" bson:"user_id"`
-	FriendID  primitive.ObjectID `json:"friend_id" bson:"friend_id"`
-	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
-	UpdateAt  time.Time          `json:"update_at" bson:"update_at"`
-}
-
-// 好友請求
-type FriendRequest struct {
-	ID        primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-	InviterID primitive.ObjectID `json:"inviter_id" bson:"inviter_id"`
-	InviteeID primitive.ObjectID `json:"invitee_id" bson:"invitee_id"`
-	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
-	UpdateAt  time.Time          `json:"update_at" bson:"update_at"`
-}
-
-// 聊天室
-type ChatRoom struct {
-	ID        primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-	Name      string             `json:"name" bson:"name"`
 	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
 	UpdateAt  time.Time          `json:"update_at" bson:"update_at"`
 }

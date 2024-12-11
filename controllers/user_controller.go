@@ -26,8 +26,11 @@ type TokenResponse struct {
 }
 
 type APIUser struct {
-	Username string `json:"username"`
-	Email    string `json:"email"`
+	ID       string `json:"id" bson:"_id"`
+	Username string `json:"username" bson:"username"`
+	Email    string `json:"email" bson:"email"`
+	NickName string `json:"nick_name" bson:"nick_name"`
+	Picture  string `json:"picture" bson:"picture"`
 }
 
 // 註冊
