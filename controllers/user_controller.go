@@ -2,13 +2,13 @@ package controllers
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"time"
 
 	"chat_app_backend/config"
 	"chat_app_backend/models"
 	"chat_app_backend/services"
+	"chat_app_backend/utils"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
@@ -113,12 +113,12 @@ func (bc *BaseController) Login(c *gin.Context) {
 	// Generate JWT tokens
 	accessTokenResponse, err := GenAccessToken(user.ID.Hex())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tokens"})
+		utils.ErrorResponse(c, http.StatusInternalServerError, err, "Failed to generate tokens")
 		return
 	}
 
 	// 返回 access token 給客戶端
-	c.JSON(http.StatusOK, gin.H{"access_token": accessTokenResponse.Token})
+	utils.SuccessResponse(c, gin.H{"access_token": accessTokenResponse.Token}, "Login successfully")
 }
 
 // 登出
@@ -156,13 +156,13 @@ func (bc *BaseController) Refresh(c *gin.Context) {
 
 // 取得用戶資訊
 func (bc *BaseController) GetUser(c *gin.Context) {
-	userID, objectID, err := services.GetUserIDFromHeader(c)
+	_, objectID, err := services.GetUserIDFromHeader(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: err.Error()})
 		return
 	}
 
-	log.Printf("userID: %s", userID)
+	// log.Printf("userID: %s", userID)
 	collection := bc.MongoConnect.Collection("users")
 
 	var apiUser APIUser

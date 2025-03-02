@@ -61,7 +61,7 @@
   - `Authorization`: 用戶的 access token
 - **回應**: 返回所有聊天頻道的清單
 
-## GET /chat_rooms
+## GET /rooms
 - **描述**: 獲取用戶加入的聊天室清單
 - **Header**:
   - `Authorization`: 用戶的 access token

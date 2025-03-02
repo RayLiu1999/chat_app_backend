@@ -13,7 +13,7 @@ type Server struct {
 	Picture     string               `json:"picture" bson:"picture"`
 	Description string               `json:"description" bson:"description"`
 	OwnerID     primitive.ObjectID   `json:"owner_id" bson:"owner_id"`
-	Channels    []primitive.ObjectID `json:"channels" bson:"channels"`
+	Rooms       []primitive.ObjectID `json:"rooms" bson:"rooms"`
 	Members     []Member             `json:"members" bson:"members"` // 伺服器成員
 	CreatedAt   time.Time            `json:"created_at" bson:"created_at"`
 	UpdateAt    time.Time            `json:"update_at" bson:"update_at"`
@@ -28,7 +28,7 @@ type Member struct {
 }
 
 // 聊天室(頻道或私聊)
-type ChatRoom struct {
+type Room struct {
 	ID          primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
 	Name        string             `json:"name,omitempty" bson:"name,omitempty"` // 頻道名稱或對話名稱（私聊可選）
 	Type        string             `json:"type" bson:"type"`                     // "channel" 或 "dm"
@@ -40,9 +40,11 @@ type ChatRoom struct {
 // 訊息
 type Message struct {
 	ID         primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+	Type       string             `json:"type" bson:"type"` // "channel" or "dm"
 	Content    string             `json:"content" bson:"content"`
 	SenderID   primitive.ObjectID `json:"sender_id" bson:"sender_id"`
 	ReceiverID primitive.ObjectID `json:"receiver_id" bson:"receiver_id"`
+	RoomID     primitive.ObjectID `json:"room_id" bson:"room_id"`
 	CreatedAt  time.Time          `json:"created_at" bson:"created_at"`
 	UpdateAt   time.Time          `json:"update_at" bson:"update_at"`
 }
@@ -57,10 +59,10 @@ type UserServer struct {
 }
 
 // 聊天室與使用者關聯
-type ChatRoomParticipants struct {
-	ID         primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-	UserID     primitive.ObjectID `json:"user_id" bson:"user_id"`
-	ChatRoomID primitive.ObjectID `json:"chat_room_id" bson:"chat_room_id"`
-	CreatedAt  time.Time          `json:"created_at" bson:"created_at"`
-	UpdateAt   time.Time          `json:"update_at" bson:"update_at"`
+type RoomParticipants struct {
+	ID        primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+	UserID    primitive.ObjectID `json:"user_id" bson:"user_id"`
+	RoomID    primitive.ObjectID `json:"room_id" bson:"room_id"`
+	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
+	UpdateAt  time.Time          `json:"update_at" bson:"update_at"`
 }

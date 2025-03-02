@@ -43,6 +43,7 @@ func SetupRoutes(r *gin.Engine) {
 	csrf.Use(middlewares.VerifyCsrfToken())
 	csrf.POST("/register", baseController.Register)
 	csrf.POST("/login", baseController.Login)
+	csrf.POST("/logout", baseController.Logout)
 	csrf.POST("/refresh_token", baseController.Refresh)
 
 	auth := r.Group("/")
@@ -50,6 +51,8 @@ func SetupRoutes(r *gin.Engine) {
 	auth.GET("/ws", baseController.HandleConnections)
 	auth.GET("/user", baseController.GetUser)
 	auth.GET("/servers", baseController.GetServerList)
+	// auth.GET("/channels/:server_id", baseController.GetChannelList)
+	// auth.GET("/messages/:room_id", baseController.GetMessages)
 
 	// GET以外的請求需要驗證 CSRF Token
 	auth.Use(middlewares.VerifyCsrfToken())
