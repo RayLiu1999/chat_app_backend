@@ -4,6 +4,8 @@ import (
 	"chat_app_backend/config"
 	"chat_app_backend/controllers"
 	"chat_app_backend/middlewares"
+	"chat_app_backend/repositories"
+	"chat_app_backend/services"
 	"time"
 
 	"chat_app_backend/database"
@@ -19,8 +21,13 @@ func SetupRoutes(r *gin.Engine) {
 	// 初始化資料庫連接
 	mongodb := database.MongoDBConnect()
 
+	// 獲取服務實例
+	chatService := services.NewChatService(repositories.NewChatRepository(cfg, mongodb), repositories.NewServerRepository(cfg, mongodb))
+	userService := services.NewUserService(cfg, mongodb, repositories.NewUserRepository(cfg, mongodb))
+
 	// 初始化控制器
-	baseController := controllers.NewBaseController(cfg, mongodb)
+	userController := controllers.NewUserController(cfg, mongodb, userService)
+	chatController := controllers.NewChatController(cfg, mongodb, chatService, userService)
 
 	// 設定 CORS 中介軟體
 	r.Use(cors.New(cors.Config{
@@ -41,18 +48,18 @@ func SetupRoutes(r *gin.Engine) {
 
 	csrf := r.Group("/")
 	csrf.Use(middlewares.VerifyCsrfToken())
-	csrf.POST("/register", baseController.Register)
-	csrf.POST("/login", baseController.Login)
-	csrf.POST("/logout", baseController.Logout)
-	csrf.POST("/refresh_token", baseController.Refresh)
+	csrf.POST("/register", userController.Register)
+	csrf.POST("/login", userController.Login)
+	csrf.POST("/logout", userController.Logout)
+	csrf.POST("/refresh_token", userController.Refresh)
 
 	auth := r.Group("/")
 	auth.Use(middlewares.Auth())
-	auth.GET("/ws", baseController.HandleConnections)
-	auth.GET("/user", baseController.GetUser)
-	auth.GET("/servers", baseController.GetServerList)
-	// auth.GET("/channels/:server_id", baseController.GetChannelList)
-	// auth.GET("/messages/:room_id", baseController.GetMessages)
+	auth.GET("/ws", chatController.HandleConnections)
+	auth.GET("/user", userController.GetUser)
+	auth.GET("/servers", chatController.GetServerList)
+	// auth.GET("/channels/:server_id", chatController.GetChannelList)
+	// auth.GET("/messages/:room_id", chatController.GetMessages)
 
 	// GET以外的請求需要驗證 CSRF Token
 	auth.Use(middlewares.VerifyCsrfToken())

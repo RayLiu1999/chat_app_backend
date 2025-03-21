@@ -2,7 +2,6 @@ package middlewares
 
 import (
 	"chat_app_backend/services"
-	"log"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -12,8 +11,6 @@ func Auth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var accessToken string
 		var err error
-
-		log.Printf("Request URL: %s", c.Request.URL.Path)
 
 		if websocket.IsWebSocketUpgrade(c.Request) {
 			accessToken = c.Query("token")
@@ -26,7 +23,6 @@ func Auth() gin.HandlerFunc {
 				return
 			}
 		}
-		log.Printf("accessToken: %s", accessToken)
 
 		res, err := services.ValidateAccessToken(accessToken)
 		if err != nil || !res {

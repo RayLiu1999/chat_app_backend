@@ -6,7 +6,6 @@ import (
 	"chat_app_backend/config"
 	"chat_app_backend/database"
 	"chat_app_backend/routes"
-	"chat_app_backend/services"
 
 	"github.com/gin-gonic/gin"
 )
@@ -28,9 +27,6 @@ func main() {
 
 	// 設置路由
 	routes.SetupRoutes(r)
-
-	// 初始化並啟動聊天服務
-	services.InitChatService()
 
 	// 啟動服務器
 	log.Println("Server starting on :" + cfg.Server.Port)

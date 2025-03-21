@@ -13,11 +13,22 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type UserController struct {
-	*BaseController
+	config       *config.Config
+	mongoConnect *mongo.Database
+	userService  services.UserServiceInterface
+}
+
+func NewUserController(cfg *config.Config, mongodb *mongo.Database, userService services.UserServiceInterface) *UserController {
+	return &UserController{
+		config:       cfg,
+		mongoConnect: mongodb,
+		userService:  userService,
+	}
 }
 
 type TokenResponse struct {
@@ -34,7 +45,7 @@ type APIUser struct {
 }
 
 // 註冊
-func (bc *BaseController) Register(c *gin.Context) {
+func (uc *UserController) Register(c *gin.Context) {
 	var user models.User
 	if err := c.ShouldBindJSON(&user); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -42,7 +53,7 @@ func (bc *BaseController) Register(c *gin.Context) {
 	}
 
 	// 檢查用戶名是否已存在
-	collection := bc.MongoConnect.Collection("users")
+	collection := uc.mongoConnect.Collection("users")
 	var existingUser models.User
 	err := collection.FindOne(context.Background(), bson.M{"username": user.Username, "email": user.Email}).Decode(&existingUser)
 	if err == nil {
@@ -63,14 +74,14 @@ func (bc *BaseController) Register(c *gin.Context) {
 }
 
 // 登入
-func (bc *BaseController) Login(c *gin.Context) {
+func (uc *UserController) Login(c *gin.Context) {
 	var loginUser models.User
 	if err := c.ShouldBindJSON(&loginUser); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	collection := bc.MongoConnect.Collection("users")
+	collection := uc.mongoConnect.Collection("users")
 	var user models.User
 	err := collection.FindOne(context.Background(), bson.M{"email": loginUser.Email}).Decode(&user)
 	if err != nil {
@@ -92,7 +103,7 @@ func (bc *BaseController) Login(c *gin.Context) {
 	}
 
 	// 將 refresh token 寫入 資料庫
-	refreshTokenCollection := bc.MongoConnect.Collection("refresh_tokens")
+	refreshTokenCollection := uc.mongoConnect.Collection("refresh_tokens")
 	var refreshTokenDoc = models.RefreshToken{
 		UserID:    user.ID,
 		Token:     refreshTokenResponse.Token,
@@ -122,13 +133,13 @@ func (bc *BaseController) Login(c *gin.Context) {
 }
 
 // 登出
-func (bc *BaseController) Logout(c *gin.Context) {
+func (uc *UserController) Logout(c *gin.Context) {
 	c.SetCookie("refresh_token", "", -1, "/", "localhost", false, true)
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
 
 // 刷新 access token
-func (bc *BaseController) Refresh(c *gin.Context) {
+func (uc *UserController) Refresh(c *gin.Context) {
 	token, err := c.Cookie("refresh_token")
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "No refresh token provided"})
@@ -136,7 +147,7 @@ func (bc *BaseController) Refresh(c *gin.Context) {
 	}
 
 	// 資料庫檢查 refresh token 是否有效
-	refreshTokenCollection := bc.MongoConnect.Collection("refresh_tokens")
+	refreshTokenCollection := uc.mongoConnect.Collection("refresh_tokens")
 	var refreshTokenDoc models.RefreshToken
 	err = refreshTokenCollection.FindOne(context.Background(), bson.M{"token": token, "expires_at": bson.M{"$gt": time.Now().Unix()}}).Decode(&refreshTokenDoc)
 	if err != nil {
@@ -155,7 +166,7 @@ func (bc *BaseController) Refresh(c *gin.Context) {
 }
 
 // 取得用戶資訊
-func (bc *BaseController) GetUser(c *gin.Context) {
+func (uc *UserController) GetUser(c *gin.Context) {
 	_, objectID, err := services.GetUserIDFromHeader(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: err.Error()})
@@ -163,7 +174,7 @@ func (bc *BaseController) GetUser(c *gin.Context) {
 	}
 
 	// log.Printf("userID: %s", userID)
-	collection := bc.MongoConnect.Collection("users")
+	collection := uc.mongoConnect.Collection("users")
 
 	var apiUser APIUser
 	err = collection.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&apiUser)

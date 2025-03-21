@@ -2,10 +2,12 @@ package services
 
 import (
 	"chat_app_backend/models"
+	"chat_app_backend/repositories"
 	"context"
 	"encoding/json"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -81,40 +83,16 @@ type ChatService struct {
 	Register        chan *Client                   // 註冊通道
 	Unregister      chan *Client                   // 註銷通道
 	Lock            sync.Mutex                     // 保護共享資源的鎖
+	chatRepo        repositories.ChatRepositoryInterface
+	serverRepo      repositories.ServerRepositoryInterface
 }
 
-// 全局聊天室實例
-var (
-	chatService *ChatService
-	once        sync.Once
-	runOnce     sync.Once // 添加新的 once 實例
-)
-
-// GetChatService 獲取全局聊天服務實例
-func GetChatService() *ChatService {
-	once.Do(func() {
-		if chatService == nil {
-			chatService = NewChatService()
-		}
-	})
-	return chatService
-}
-
-// InitChatService 初始化並啟動聊天服務
-func InitChatService() {
-	// 獲取服務實例(確保服務有被初始化)
-	cs := GetChatService()
-	if cs == nil {
-		log.Fatal("Failed to initialize chat service")
-		return
-	}
-
-	StartService() // 啟動服務
-}
+// 用於確保服務只啟動一次的鎖
+var runOnce sync.Once
 
 // NewChatService 初始化聊天室服務
-func NewChatService() *ChatService {
-	return &ChatService{
+func NewChatService(chatRepo repositories.ChatRepositoryInterface, serverRepo repositories.ServerRepositoryInterface) *ChatService {
+	cs := &ChatService{
 		Clients:         make(map[*Client]bool),
 		ClientsByUserID: make(map[primitive.ObjectID]*Client),
 		Rooms:           make(map[string]map[*Client]bool),
@@ -122,19 +100,20 @@ func NewChatService() *ChatService {
 		Broadcast:       make(chan Message, 1),  // 增加緩衝，為了避免訊息發送時阻塞
 		Register:        make(chan *Client, 10), // 增加緩衝，為了避免使用者重連ws時阻塞
 		Unregister:      make(chan *Client, 10), // 增加緩衝，為了避免使用者重連ws時阻塞
+		chatRepo:        chatRepo,
+		serverRepo:      serverRepo,
 	}
-}
 
-// StartService 啟動聊天室服務
-func StartService() {
+	// 確保聊天服務只啟動一次
 	runOnce.Do(func() {
-		cs := GetChatService()
 		go func() {
 			log.Printf("===== ChatService run goroutine 開始啟動 =====")
 			cs.run()
 			log.Printf("===== ChatService run goroutine 已結束 =====") // 這行正常情況下不應該被執行到
 		}()
 	})
+
+	return cs
 }
 
 // run 處理所有的聊天室邏輯
@@ -365,6 +344,58 @@ func (cs *ChatService) writePump(client *Client) {
 	}
 }
 
+// 寫入聊天資料表記錄
+func (cs *ChatService) writeChatRecord(message Message) {
+	// 將 WebSocket 消息轉換為數據庫模型
+	dbMessage := models.Message{
+		ID:        primitive.NewObjectID(),
+		Type:      message.Type,
+		Content:   message.Text,
+		CreatedAt: time.Now(),
+		UpdateAt:  time.Now(),
+	}
+
+	// 轉換 UserID 為 ObjectID
+	senderID, err := primitive.ObjectIDFromHex(message.UserID)
+	if err != nil {
+		log.Printf("無效的用戶ID: %v", err)
+		return
+	}
+	dbMessage.SenderID = senderID
+
+	// 轉換 RoomID 為 ObjectID
+	roomID, err := primitive.ObjectIDFromHex(message.RoomID)
+	if err != nil {
+		log.Printf("無效的房間ID: %v", err)
+		return
+	}
+	dbMessage.RoomID = roomID
+
+	// 如果是伺服器消息，則不設置接收者ID
+	if message.Type == "dm" && message.RoomID != "" {
+		// 對於私聊消息，我們需要找出接收者ID
+		// 這裡假設私聊房間只有兩個人
+		cs.Lock.Lock()
+		if room, ok := cs.Rooms[message.RoomID]; ok {
+			for client := range room {
+				if client.UserID.Hex() != message.UserID {
+					dbMessage.ReceiverID = client.UserID
+					break
+				}
+			}
+		}
+		cs.Lock.Unlock()
+	}
+
+	// 保存消息到數據庫
+	_, err = cs.chatRepo.SaveMessage(dbMessage)
+	if err != nil {
+		log.Printf("保存聊天記錄失敗: %v", err)
+	} else {
+		log.Printf("聊天記錄已保存到數據庫, 消息ID: %s", dbMessage.ID.Hex())
+	}
+}
+
 // updateClientStatus 更新客戶端狀態
 func (cs *ChatService) updateClientStatus(client *Client, status string) {
 	cs.Lock.Lock()
@@ -456,8 +487,8 @@ func (cs *ChatService) handleConnectionClose(client *Client, code int, text stri
 }
 
 // GetServerListByUserId 獲取用戶的伺服器列表
-func (bs *BaseService) GetServerListByUserId(objectID primitive.ObjectID) ([]models.Server, error) {
-	servers, err := bs.repo.GetServerListByUserId(objectID)
+func (cs *ChatService) GetServerListByUserId(objectID primitive.ObjectID) ([]models.Server, error) {
+	servers, err := cs.serverRepo.GetServerListByUserId(objectID)
 	if err != nil {
 		return nil, err
 	}
@@ -466,7 +497,7 @@ func (bs *BaseService) GetServerListByUserId(objectID primitive.ObjectID) ([]mod
 }
 
 // AddServer 添加新伺服器
-func (bs *BaseService) AddServer(server *models.Server) (models.Server, error) {
+func (cs *ChatService) AddServer(server *models.Server) (models.Server, error) {
 	// ... 保持原有的實現 ...
 	return models.Server{}, nil
 }
