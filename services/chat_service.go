@@ -1,6 +1,7 @@
 package services
 
 import (
+	"chat_app_backend/config"
 	"chat_app_backend/models"
 	"chat_app_backend/repositories"
 	"context"
@@ -12,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // Client 代表一個WebSocket客戶端
@@ -75,6 +77,10 @@ type WsMessage struct {
 
 // ChatService 管理所有的聊天功能
 type ChatService struct {
+	config          *config.Config
+	mongoConnect    *mongo.Database
+	chatRepo        repositories.ChatRepositoryInterface
+	serverRepo      repositories.ServerRepositoryInterface
 	Clients         map[*Client]bool               // 所有連接的客戶端
 	ClientsByUserID map[primitive.ObjectID]*Client // 用戶ID到客戶端的映射
 	Rooms           map[string]map[*Client]bool    // 房間到客戶端的映射
@@ -83,16 +89,18 @@ type ChatService struct {
 	Register        chan *Client                   // 註冊通道
 	Unregister      chan *Client                   // 註銷通道
 	Lock            sync.Mutex                     // 保護共享資源的鎖
-	chatRepo        repositories.ChatRepositoryInterface
-	serverRepo      repositories.ServerRepositoryInterface
 }
 
 // 用於確保服務只啟動一次的鎖
 var runOnce sync.Once
 
 // NewChatService 初始化聊天室服務
-func NewChatService(chatRepo repositories.ChatRepositoryInterface, serverRepo repositories.ServerRepositoryInterface) *ChatService {
+func NewChatService(cfg *config.Config, mongodb *mongo.Database, chatRepo repositories.ChatRepositoryInterface, serverRepo repositories.ServerRepositoryInterface) *ChatService {
 	cs := &ChatService{
+		config:          cfg,
+		mongoConnect:    mongodb,
+		chatRepo:        chatRepo,
+		serverRepo:      serverRepo,
 		Clients:         make(map[*Client]bool),
 		ClientsByUserID: make(map[primitive.ObjectID]*Client),
 		Rooms:           make(map[string]map[*Client]bool),
@@ -100,8 +108,6 @@ func NewChatService(chatRepo repositories.ChatRepositoryInterface, serverRepo re
 		Broadcast:       make(chan Message, 1),  // 增加緩衝，為了避免訊息發送時阻塞
 		Register:        make(chan *Client, 10), // 增加緩衝，為了避免使用者重連ws時阻塞
 		Unregister:      make(chan *Client, 10), // 增加緩衝，為了避免使用者重連ws時阻塞
-		chatRepo:        chatRepo,
-		serverRepo:      serverRepo,
 	}
 
 	// 確保聊天服務只啟動一次
@@ -286,6 +292,9 @@ func (cs *ChatService) readPump(client *Client) {
 			log.Printf("訊息內容: %+v", msg)
 			log.Printf("userId: %s", msg.UserID)
 
+			// 儲存訊息
+			cs.SaveMessage(msg)
+
 			switch msg.Type {
 			case "dm":
 				// msg.UserID = client.ID
@@ -345,12 +354,15 @@ func (cs *ChatService) writePump(client *Client) {
 }
 
 // 寫入聊天資料表記錄
-func (cs *ChatService) writeChatRecord(message Message) {
+func (cs *ChatService) SaveMessage(message Message) {
 	// 將 WebSocket 消息轉換為數據庫模型
 	dbMessage := models.Message{
-		ID:        primitive.NewObjectID(),
-		Type:      message.Type,
-		Content:   message.Text,
+		ID:   primitive.NewObjectID(),
+		Type: message.Type,
+		Text: message.Text,
+		// SenderID:   message.SenderID,
+		// ReceiverID: message.ReceiverID,
+		// RoomID:     message.RoomID,
 		CreatedAt: time.Now(),
 		UpdateAt:  time.Now(),
 	}
@@ -484,20 +496,4 @@ func (cs *ChatService) handleConnectionClose(client *Client, code int, text stri
 	default:
 		log.Printf("客戶端 %s 其他關閉情況: %d", client.ID, code)
 	}
-}
-
-// GetServerListByUserId 獲取用戶的伺服器列表
-func (cs *ChatService) GetServerListByUserId(objectID primitive.ObjectID) ([]models.Server, error) {
-	servers, err := cs.serverRepo.GetServerListByUserId(objectID)
-	if err != nil {
-		return nil, err
-	}
-
-	return servers, nil
-}
-
-// AddServer 添加新伺服器
-func (cs *ChatService) AddServer(server *models.Server) (models.Server, error) {
-	// ... 保持原有的實現 ...
-	return models.Server{}, nil
 }

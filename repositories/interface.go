@@ -18,8 +18,8 @@ type ServerRepositoryInterface interface {
 	// GetServerListByUserId 獲取用戶的伺服器列表
 	GetServerListByUserId(objectID primitive.ObjectID) ([]models.Server, error)
 
-	// AddServer 新建測試用戶伺服器關聯
-	AddServer(server *models.Server) (models.Server, error)
+	// CreateServer 新建測試用戶伺服器關聯
+	CreateServer(server *models.Server) (models.Server, error)
 }
 
 type UserRepositoryInterface interface {

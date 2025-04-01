@@ -6,6 +6,7 @@ import (
 	"chat_app_backend/middlewares"
 	"chat_app_backend/repositories"
 	"chat_app_backend/services"
+	"path/filepath"
 	"time"
 
 	"chat_app_backend/database"
@@ -22,12 +23,19 @@ func SetupRoutes(r *gin.Engine) {
 	mongodb := database.MongoDBConnect()
 
 	// 獲取服務實例
-	chatService := services.NewChatService(repositories.NewChatRepository(cfg, mongodb), repositories.NewServerRepository(cfg, mongodb))
 	userService := services.NewUserService(cfg, mongodb, repositories.NewUserRepository(cfg, mongodb))
+	chatService := services.NewChatService(cfg, mongodb, repositories.NewChatRepository(cfg, mongodb), repositories.NewServerRepository(cfg, mongodb))
+	serverService := services.NewServerService(cfg, mongodb, repositories.NewServerRepository(cfg, mongodb))
 
 	// 初始化控制器
 	userController := controllers.NewUserController(cfg, mongodb, userService)
 	chatController := controllers.NewChatController(cfg, mongodb, chatService, userService)
+	serverController := controllers.NewServerController(cfg, mongodb, serverService, userService)
+
+	// 設定靜態文件服務
+	// 使用絕對路徑，確保在任何環境下都可以正確訪問上傳的文件
+	uploadsAbsPath := filepath.Join(".", "uploads")
+	r.Static("/uploads", uploadsAbsPath)
 
 	// 設定 CORS 中介軟體
 	r.Use(cors.New(cors.Config{
@@ -57,7 +65,8 @@ func SetupRoutes(r *gin.Engine) {
 	auth.Use(middlewares.Auth())
 	auth.GET("/ws", chatController.HandleConnections)
 	auth.GET("/user", userController.GetUser)
-	auth.GET("/servers", chatController.GetServerList)
+	auth.GET("/servers", serverController.GetServerList)
+	auth.POST("/servers", serverController.CreateServer)
 	// auth.GET("/channels/:server_id", chatController.GetChannelList)
 	// auth.GET("/messages/:room_id", chatController.GetMessages)
 

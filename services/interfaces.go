@@ -27,11 +27,21 @@ type ChatServiceInterface interface {
 	// HandleConnection 處理 WebSocket 連接
 	HandleConnection(userID primitive.ObjectID, ws *websocket.Conn)
 
-	// SendMessage 發送消息到聊天室
-	// HandleNewMessage(message models.Message)
+	// SaveMessage 儲存聊天訊息
+	SaveMessage(message Message)
 
+	// 其他已實現的方法應該添加到這裡
+	// ... 其他方法 ...
+}
+
+// ServerServiceInterface 定義了伺服器服務的接口
+// 所有與伺服器相關的業務邏輯方法都應該在這裡声明
+type ServerServiceInterface interface {
 	// GetServerListByUserId 獲取用戶的伺服器列表
-	GetServerListByUserId(userID primitive.ObjectID) ([]models.Server, error)
+	GetServerListByUserId(objectID primitive.ObjectID) ([]models.Server, error)
+
+	// CreateServer 新建測試用戶伺服器關聯
+	CreateServer(server *models.Server) (models.Server, error)
 
 	// 其他已實現的方法應該添加到這裡
 	// ... 其他方法 ...

@@ -5,6 +5,7 @@ import (
 	"chat_app_backend/models"
 	"context"
 	"log"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -37,14 +38,26 @@ func (sr *ServerRepository) GetServerListByUserId(objectID primitive.ObjectID) (
 	return servers, nil
 }
 
-func (sr *ServerRepository) AddServer(server *models.Server) (models.Server, error) {
-	var collection = sr.mongoConnect.Collection("servers")
+func (sr *ServerRepository) CreateServer(server *models.Server) (models.Server, error) {
+	collection := sr.mongoConnect.Collection("servers")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	// 新建測試用戶伺服器關聯
-	_, err := collection.InsertOne(context.Background(), server)
+	result, err := collection.InsertOne(ctx, server)
 	if err != nil {
+		log.Printf("保存伺服器失敗: %v", err)
 		return models.Server{}, err
 	}
-	log.Println("Server added: %v", server)
+
+	// 將插入結果的ID轉換為ObjectID
+	id, ok := result.InsertedID.(primitive.ObjectID)
+	if !ok {
+		log.Printf("無法獲取插入的伺服器ID")
+		return models.Server{}, err
+	}
+
+	// 更新伺服器ID
+	server.ID = id
+
 	return *server, nil
 }

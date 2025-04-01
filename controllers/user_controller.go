@@ -48,7 +48,7 @@ type APIUser struct {
 func (uc *UserController) Register(c *gin.Context) {
 	var user models.User
 	if err := c.ShouldBindJSON(&user); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		utils.ErrorResponse(c, http.StatusBadRequest, utils.ErrInvalidParams, "請求參數錯誤")
 		return
 	}
 
@@ -57,7 +57,7 @@ func (uc *UserController) Register(c *gin.Context) {
 	var existingUser models.User
 	err := collection.FindOne(context.Background(), bson.M{"username": user.Username, "email": user.Email}).Decode(&existingUser)
 	if err == nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "User already exists!"})
+		utils.ErrorResponse(c, http.StatusConflict, utils.ErrUsernameExists, "該用戶名已被使用")
 		return
 	}
 
@@ -66,18 +66,18 @@ func (uc *UserController) Register(c *gin.Context) {
 
 	_, err = collection.InsertOne(context.Background(), user)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error creating user!"})
+		utils.ErrorResponse(c, http.StatusInternalServerError, utils.ErrInternalServer, "伺服器內部錯誤")
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "User created successfully"})
+	utils.SuccessResponse(c, nil, "用戶創建成功", 0)
 }
 
 // 登入
 func (uc *UserController) Login(c *gin.Context) {
 	var loginUser models.User
 	if err := c.ShouldBindJSON(&loginUser); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		utils.ErrorResponse(c, http.StatusBadRequest, utils.ErrInvalidParams, "請求參數錯誤")
 		return
 	}
 
@@ -85,20 +85,20 @@ func (uc *UserController) Login(c *gin.Context) {
 	var user models.User
 	err := collection.FindOne(context.Background(), bson.M{"email": loginUser.Email}).Decode(&user)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		utils.ErrorResponse(c, http.StatusUnauthorized, utils.ErrLoginFailed, "登入失敗，請檢查用戶名和密碼")
 		return
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginUser.Password))
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		utils.ErrorResponse(c, http.StatusUnauthorized, utils.ErrLoginFailed, "登入失敗，請檢查用戶名和密碼")
 		return
 	}
 
 	// Generate JWT tokens
 	refreshTokenResponse, err := GenRefreshToken(user.ID.Hex())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tokens"})
+		utils.ErrorResponse(c, http.StatusInternalServerError, utils.ErrInternalServer, "伺服器內部錯誤")
 		return
 	}
 
@@ -114,7 +114,7 @@ func (uc *UserController) Login(c *gin.Context) {
 	}
 	_, err = refreshTokenCollection.InsertOne(context.Background(), refreshTokenDoc)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tokens"})
+		utils.ErrorResponse(c, http.StatusInternalServerError, utils.ErrInternalServer, "伺服器內部錯誤")
 		return
 	}
 
@@ -124,25 +124,25 @@ func (uc *UserController) Login(c *gin.Context) {
 	// Generate JWT tokens
 	accessTokenResponse, err := GenAccessToken(user.ID.Hex())
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusInternalServerError, err, "Failed to generate tokens")
+		utils.ErrorResponse(c, http.StatusInternalServerError, utils.ErrInternalServer, "伺服器內部錯誤")
 		return
 	}
 
 	// 返回 access token 給客戶端
-	utils.SuccessResponse(c, gin.H{"access_token": accessTokenResponse.Token}, "Login successfully")
+	utils.SuccessResponse(c, gin.H{"access_token": accessTokenResponse.Token}, "登入成功", 0)
 }
 
 // 登出
 func (uc *UserController) Logout(c *gin.Context) {
 	c.SetCookie("refresh_token", "", -1, "/", "localhost", false, true)
-	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
+	utils.SuccessResponse(c, nil, "登出成功", 0)
 }
 
 // 刷新 access token
 func (uc *UserController) Refresh(c *gin.Context) {
 	token, err := c.Cookie("refresh_token")
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "No refresh token provided"})
+		utils.ErrorResponse(c, http.StatusUnauthorized, utils.ErrUnauthorized, "未提供刷新令牌")
 		return
 	}
 
@@ -151,39 +151,38 @@ func (uc *UserController) Refresh(c *gin.Context) {
 	var refreshTokenDoc models.RefreshToken
 	err = refreshTokenCollection.FindOne(context.Background(), bson.M{"token": token, "expires_at": bson.M{"$gt": time.Now().Unix()}}).Decode(&refreshTokenDoc)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
+		utils.ErrorResponse(c, http.StatusUnauthorized, utils.ErrInvalidToken, "無效的刷新令牌")
 		return
 	}
 
 	// Generate new access
 	accessTokenResponse, err := GenAccessToken(refreshTokenDoc.UserID.Hex())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tokens"})
+		utils.ErrorResponse(c, http.StatusInternalServerError, utils.ErrInternalServer, "伺服器內部錯誤")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"access_token": accessTokenResponse.Token})
+	utils.SuccessResponse(c, gin.H{"access_token": accessTokenResponse.Token}, "令牌刷新成功", 0)
 }
 
 // 取得用戶資訊
 func (uc *UserController) GetUser(c *gin.Context) {
-	_, objectID, err := services.GetUserIDFromHeader(c)
+	_, objectID, err := utils.GetUserIDFromHeader(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: err.Error()})
+		utils.ErrorResponse(c, http.StatusUnauthorized, utils.ErrUnauthorized, "未授權的請求")
 		return
 	}
 
-	// log.Printf("userID: %s", userID)
 	collection := uc.mongoConnect.Collection("users")
 
 	var apiUser APIUser
 	err = collection.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&apiUser)
 	if err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: "User not found"})
+		utils.ErrorResponse(c, http.StatusNotFound, utils.ErrUserNotFound, "使用者不存在")
 		return
 	}
 
-	c.JSON(http.StatusOK, apiUser)
+	utils.SuccessResponse(c, apiUser, "使用者資訊獲取成功", 0)
 }
 
 // 生成 access token

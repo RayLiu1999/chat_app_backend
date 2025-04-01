@@ -1,0 +1,29 @@
+package models
+
+import (
+	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
+
+// 伺服器
+type Server struct {
+	ID          primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+	Name        string             `json:"name" bson:"name"`
+	Picture     string             `json:"picture" bson:"picture"`
+	Description string             `json:"description" bson:"description"`
+	OwnerID     primitive.ObjectID `json:"owner_id" bson:"owner_id"`
+	// Rooms       []primitive.ObjectID `json:"rooms" bson:"rooms"`
+	Members   []Member  `json:"members" bson:"members"` // 伺服器成員
+	CreatedAt time.Time `json:"created_at" bson:"created_at"`
+	UpdateAt  time.Time `json:"update_at" bson:"update_at"`
+}
+
+// 使用者與伺服器關聯
+type UserServer struct {
+	ID        primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+	UserID    primitive.ObjectID `json:"user_id" bson:"user_id"`
+	ServerID  primitive.ObjectID `json:"server_id" bson:"server_id"`
+	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
+	UpdateAt  time.Time          `json:"update_at" bson:"update_at"`
+}

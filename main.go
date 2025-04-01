@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"chat_app_backend/config"
 	"chat_app_backend/database"
@@ -27,6 +28,12 @@ func main() {
 
 	// 設置路由
 	routes.SetupRoutes(r)
+
+	// 確保上傳目錄存在
+	err = os.MkdirAll("uploads", 0755)
+	if err != nil {
+		log.Fatalf("無法創建上傳目錄: %v", err)
+	}
 
 	// 啟動服務器
 	log.Println("Server starting on :" + cfg.Server.Port)

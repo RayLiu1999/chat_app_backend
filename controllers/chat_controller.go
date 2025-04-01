@@ -2,9 +2,7 @@ package controllers
 
 import (
 	"chat_app_backend/config"
-	"chat_app_backend/models"
 	"chat_app_backend/services"
-	"chat_app_backend/utils"
 	"log"
 	"net/http"
 
@@ -70,53 +68,4 @@ func (cc *ChatController) HandleConnections(c *gin.Context) {
 
 	// 使用聊天服務處理連接
 	cc.chatService.HandleConnection(objectID, ws)
-}
-
-// 取得伺服器列表
-func (cc *ChatController) GetServerList(c *gin.Context) {
-	// 取得使用者ID
-	_, objectID, err := services.GetUserIDFromHeader(c)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: err.Error()})
-		return
-	}
-
-	_, err = cc.userService.GetUserById(objectID)
-	if err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: "User not found"})
-		return
-	}
-
-	// var members = []models.Member{
-	// 	{
-	// 		UserID: objectID,
-	// 	},
-	// }
-
-	// // 新建測試伺服器
-	// server := &models.Server{
-	// 	ID:          primitive.NewObjectID(),
-	// 	Name:        "server2",
-	// 	Picture:     "https://via.placeholder.com/150",
-	// 	Description: "This is a test server",
-	// 	OwnerID:     objectID,
-	// 	Channels:    []primitive.ObjectID{},
-	// 	Members:     members,
-	// 	CreatedAt:   time.Now(),
-	// 	UpdateAt:    time.Now(),
-	// }
-
-	// _, err = bc.service.AddServer(server)
-	// if err != nil {
-	// 	log.Println(err)
-	// }
-
-	servers, err := cc.chatService.GetServerListByUserId(objectID)
-	// log.Println("Servers:", servers)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: err.Error()})
-		return
-	}
-
-	utils.SuccessResponse(c, servers, "Success")
 }

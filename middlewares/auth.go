@@ -1,7 +1,7 @@
 package middlewares
 
 import (
-	"chat_app_backend/services"
+	"chat_app_backend/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -16,17 +16,17 @@ func Auth() gin.HandlerFunc {
 			accessToken = c.Query("token")
 		} else {
 			// 判斷是否帶bearer token
-			accessToken, err = services.GetAccessTokenByHeader(c)
+			accessToken, err = utils.GetAccessTokenByHeader(c)
 			if err != nil {
-				c.JSON(401, gin.H{"error": "Unauthorized"})
+				utils.ErrorResponse(c, 401, utils.ErrUnauthorized, "未授權的請求")
 				c.Abort()
 				return
 			}
 		}
 
-		res, err := services.ValidateAccessToken(accessToken)
+		res, err := utils.ValidateAccessToken(accessToken)
 		if err != nil || !res {
-			c.JSON(401, gin.H{"error": "Unauthorized"})
+			utils.ErrorResponse(c, 401, utils.ErrInvalidToken, "無效的 Token")
 			c.Abort()
 			return
 		}
