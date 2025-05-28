@@ -5,29 +5,30 @@ import (
 	"os"
 
 	"chat_app_backend/config"
-	"chat_app_backend/database"
+	"chat_app_backend/providers"
 	"chat_app_backend/routes"
 
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	// 获取全局配置
+	// 取得全局配置
 	cfg := config.GetConfig()
 
-	gin.SetMode(cfg.Server.Mode)
-
-	// 初始化數據庫連接
-	_, err := database.ConnectDatabase()
+	// 初始化資料庫連接
+	mongodb, err := providers.DBConnect[*providers.MongoWrapper]("mongodb")
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		mongodb.Close()
+		log.Fatalf("Failed to connect to MongoDB: %v", err)
 	}
+
+	gin.SetMode(cfg.Server.Mode)
 
 	// 初始化 Gin
 	r := gin.Default()
 
 	// 設置路由
-	routes.SetupRoutes(r)
+	routes.SetupRoutes(r, cfg, mongodb)
 
 	// 確保上傳目錄存在
 	err = os.MkdirAll("uploads", 0755)

@@ -20,7 +20,7 @@ type Config struct {
 	} `mapstructure:"server"`
 	AllowedOrigins []string `mapstructure:"allowed_origins"`
 	Database       struct {
-		Type    string `mapstructure:"type"` // 数据库类型
+		Type    string `mapstructure:"type"` // 資料庫類型
 		MongoDB struct {
 			Host       string `mapstructure:"host"`
 			Port       string `mapstructure:"port"`
@@ -29,21 +29,14 @@ type Config struct {
 			DBName     string `mapstructure:"dbname"`
 			AuthSource string `mapstructure:"authSource"`
 		} `mapstructure:"mongodb"`
-		// MySQL struct {
-		// 	Host     string `mapstructure:"host"`
-		// 	Port     string `mapstructure:"port"`
-		// 	Username string `mapstructure:"username"`
-		// 	Password string `mapstructure:"password"`
-		// 	DBName   string `mapstructure:"dbname"`
-		// } `mapstructure:"mysql"`
-
-		// PostgreSQL struct {
-		// 	Host     string `mapstructure:"host"`
-		// 	Port     string `mapstructure:"port"`
-		// 	Username string `mapstructure:"username"`
-		// 	Password string `mapstructure:"password"`
-		// 	DBName   string `mapstructure:"dbname"`
-		// } `mapstructure:"postgresql"`
+		PostgreSQL struct {
+			Host     string `mapstructure:"host"`
+			Port     string `mapstructure:"port"`
+			Username string `mapstructure:"username"`
+			Password string `mapstructure:"password"`
+			DBName   string `mapstructure:"dbname"`
+			SSLMode  string `mapstructure:"sslmode"`
+		} `mapstructure:"postgresql"`
 	} `mapstructure:"database"`
 	JWT struct {
 		AccessToken struct {
@@ -52,13 +45,13 @@ type Config struct {
 		} `mapstructure:"access_token"`
 
 		RefreshToken struct {
-			Secret      string  `mapstructure: "secret"`
+			Secret      string  `mapstructure:"secret"`
 			ExpireHours float32 `mapstructure:"expire_hours"`
 		} `mapstructure:"refresh_token"`
 	} `mapstructure:"jwt"`
 }
 
-// GetConfig 使用单例模式加载配置
+// GetConfig 使用單例模式載入配置
 func GetConfig() *Config {
 	once.Do(func() {
 		// 獲取當前工作目錄

@@ -5,7 +5,6 @@ server:
 allowed_origins:
 
 database:
-  type: "mongodb"
   mongodb:
     host: "localhost"
     port: "27017"
@@ -13,6 +12,12 @@ database:
     password: ""
     dbname: ""
     authSource: "admin"
+  postgresql:
+    host: ""
+    port: ""
+    username: ""
+    password: ""
+    dbname: ""
 
 jwt:
   access_token:
