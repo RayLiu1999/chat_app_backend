@@ -10,7 +10,7 @@ const (
 
 	// 認證錯誤
 	ErrUnauthorized = 2000 // 未授權的請求
-	ErrLoginFailed  = 2001 // 登入失敗，請檢查用戶名和密碼
+	ErrLoginFailed  = 2001 // 登入失敗，請檢查信箱或密碼
 	ErrLoginExpired = 2002 // 您的登入已過期，請重新登入
 	ErrNoPermission = 2003 // 您沒有權限進行此操作
 	ErrInvalidToken = 2004 // 無效的 Token
@@ -19,6 +19,10 @@ const (
 	ErrUserNotFound   = 3000 // 使用者不存在
 	ErrUsernameExists = 3001 // 該用戶名已被使用
 	ErrEmailExists    = 3002 // 該信箱已被使用
+
+	// 好友相關錯誤
+	ErrFriendExists        = 3500 // 已經是好友
+	ErrFriendRequestExists = 3501 // 已經有好友請求
 
 	// 伺服器相關錯誤
 	ErrServerNotFound     = 4000 // 伺服器不存在
@@ -49,7 +53,7 @@ func GetErrorMessage(code int) string {
 	case ErrUnauthorized:
 		return "未授權的請求"
 	case ErrLoginFailed:
-		return "登入失敗，請檢查用戶名和密碼"
+		return "登入失敗，請檢查信箱或密碼"
 	case ErrLoginExpired:
 		return "您的登入已過期，請重新登入"
 	case ErrNoPermission:
@@ -64,6 +68,12 @@ func GetErrorMessage(code int) string {
 		return "該用戶名已被使用"
 	case ErrEmailExists:
 		return "該信箱已被使用"
+
+	// 好友相關錯誤
+	case ErrFriendExists:
+		return "已經是好友"
+	case ErrFriendRequestExists:
+		return "已經有好友請求"
 
 	// 伺服器相關錯誤
 	case ErrServerNotFound:

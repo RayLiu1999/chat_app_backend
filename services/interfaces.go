@@ -30,6 +30,18 @@ type ChatServiceInterface interface {
 	// SaveMessage 儲存聊天訊息
 	SaveMessage(message Message)
 
+	// GetChatListByUserID 獲取用戶的聊天列表
+	GetChatListByUserID(userID primitive.ObjectID, includeDeleted bool) ([]models.Chat, error)
+
+	// UpdateChatListDeleteStatus 更新聊天列表的刪除狀態
+	UpdateChatListDeleteStatus(userID, chatWithUserID primitive.ObjectID, isDeleted bool) error
+
+	// SaveChat 保存聊天列表
+	SaveChat(chatList models.Chat) (models.ChatResponse, error)
+
+	// GetChatResponseList 獲取聊天列表response
+	GetChatResponseList(userID primitive.ObjectID, includeDeleted bool) ([]models.ChatResponse, error)
+
 	// 其他已實現的方法應該添加到這裡
 	// ... 其他方法 ...
 }
@@ -45,4 +57,9 @@ type ServerServiceInterface interface {
 
 	// 其他已實現的方法應該添加到這裡
 	// ... 其他方法 ...
+}
+
+type FriendServiceInterface interface {
+	// GetFriendById 根據ID獲取好友信息
+	GetFriendById(objectID primitive.ObjectID) (*models.Friend, error)
 }

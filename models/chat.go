@@ -6,11 +6,13 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+// 成員結構
 type Member struct {
 	UserID   primitive.ObjectID `json:"user_id" bson:"user_id"`
+	UserName string             `json:"user_name" bson:"user_name"`
+	Nickname string             `json:"nickname" bson:"nickname"`
 	JoinedAt time.Time          `json:"joined_at" bson:"joined_at"`
 	// RoleID       primitive.ObjectID `json:"role_id,omitempty" bson:"role_id,omitempty"`
-	Nickname     string    `json:"nickname" bson:"nickname"`
 	LastActiveAt time.Time `json:"last_active_at" bson:"last_active_at"`
 }
 
@@ -24,6 +26,15 @@ type Room struct {
 	UpdatedAt   time.Time          `json:"updated_at" bson:"updated_at"`
 }
 
+// 聊天室與使用者關聯
+type RoomParticipants struct {
+	ID        primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+	UserID    primitive.ObjectID `json:"user_id" bson:"user_id"`
+	RoomID    primitive.ObjectID `json:"room_id" bson:"room_id"`
+	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
+	UpdatedAt time.Time          `json:"updated_at" bson:"updated_at"`
+}
+
 // 訊息
 type Message struct {
 	ID         primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
@@ -33,14 +44,15 @@ type Message struct {
 	ReceiverID primitive.ObjectID `json:"receiver_id" bson:"receiver_id"`
 	RoomID     primitive.ObjectID `json:"room_id" bson:"room_id"`
 	CreatedAt  time.Time          `json:"created_at" bson:"created_at"`
-	UpdateAt   time.Time          `json:"update_at" bson:"update_at"`
+	UpdatedAt  time.Time          `json:"updated_at" bson:"updated_at"`
 }
 
-// 聊天室與使用者關聯
-type RoomParticipants struct {
-	ID        primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-	UserID    primitive.ObjectID `json:"user_id" bson:"user_id"`
-	RoomID    primitive.ObjectID `json:"room_id" bson:"room_id"`
-	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
-	UpdateAt  time.Time          `json:"update_at" bson:"update_at"`
+// 聊天紀錄
+type Chat struct {
+	ID             primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+	UserID         primitive.ObjectID `json:"user_id" bson:"user_id"`
+	ChatWithUserID primitive.ObjectID `json:"chat_with_user_id" bson:"chat_with_user_id"`
+	IsDeleted      bool               `json:"is_deleted" bson:"is_deleted"` // 標記記錄是否被「刪除」（實際上只是隱藏）
+	CreatedAt      time.Time          `json:"created_at" bson:"created_at"`
+	UpdatedAt      time.Time          `json:"updated_at" bson:"updated_at"` // 最後聊天時間(用來排序)
 }

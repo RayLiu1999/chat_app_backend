@@ -33,3 +33,20 @@ func (ur *UserRepository) GetUserById(objectId primitive.ObjectID) (*models.User
 
 	return &user, nil
 }
+
+func (ur *UserRepository) GetUserListByIds(objectIds []primitive.ObjectID) ([]models.User, error) {
+	var users []models.User
+	var collection = ur.mongoConnect.Collection("users")
+
+	cursor, err := collection.Find(context.Background(), bson.M{"_id": bson.M{"$in": objectIds}})
+	if err != nil {
+		return nil, err
+	}
+
+	err = cursor.All(context.Background(), &users)
+	if err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}

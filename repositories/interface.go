@@ -12,6 +12,15 @@ type ChatRepositoryInterface interface {
 
 	// GetMessagesByRoomID 根據房間ID獲取消息
 	GetMessagesByRoomID(roomID primitive.ObjectID, limit int64) ([]models.Message, error)
+
+	// GetChatListByUserID 獲取用戶的聊天列表
+	GetChatListByUserID(userID primitive.ObjectID, includeDeleted bool) ([]models.Chat, error)
+
+	// UpdateChatListDeleteStatus 更新聊天列表的刪除狀態
+	UpdateChatListDeleteStatus(userID, chatWithUserID primitive.ObjectID, isDeleted bool) error
+
+	// SaveOrUpdateChat 保存或更新聊天列表
+	SaveOrUpdateChat(chat models.Chat) (models.Chat, error)
 }
 
 type ServerRepositoryInterface interface {
@@ -25,4 +34,12 @@ type ServerRepositoryInterface interface {
 type UserRepositoryInterface interface {
 	// GetUserById 根據用戶ID獲取用戶
 	GetUserById(objectID primitive.ObjectID) (*models.User, error)
+
+	// GetUserListByIds 根據用戶ID陣列獲取用戶
+	GetUserListByIds(objectIds []primitive.ObjectID) ([]models.User, error)
+}
+
+type FriendRepositoryInterface interface {
+	// GetFriendById 根據用戶ID獲取用戶
+	GetFriendById(objectID primitive.ObjectID) (*models.Friend, error)
 }

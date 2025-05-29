@@ -37,19 +37,19 @@ func (sc *ServerController) GetServerList(c *gin.Context) {
 	// 取得使用者ID
 	_, objectID, err := utils.GetUserIDFromHeader(c)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusUnauthorized, utils.ErrUnauthorized, "未授權的請求")
+		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{Code: utils.ErrUnauthorized})
 		return
 	}
 
 	_, err = sc.userService.GetUserById(objectID)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusNotFound, utils.ErrUserNotFound, "使用者不存在")
+		utils.ErrorResponse(c, http.StatusNotFound, utils.MessageOptions{Code: utils.ErrUserNotFound})
 		return
 	}
 
 	servers, err := sc.serverService.GetServerListByUserId(objectID)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusInternalServerError, utils.ErrInternalServer, "伺服器內部錯誤")
+		utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{Code: utils.ErrInternalServer})
 		return
 	}
 
@@ -65,7 +65,7 @@ func (sc *ServerController) GetServerList(c *gin.Context) {
 	}
 
 	// 返回響應
-	utils.SuccessResponse(c, serverResponses, "伺服器列表獲取成功", 0)
+	utils.SuccessResponse(c, serverResponses, utils.MessageOptions{Message: "伺服器列表獲取成功"})
 }
 
 // 建立伺服器
@@ -73,13 +73,13 @@ func (sc *ServerController) CreateServer(c *gin.Context) {
 	// 取得使用者ID
 	_, objectID, err := utils.GetUserIDFromHeader(c)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusUnauthorized, utils.ErrUnauthorized, "未授權的請求")
+		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{Code: utils.ErrUnauthorized})
 		return
 	}
 
 	_, err = sc.userService.GetUserById(objectID)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusNotFound, utils.ErrUserNotFound, "使用者不存在")
+		utils.ErrorResponse(c, http.StatusNotFound, utils.MessageOptions{Code: utils.ErrUserNotFound})
 		return
 	}
 
@@ -88,7 +88,7 @@ func (sc *ServerController) CreateServer(c *gin.Context) {
 	picture, err := c.FormFile("picture")
 	if err != nil {
 		log.Printf("Error getting file: %v", err)
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.ErrInvalidParams, "請求參數錯誤")
+		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{Code: utils.ErrInvalidParams})
 		return
 	}
 
@@ -96,7 +96,7 @@ func (sc *ServerController) CreateServer(c *gin.Context) {
 	err = c.SaveUploadedFile(picture, "uploads/"+picture.Filename)
 	if err != nil {
 		log.Printf("Error saving file: %v", err)
-		utils.ErrorResponse(c, http.StatusInternalServerError, utils.ErrInternalServer, "伺服器內部錯誤")
+		utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{Code: utils.ErrInternalServer})
 		return
 	}
 
@@ -108,14 +108,14 @@ func (sc *ServerController) CreateServer(c *gin.Context) {
 		OwnerID:     objectID,
 		Members:     []models.Member{{UserID: objectID}},
 		CreatedAt:   time.Now(),
-		UpdateAt:    time.Now(),
+		UpdatedAt:   time.Now(),
 	}
 
 	// 建立伺服器
 	createdServer, err := sc.serverService.CreateServer(server)
 	if err != nil {
 		log.Printf("Error creating server: %v", err)
-		utils.ErrorResponse(c, http.StatusInternalServerError, utils.ErrInternalServer, "伺服器內部錯誤")
+		utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{Code: utils.ErrInternalServer})
 		return
 	}
 
@@ -128,5 +128,5 @@ func (sc *ServerController) CreateServer(c *gin.Context) {
 	}
 
 	// 返回響應
-	utils.SuccessResponse(c, serverResponse, "伺服器創建成功", 0, true)
+	utils.SuccessResponse(c, serverResponse, utils.MessageOptions{Message: "伺服器創建成功"})
 }

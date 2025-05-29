@@ -16,7 +16,7 @@ type Server struct {
 	// Rooms       []primitive.ObjectID `json:"rooms" bson:"rooms"`
 	Members   []Member  `json:"members" bson:"members"` // 伺服器成員
 	CreatedAt time.Time `json:"created_at" bson:"created_at"`
-	UpdateAt  time.Time `json:"update_at" bson:"update_at"`
+	UpdatedAt time.Time `json:"updated_at" bson:"updated_at"`
 }
 
 // 使用者與伺服器關聯
@@ -25,5 +25,5 @@ type UserServer struct {
 	UserID    primitive.ObjectID `json:"user_id" bson:"user_id"`
 	ServerID  primitive.ObjectID `json:"server_id" bson:"server_id"`
 	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
-	UpdateAt  time.Time          `json:"update_at" bson:"update_at"`
+	UpdatedAt time.Time          `json:"updated_at" bson:"updated_at"`
 }

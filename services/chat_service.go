@@ -81,6 +81,7 @@ type ChatService struct {
 	mongoConnect    *mongo.Database
 	chatRepo        repositories.ChatRepositoryInterface
 	serverRepo      repositories.ServerRepositoryInterface
+	userRepo        repositories.UserRepositoryInterface
 	Clients         map[*Client]bool               // 所有連接的客戶端
 	ClientsByUserID map[primitive.ObjectID]*Client // 用戶ID到客戶端的映射
 	Rooms           map[string]map[*Client]bool    // 房間到客戶端的映射
@@ -95,12 +96,13 @@ type ChatService struct {
 var runOnce sync.Once
 
 // NewChatService 初始化聊天室服務
-func NewChatService(cfg *config.Config, mongodb *mongo.Database, chatRepo repositories.ChatRepositoryInterface, serverRepo repositories.ServerRepositoryInterface) *ChatService {
+func NewChatService(cfg *config.Config, mongodb *mongo.Database, chatRepo repositories.ChatRepositoryInterface, serverRepo repositories.ServerRepositoryInterface, userRepo repositories.UserRepositoryInterface) *ChatService {
 	cs := &ChatService{
 		config:          cfg,
 		mongoConnect:    mongodb,
 		chatRepo:        chatRepo,
 		serverRepo:      serverRepo,
+		userRepo:        userRepo,
 		Clients:         make(map[*Client]bool),
 		ClientsByUserID: make(map[primitive.ObjectID]*Client),
 		Rooms:           make(map[string]map[*Client]bool),
@@ -364,7 +366,7 @@ func (cs *ChatService) SaveMessage(message Message) {
 		// ReceiverID: message.ReceiverID,
 		// RoomID:     message.RoomID,
 		CreatedAt: time.Now(),
-		UpdateAt:  time.Now(),
+		UpdatedAt: time.Now(),
 	}
 
 	// 轉換 UserID 為 ObjectID
@@ -405,6 +407,29 @@ func (cs *ChatService) SaveMessage(message Message) {
 		log.Printf("保存聊天記錄失敗: %v", err)
 	} else {
 		log.Printf("聊天記錄已保存到數據庫, 消息ID: %s", dbMessage.ID.Hex())
+
+		// 如果是私聊消息，更新聊天列表
+		if message.Type == "dm" {
+			// 為發送者更新聊天列表
+			senderChat := models.Chat{
+				UserID:         senderID,
+				ChatWithUserID: dbMessage.ReceiverID,
+			}
+			_, err = cs.chatRepo.SaveOrUpdateChat(senderChat)
+			if err != nil {
+				log.Printf("更新發送者聊天列表失敗: %v", err)
+			}
+
+			// 為接收者更新聊天列表
+			receiverChat := models.Chat{
+				UserID:         dbMessage.ReceiverID,
+				ChatWithUserID: senderID,
+			}
+			_, err = cs.chatRepo.SaveOrUpdateChat(receiverChat)
+			if err != nil {
+				log.Printf("更新接收者聊天列表失敗: %v", err)
+			}
+		}
 	}
 }
 
@@ -485,15 +510,94 @@ func (cs *ChatService) unregisterClient(client *Client) {
 
 // 添加一個輔助函數來處理連接關閉
 func (cs *ChatService) handleConnectionClose(client *Client, code int, text string) {
-	log.Printf("WebSocket 連接關閉事件 - 客戶端: %s, 代碼: %d, 原因: %s", client.ID, code, text)
-	switch code {
-	case websocket.CloseGoingAway:
-		log.Printf("客戶端 %s 正常離開（頁面關閉/刷新）", client.ID)
-	case websocket.CloseAbnormalClosure:
-		log.Printf("客戶端 %s 異常關閉", client.ID)
-	case websocket.CloseNoStatusReceived:
-		log.Printf("客戶端 %s 沒有發送關閉狀態就斷開了", client.ID)
-	default:
-		log.Printf("客戶端 %s 其他關閉情況: %d", client.ID, code)
+	log.Printf("處理連接關閉: 客戶端=%s, 代碼=%d, 文本=%s", client.ID, code, text)
+
+	// 取消客戶端的上下文
+	client.CancelCtx()
+
+	// 註銷客戶端
+	cs.Unregister <- client
+
+	// 關閉連接
+	if err := client.Conn.Close(); err != nil {
+		log.Printf("關閉客戶端連接失敗: %v", err)
 	}
+}
+
+// GetChatListByUserID 獲取用戶的聊天列表
+func (cs *ChatService) GetChatListByUserID(userID primitive.ObjectID, includeDeleted bool) ([]models.Chat, error) {
+	return cs.chatRepo.GetChatListByUserID(userID, includeDeleted)
+}
+
+// UpdateChatListDeleteStatus 更新聊天列表的刪除狀態
+func (cs *ChatService) UpdateChatListDeleteStatus(userID, chatWithUserID primitive.ObjectID, isDeleted bool) error {
+	return cs.chatRepo.UpdateChatListDeleteStatus(userID, chatWithUserID, isDeleted)
+}
+
+// SaveChat 保存聊天列表
+func (cs *ChatService) SaveChat(chat models.Chat) (models.ChatResponse, error) {
+	chat, err := cs.chatRepo.SaveOrUpdateChat(chat)
+	if err != nil {
+		return models.ChatResponse{}, err
+	}
+
+	// 取得用戶
+	user, err := cs.userRepo.GetUserById(chat.ChatWithUserID)
+	if err != nil {
+		return models.ChatResponse{}, err
+	}
+
+	chatResponse := models.ChatResponse{
+		ID:        chat.ID,
+		UserID:    chat.ChatWithUserID,
+		Nickname:  user.Nickname,
+		Picture:   user.Picture,
+		CreatedAt: chat.CreatedAt,
+		UpdatedAt: chat.UpdatedAt,
+	}
+
+	return chatResponse, err
+}
+
+// 取得聊天記錄response
+func (cs *ChatService) GetChatResponseList(userID primitive.ObjectID, includeDeleted bool) ([]models.ChatResponse, error) {
+	chatList, err := cs.GetChatListByUserID(userID, includeDeleted)
+	if err != nil {
+		return nil, err
+	}
+
+	var userIds []primitive.ObjectID
+	for _, chat := range chatList {
+		userIds = append(userIds, chat.ChatWithUserID)
+	}
+
+	// 取得用戶id陣列
+	userList, err := cs.userRepo.GetUserListByIds(userIds)
+	if err != nil {
+		return nil, err
+	}
+
+	userListById := make(map[primitive.ObjectID]models.User)
+	for _, user := range userList {
+		userListById[user.ID] = user
+	}
+
+	// 轉換為 ChatResponse 格式
+	chatResponseList := []models.ChatResponse{}
+	for _, chat := range chatList {
+		user, ok := userListById[chat.ChatWithUserID]
+		if !ok {
+			continue
+		}
+		chatResponseList = append(chatResponseList, models.ChatResponse{
+			ID:        chat.ID,
+			UserID:    chat.ChatWithUserID,
+			Nickname:  user.Nickname,
+			Picture:   user.Picture,
+			CreatedAt: chat.CreatedAt,
+			UpdatedAt: chat.UpdatedAt,
+		})
+	}
+
+	return chatResponseList, nil
 }
