@@ -1,0 +1,302 @@
+package providers
+
+import (
+	"context"
+	"errors"
+	"reflect"
+	"time"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+)
+
+// ODM 錯誤定義
+var (
+	ErrInvalidModel     = errors.New("無效的模型結構")
+	ErrDocumentNotFound = errors.New("文檔不存在")
+	ErrInvalidID        = errors.New("無效的ID格式")
+	ErrNoDocumentID     = errors.New("文檔沒有ID欄位")
+)
+
+// Model 介面定義所有模型必須實現的方法
+type Model interface {
+	GetID() primitive.ObjectID
+	SetID(id primitive.ObjectID)
+	GetCollectionName() string
+}
+
+// BaseModel 提供基本模型功能的實現
+type BaseModel struct {
+	ID        primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
+	UpdatedAt time.Time          `json:"updated_at" bson:"updated_at"`
+}
+
+// GetID 獲取文檔ID
+func (m *BaseModel) GetID() primitive.ObjectID {
+	return m.ID
+}
+
+// SetID 設置文檔ID
+func (m *BaseModel) SetID(id primitive.ObjectID) {
+	m.ID = id
+}
+
+// GetBaseModel 返回 BaseModel 指標
+func (m *BaseModel) GetBaseModel() *BaseModel {
+	return m
+}
+
+// ODM 提供對模型的資料庫操作
+type ODM struct {
+	db *mongo.Database
+}
+
+// NewODM 創建新的ODM實例
+func NewODM(db *mongo.Database) *ODM {
+	return &ODM{
+		db: db,
+	}
+}
+
+// Collection 獲取模型對應的集合
+func (o *ODM) Collection(model Model) *mongo.Collection {
+	return o.db.Collection(model.GetCollectionName())
+}
+
+// Create 創建新文檔
+func (o *ODM) Create(ctx context.Context, model Model) error {
+	if reflect.ValueOf(model).Kind() != reflect.Ptr {
+		return ErrInvalidModel
+	}
+
+	// 設置創建和更新時間
+	v := reflect.ValueOf(model).Elem()
+	if baseField := v.FieldByName("BaseModel"); baseField.IsValid() {
+		now := time.Now()
+		baseModel := baseField.Addr().Interface().(*BaseModel)
+		baseModel.CreatedAt = now
+		baseModel.UpdatedAt = now
+	}
+
+	// 如果ID為空，則生成新ID
+	if model.GetID().IsZero() {
+		model.SetID(primitive.NewObjectID())
+	}
+
+	_, err := o.Collection(model).InsertOne(ctx, model)
+	return err
+}
+
+// FindByID 通過ID查找文檔
+func (o *ODM) FindByID(ctx context.Context, objectID primitive.ObjectID, model Model) error {
+	if reflect.ValueOf(model).Kind() != reflect.Ptr {
+		return ErrInvalidModel
+	}
+
+	filter := bson.M{"_id": objectID}
+	err := o.Collection(model).FindOne(ctx, filter).Decode(model)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return ErrDocumentNotFound
+		}
+		return err
+	}
+
+	return nil
+}
+
+// FindOne 查找單個文檔
+func (o *ODM) FindOne(ctx context.Context, filter bson.M, model Model) error {
+	if reflect.ValueOf(model).Kind() != reflect.Ptr {
+		return ErrInvalidModel
+	}
+
+	err := o.Collection(model).FindOne(ctx, filter).Decode(model)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return ErrDocumentNotFound
+		}
+		return err
+	}
+
+	return nil
+}
+
+// Find 查找多個文檔
+func (o *ODM) Find(ctx context.Context, filter bson.M, models interface{}) error {
+	// 確保models是指向切片的指針
+	modelsValue := reflect.ValueOf(models)
+	if modelsValue.Kind() != reflect.Ptr || modelsValue.Elem().Kind() != reflect.Slice {
+		return ErrInvalidModel
+	}
+
+	// 獲取切片元素類型
+	sliceValue := modelsValue.Elem()
+	elemType := sliceValue.Type().Elem()
+
+	// 創建一個新的實例來獲取集合名稱
+	modelInstance := reflect.New(elemType).Interface()
+	model, ok := modelInstance.(Model)
+	if !ok {
+		return ErrInvalidModel
+	}
+
+	cursor, err := o.Collection(model).Find(ctx, filter)
+	if err != nil {
+		return err
+	}
+	defer cursor.Close(ctx)
+
+	return cursor.All(ctx, models)
+}
+
+// Update 更新文檔
+func (o *ODM) Update(ctx context.Context, model Model) error {
+	if reflect.ValueOf(model).Kind() != reflect.Ptr {
+		return ErrInvalidModel
+	}
+
+	id := model.GetID()
+	if id.IsZero() {
+		return ErrNoDocumentID
+	}
+
+	// 更新更新時間
+	v := reflect.ValueOf(model).Elem()
+	if baseField := v.FieldByName("BaseModel"); baseField.IsValid() {
+		baseModel := baseField.Addr().Interface().(*BaseModel)
+		baseModel.UpdatedAt = time.Now()
+	}
+
+	filter := bson.M{"_id": id}
+	_, err := o.Collection(model).ReplaceOne(ctx, filter, model)
+	return err
+}
+
+// UpdateFields 更新文檔的特定欄位
+func (o *ODM) UpdateFields(ctx context.Context, model Model, fields bson.M) error {
+	if reflect.ValueOf(model).Kind() != reflect.Ptr {
+		return ErrInvalidModel
+	}
+
+	id := model.GetID()
+	if id.IsZero() {
+		return ErrNoDocumentID
+	}
+
+	// 添加更新時間
+	fields["updated_at"] = time.Now()
+
+	filter := bson.M{"_id": id}
+	update := bson.M{"$set": fields}
+	_, err := o.Collection(model).UpdateOne(ctx, filter, update)
+	return err
+}
+
+// Delete 刪除文檔
+func (o *ODM) Delete(ctx context.Context, model Model) error {
+	if reflect.ValueOf(model).Kind() != reflect.Ptr {
+		return ErrInvalidModel
+	}
+
+	id := model.GetID()
+	if id.IsZero() {
+		return ErrNoDocumentID
+	}
+
+	filter := bson.M{"_id": id}
+	_, err := o.Collection(model).DeleteOne(ctx, filter)
+	return err
+}
+
+// DeleteMany 刪除多個文檔
+func (o *ODM) DeleteMany(ctx context.Context, model Model, filter bson.M) error {
+	_, err := o.Collection(model).DeleteMany(ctx, filter)
+	return err
+}
+
+// DeleteByID 通過ID刪除文檔
+func (o *ODM) DeleteByID(ctx context.Context, objectID primitive.ObjectID, model Model) error {
+	filter := bson.M{"_id": objectID}
+	_, err := o.Collection(model).DeleteOne(ctx, filter)
+	return err
+}
+
+// InsertOne 插入單個文檔
+func (o *ODM) InsertOne(ctx context.Context, model Model) error {
+	if reflect.ValueOf(model).Kind() != reflect.Ptr {
+		return ErrInvalidModel
+	}
+
+	// 如果模型包含 BaseModel，則設定創建和更新時間
+	if baseModel, ok := model.(interface{ GetBaseModel() *BaseModel }); ok {
+		now := time.Now()
+		base := baseModel.GetBaseModel()
+		// 只有在創建時間為零值時才設定
+		if base.CreatedAt.IsZero() {
+			base.CreatedAt = now
+		}
+		base.UpdatedAt = now
+	}
+
+	_, err := o.Collection(model).InsertOne(ctx, model)
+	return err
+}
+
+// InsertMany 插入多個文檔
+func (o *ODM) InsertMany(ctx context.Context, models []Model) error {
+	if len(models) == 0 {
+		return nil
+	}
+
+	// 將 []Model 轉換為 []interface{}
+	interfaces := make([]interface{}, len(models))
+	for i, model := range models {
+
+		// 如果模型包含 BaseModel，則設定創建和更新時間
+		if baseModel, ok := model.(interface{ GetBaseModel() *BaseModel }); ok {
+			now := time.Now()
+			base := baseModel.GetBaseModel()
+			// 只有在創建時間為零值時才設定
+			if base.CreatedAt.IsZero() {
+				base.CreatedAt = now
+			}
+			base.UpdatedAt = now
+		}
+		interfaces[i] = model
+	}
+
+	_, err := o.Collection(models[0]).InsertMany(ctx, interfaces)
+	return err
+}
+
+// Count 計算符合條件的文檔數量
+func (o *ODM) Count(ctx context.Context, filter bson.M, model Model) (int64, error) {
+	return o.Collection(model).CountDocuments(ctx, filter)
+}
+
+// UpdateMany 更新多個文檔
+func (o *ODM) UpdateMany(ctx context.Context, model Model, filter bson.M, update bson.M) error {
+	// 添加更新時間
+	if updateSet, ok := update["$set"]; ok {
+		if updateSetMap, ok := updateSet.(bson.M); ok {
+			updateSetMap["updated_at"] = time.Now()
+		}
+	} else {
+		update["$set"] = bson.M{"updated_at": time.Now()}
+	}
+
+	_, err := o.Collection(model).UpdateMany(ctx, filter, update)
+	return err
+}
+
+// Exists 檢查文檔是否存在
+func (o *ODM) Exists(ctx context.Context, filter bson.M, model Model) (bool, error) {
+	count, err := o.Count(ctx, filter, model)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}

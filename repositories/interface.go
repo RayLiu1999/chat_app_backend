@@ -37,6 +37,15 @@ type UserRepositoryInterface interface {
 
 	// GetUserListByIds 根據用戶ID陣列獲取用戶
 	GetUserListByIds(objectIds []primitive.ObjectID) ([]models.User, error)
+
+	// CheckUsernameExists 檢查用戶名是否已存在
+	CheckUsernameExists(username string) (bool, error)
+
+	// CheckEmailExists 檢查電子郵件是否已存在
+	CheckEmailExists(email string) (bool, error)
+
+	// CreateUser 創建用戶
+	CreateUser(user models.User) error
 }
 
 type FriendRepositoryInterface interface {

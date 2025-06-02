@@ -7,9 +7,17 @@ import (
 )
 
 type UserResponse struct {
-	Name    string `json:"name" bson:"name"`
-	Picture string `json:"picture" bson:"picture"`
-	Email   string `json:"email" bson:"email"`
+	ID       string `json:"id" bson:"_id"`
+	Username string `json:"username" bson:"username"`
+	Email    string `json:"email" bson:"email"`
+	Nickname string `json:"nickname" bson:"nickname"`
+	Picture  string `json:"picture" bson:"picture"`
+}
+
+// LoginResponse 包含登入成功後返回的資訊
+type LoginResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token,omitempty"`
 }
 
 type ServerResponse struct {

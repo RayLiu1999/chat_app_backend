@@ -2,7 +2,6 @@ package utils
 
 import (
 	"chat_app_backend/config"
-	"chat_app_backend/models"
 	"errors"
 	"time"
 
@@ -10,6 +9,18 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
+
+// AccessTokenClaims 定義了 access token 中的聲明
+type AccessTokenClaims struct {
+	UserID string `json:"user_id"`
+	jwt.StandardClaims
+}
+
+// RefreshTokenClaims 定義了 refresh token 中的聲明
+type RefreshTokenClaims struct {
+	UserID string `json:"user_id"`
+	jwt.StandardClaims
+}
 
 type TokenResponse struct {
 	Token     string
@@ -29,7 +40,7 @@ func GenAccessToken(userID string) (TokenResponse, error) {
 	expiresAt := time.Now().Add(accessTokenExpireDuration).Unix()
 
 	// 設置 access token 的聲明
-	accessTokenClaims := models.AccessTokenClaims{
+	accessTokenClaims := &AccessTokenClaims{
 		UserID: userID,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: expiresAt,
@@ -61,7 +72,7 @@ func GenRefreshToken(userID string) (TokenResponse, error) {
 	expiresAt := time.Now().Add(refreshTokenExpireDuration).Unix()
 
 	// 設置 refresh token 的聲明
-	refreshTokenClaims := models.RefreshTokenClaims{
+	refreshTokenClaims := &RefreshTokenClaims{
 		UserID: userID,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: expiresAt,
@@ -85,7 +96,7 @@ func GenRefreshToken(userID string) (TokenResponse, error) {
 // 驗證 JWT access token
 func ValidateAccessToken(tokenString string) (bool, error) {
 	// 解析和驗證 JWT 簽章
-	token, err := jwt.ParseWithClaims(tokenString, &models.AccessTokenClaims{}, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &AccessTokenClaims{}, func(token *jwt.Token) (interface{}, error) {
 		// 檢查簽名方法是否為預期的 HMAC 方法
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("unexpected signing method")
@@ -98,7 +109,7 @@ func ValidateAccessToken(tokenString string) (bool, error) {
 	}
 
 	// 檢查 token 是否有效
-	if claims, ok := token.Claims.(*models.AccessTokenClaims); ok && token.Valid {
+	if claims, ok := token.Claims.(*AccessTokenClaims); ok && token.Valid {
 		// 檢查 token 是否過期
 		if claims.ExpiresAt < time.Now().Unix() {
 			return false, errors.New("token is expired")
@@ -112,14 +123,14 @@ func ValidateAccessToken(tokenString string) (bool, error) {
 // 從 token 中獲取用戶 ID
 func GetUserFromToken(tokenString string) (string, error) {
 	// 解析和驗證 JWT token
-	token, err := jwt.ParseWithClaims(tokenString, &models.AccessTokenClaims{}, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &AccessTokenClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return jwtSecret, nil
 	})
 	if err != nil {
 		return "", err
 	}
 
-	claims, ok := token.Claims.(*models.AccessTokenClaims)
+	claims, ok := token.Claims.(*AccessTokenClaims)
 	if !ok {
 		return "", errors.New("invalid token")
 	}

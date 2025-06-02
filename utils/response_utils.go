@@ -8,7 +8,7 @@ import (
 )
 
 type MessageOptions struct {
-	Code        int
+	Code        ErrorCode
 	Message     string
 	Displayable bool
 }
@@ -17,7 +17,7 @@ type MessageOptions struct {
 type MessageResponseOptions func(*MessageOptions)
 
 // WithCode 設置錯誤代碼
-func WithCode(code int) MessageResponseOptions {
+func WithCode(code ErrorCode) MessageResponseOptions {
 	return func(o *MessageOptions) {
 		o.Code = code
 	}
@@ -39,11 +39,11 @@ func WithDisplayable(displayable bool) MessageResponseOptions {
 
 // APIResponse represents the standard API response structure.
 type APIResponse struct {
-	Status      string `json:"status"`            // "success" 或 "error"
-	Code        int    `json:"code"`              // 自定義錯誤碼，例如 1001 表示 "用戶不存在"
-	Message     string `json:"message,omitempty"` // 訊息內容，可選
-	Displayable bool   `json:"displayable"`       // 是否可顯示給用戶
-	Data        any    `json:"data,omitempty"`    // 可選的數據
+	Status      string    `json:"status"`            // "success" 或 "error"
+	Code        ErrorCode `json:"code"`              // 自定義錯誤碼，例如 1001 表示 "用戶不存在"
+	Message     string    `json:"message,omitempty"` // 訊息內容，可選
+	Displayable bool      `json:"displayable"`       // 是否可顯示給用戶
+	Data        any       `json:"data,omitempty"`    // 可選的數據
 }
 
 // SuccessResponse sends a success JSON response.

@@ -2,7 +2,9 @@ package services
 
 import (
 	"chat_app_backend/models"
+	"chat_app_backend/utils"
 
+	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -11,7 +13,19 @@ import (
 // 所有與用戶相關的業務邏輯方法都應該在這裡聲明
 type UserServiceInterface interface {
 	// GetUserById 根據ID獲取用戶信息ch
-	GetUserById(objectID primitive.ObjectID) (*models.User, error)
+	GetUserResponseById(objectID primitive.ObjectID) (*models.UserResponse, error)
+
+	// RegisterUser 註冊新用戶
+	RegisterUser(user models.User) *utils.AppError
+
+	// Login 處理用戶登入
+	Login(loginUser models.User) (*models.LoginResponse, *utils.AppError)
+
+	// Logout 處理用戶登出
+	Logout(c *gin.Context) *utils.AppError
+
+	// RefreshToken 刷新令牌
+	RefreshToken(refreshToken string) (string, *utils.AppError)
 
 	// 未來可能添加的其他方法
 	// CreateUser(user *models.User) (primitive.ObjectID, error)
