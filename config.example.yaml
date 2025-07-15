@@ -1,3 +1,5 @@
+timezone: "Asia/Taipei"
+
 server:
   port: ""
   mode: "debug"

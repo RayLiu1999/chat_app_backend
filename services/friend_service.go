@@ -5,7 +5,6 @@ import (
 	"chat_app_backend/models"
 	"chat_app_backend/repositories"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -23,8 +22,8 @@ func NewFriendService(cfg *config.Config, mongodb *mongo.Database, friendRepo re
 	}
 }
 
-func (fs *FriendService) GetFriendById(objectID primitive.ObjectID) (*models.Friend, error) {
-	friend, err := fs.friendRepo.GetFriendById(objectID)
+func (fs *FriendService) GetFriendById(userID string) (*models.Friend, error) {
+	friend, err := fs.friendRepo.GetFriendById(userID)
 	if err != nil {
 		return nil, err
 	}

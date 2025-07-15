@@ -90,13 +90,18 @@ func (o *ODM) Create(ctx context.Context, model Model) error {
 }
 
 // FindByID 通過ID查找文檔
-func (o *ODM) FindByID(ctx context.Context, objectID primitive.ObjectID, model Model) error {
+func (o *ODM) FindByID(ctx context.Context, ID string, model Model) error {
 	if reflect.ValueOf(model).Kind() != reflect.Ptr {
 		return ErrInvalidModel
 	}
 
+	objectID, err := primitive.ObjectIDFromHex(ID)
+	if err != nil {
+		return ErrInvalidID
+	}
+
 	filter := bson.M{"_id": objectID}
-	err := o.Collection(model).FindOne(ctx, filter).Decode(model)
+	err = o.Collection(model).FindOne(ctx, filter).Decode(model)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return ErrDocumentNotFound
@@ -218,9 +223,13 @@ func (o *ODM) DeleteMany(ctx context.Context, model Model, filter bson.M) error 
 }
 
 // DeleteByID 通過ID刪除文檔
-func (o *ODM) DeleteByID(ctx context.Context, objectID primitive.ObjectID, model Model) error {
+func (o *ODM) DeleteByID(ctx context.Context, ID string, model Model) error {
+	objectID, err := primitive.ObjectIDFromHex(ID)
+	if err != nil {
+		return ErrInvalidID
+	}
 	filter := bson.M{"_id": objectID}
-	_, err := o.Collection(model).DeleteOne(ctx, filter)
+	_, err = o.Collection(model).DeleteOne(ctx, filter)
 	return err
 }
 

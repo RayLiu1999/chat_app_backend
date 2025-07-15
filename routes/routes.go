@@ -46,11 +46,8 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, mongodb *providers.MongoWrap
 	// CSRF 驗證
 	auth.Use(middlewares.VerifyCsrfToken())
 
-	// chat
+	// WebSocket
 	auth.GET("/ws", controllers.ChatController.HandleConnections)
-	auth.GET("/chats", controllers.ChatController.GetChatList) // 獲取聊天列表
-	auth.PUT("/chats", controllers.ChatController.UpdateChat)  // 更新聊天列表狀態
-	auth.POST("/chats", controllers.ChatController.SaveChat)   // 保存聊天列表
 
 	// user
 	auth.GET("/user", controllers.UserController.GetUser)
@@ -61,6 +58,12 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, mongodb *providers.MongoWrap
 	auth.PUT("/friends/:friend_id", controllers.FriendController.UpdateFriendStatus) // 更新好友狀態
 	// auth.DELETE("/friends/:friend_id", controllers.FriendController.RemoveFriend)     // 刪除好友
 
+	// dm room
+	auth.GET("/dm_rooms", controllers.ChatController.GetDMRoomList)                   // 獲取聊天列表
+	auth.PUT("/dm_rooms", controllers.ChatController.UpdateDMRoom)                    // 更新聊天列表狀態
+	auth.POST("/dm_rooms", controllers.ChatController.CreateDMRoom)                   // 保存聊天列表
+	auth.GET("/dm_rooms/:room_id/messages", controllers.ChatController.GetDMMessages) // 獲取私聊訊息
+
 	// server
 	auth.GET("/servers", controllers.ServerController.GetServerList)
 	auth.POST("/servers", controllers.ServerController.CreateServer)
@@ -68,5 +71,4 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, mongodb *providers.MongoWrap
 
 	// channel
 	// auth.GET("/channels/:server_id", controllers.ChatController.GetChannelList)
-	// auth.GET("/messages/:room_id", controllers.chatController.GetMessages)
 }

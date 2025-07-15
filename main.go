@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"time"
 
 	"chat_app_backend/config"
 	"chat_app_backend/providers"
@@ -11,10 +12,21 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func main() {
-	// 取得全局配置
-	cfg := config.GetConfig()
+var cfg *config.Config
 
+func init() {
+	// 取得全局配置
+	cfg = config.GetConfig()
+
+	// 設置時區
+	location, err := time.LoadLocation(cfg.Timezone)
+	if err != nil {
+		log.Fatalf("Failed to load location: %v", err)
+	}
+	time.Local = location
+}
+
+func main() {
 	// 初始化資料庫連接
 	mongodb, err := providers.DBConnect[*providers.MongoWrapper]("mongodb")
 	if err != nil {

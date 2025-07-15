@@ -3,14 +3,13 @@ package controllers
 import (
 	"chat_app_backend/config"
 	"chat_app_backend/models"
+	"chat_app_backend/repositories"
 	"chat_app_backend/services"
 	"chat_app_backend/utils"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -19,35 +18,35 @@ type ServerController struct {
 	config        *config.Config
 	mongoConnect  *mongo.Database
 	serverService services.ServerServiceInterface
-	userService   services.UserServiceInterface
+	userRepo      repositories.UserRepositoryInterface
 }
 
 // 創建控制器的工廠函數
-func NewServerController(cfg *config.Config, mongodb *mongo.Database, serverService services.ServerServiceInterface, userService services.UserServiceInterface) *ServerController {
+func NewServerController(cfg *config.Config, mongodb *mongo.Database, serverService services.ServerServiceInterface, userRepo repositories.UserRepositoryInterface) *ServerController {
 	return &ServerController{
 		config:        cfg,
 		mongoConnect:  mongodb,
 		serverService: serverService,
-		userService:   userService,
+		userRepo:      userRepo,
 	}
 }
 
 // 獲取用戶的伺服器列表
 func (sc *ServerController) GetServerList(c *gin.Context) {
 	// 取得使用者ID
-	_, objectID, err := utils.GetUserIDFromHeader(c)
+	userID, _, err := utils.GetUserIDFromHeader(c)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{Code: utils.ErrUnauthorized})
 		return
 	}
 
-	_, err = sc.userService.GetUserById(objectID)
+	_, err = sc.userRepo.GetUserById(userID)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusNotFound, utils.MessageOptions{Code: utils.ErrUserNotFound})
 		return
 	}
 
-	servers, err := sc.serverService.GetServerListByUserId(objectID)
+	servers, err := sc.serverService.GetServerListByUserId(userID)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{Code: utils.ErrInternalServer})
 		return
@@ -57,7 +56,7 @@ func (sc *ServerController) GetServerList(c *gin.Context) {
 	serverResponses := make([]models.ServerResponse, len(servers))
 	for i, server := range servers {
 		serverResponses[i] = models.ServerResponse{
-			ID:          server.ID,
+			ID:          server.BaseModel.ID,
 			Name:        server.Name,
 			PictureURL:  utils.GetUploadURL(server.Picture, nil),
 			Description: server.Description,
@@ -71,13 +70,13 @@ func (sc *ServerController) GetServerList(c *gin.Context) {
 // 建立伺服器
 func (sc *ServerController) CreateServer(c *gin.Context) {
 	// 取得使用者ID
-	_, objectID, err := utils.GetUserIDFromHeader(c)
+	userID, userObjectId, err := utils.GetUserIDFromHeader(c)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{Code: utils.ErrUnauthorized})
 		return
 	}
 
-	_, err = sc.userService.GetUserById(objectID)
+	_, err = sc.userRepo.GetUserById(userID)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusNotFound, utils.MessageOptions{Code: utils.ErrUserNotFound})
 		return
@@ -101,14 +100,11 @@ func (sc *ServerController) CreateServer(c *gin.Context) {
 	}
 
 	server := &models.Server{
-		ID:          primitive.NewObjectID(),
 		Name:        name,
 		Picture:     picture.Filename,
 		Description: "This is a test server",
-		OwnerID:     objectID,
-		Members:     []models.Member{{UserID: objectID}},
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		OwnerID:     userObjectId,
+		Members:     []models.Member{{UserID: userObjectId}},
 	}
 
 	// 建立伺服器
@@ -121,7 +117,7 @@ func (sc *ServerController) CreateServer(c *gin.Context) {
 
 	// 定義響應
 	serverResponse := models.ServerResponse{
-		ID:          createdServer.ID,
+		ID:          createdServer.BaseModel.ID,
 		Name:        createdServer.Name,
 		PictureURL:  utils.GetUploadURL(createdServer.Picture, nil),
 		Description: createdServer.Description,

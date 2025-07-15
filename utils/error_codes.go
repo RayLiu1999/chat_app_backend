@@ -38,6 +38,9 @@ const (
 	// 訊息相關錯誤
 	ErrSendMessageFailed ErrorCode = 6000 // 訊息發送失敗
 	ErrGetMessagesFailed ErrorCode = 6001 // 無法獲取訊息歷史記錄
+
+	// 聊天室相關錯誤
+	ErrRoomNotFound ErrorCode = 7000 // 聊天室不存在
 )
 
 type AppError struct {

@@ -22,11 +22,16 @@ func NewFriendRepository(cfg *config.Config, mongodb *mongo.Database) *FriendRep
 	}
 }
 
-func (fr *FriendRepository) GetFriendById(objectId primitive.ObjectID) (*models.Friend, error) {
+func (fr *FriendRepository) GetFriendById(userID string) (*models.Friend, error) {
 	var friend models.Friend
 	var collection = fr.mongoConnect.Collection("friends")
 
-	err := collection.FindOne(context.Background(), bson.M{"_id": objectId}).Decode(&friend)
+	userObjectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	err = collection.FindOne(context.Background(), bson.M{"_id": userObjectID}).Decode(&friend)
 	if err != nil {
 		return nil, err
 	}

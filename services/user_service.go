@@ -11,7 +11,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -90,15 +89,15 @@ func (us *UserService) RegisterUser(user models.User) *utils.AppError {
 }
 
 // 根據ID獲取用戶信息
-func (us *UserService) GetUserResponseById(objectID primitive.ObjectID) (*models.UserResponse, error) {
-	user, err := us.userRepo.GetUserById(objectID)
+func (us *UserService) GetUserResponseById(userID string) (*models.UserResponse, error) {
+	user, err := us.userRepo.GetUserById(userID)
 	if err != nil {
 		return nil, err
 	}
 
 	// 轉換為 UserResponse
 	response := &models.UserResponse{
-		ID:       objectID.Hex(),
+		ID:       userID,
 		Username: user.Username,
 		Email:    user.Email,
 		Nickname: user.Nickname,
@@ -182,7 +181,7 @@ func (us *UserService) Login(loginUser models.User) (*models.LoginResponse, *uti
 // 登出
 func (us *UserService) Logout(c *gin.Context) *utils.AppError {
 	// 註銷 refresh token
-	_, objectID, err := utils.GetUserIDFromHeader(c)
+	_, userObjectID, err := utils.GetUserIDFromHeader(c)
 	if err != nil {
 		return &utils.AppError{
 			Code: utils.ErrUnauthorized,
@@ -190,7 +189,7 @@ func (us *UserService) Logout(c *gin.Context) *utils.AppError {
 	}
 
 	// 使用 UpdateMany 直接更新所有符合條件的文檔
-	filter := bson.M{"user_id": objectID, "revoked": false}
+	filter := bson.M{"user_id": userObjectID, "revoked": false}
 	update := bson.M{"$set": bson.M{"revoked": true}}
 	err = us.odm.UpdateMany(context.Background(), &models.RefreshToken{}, filter, update)
 	if err != nil {

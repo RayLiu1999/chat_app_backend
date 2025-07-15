@@ -4,7 +4,6 @@ import (
 	"chat_app_backend/config"
 	"chat_app_backend/models"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -28,8 +27,8 @@ func (ss *ServerService) CreateServer(server *models.Server) (models.Server, err
 }
 
 // GetServerListByUserId 獲取用戶的伺服器列表
-func (ss *ServerService) GetServerListByUserId(objectID primitive.ObjectID) ([]models.Server, error) {
-	servers, err := ss.serverRepo.GetServerListByUserId(objectID)
+func (ss *ServerService) GetServerListByUserId(userID string) ([]models.Server, error) {
+	servers, err := ss.serverRepo.GetServerListByUserId(userID)
 	if err != nil {
 		return nil, err
 	}

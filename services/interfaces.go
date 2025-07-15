@@ -6,14 +6,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // UserServiceInterface 定義了用戶服務的接口
 // 所有與用戶相關的業務邏輯方法都應該在這裡聲明
 type UserServiceInterface interface {
 	// GetUserById 根據ID獲取用戶信息ch
-	GetUserResponseById(objectID primitive.ObjectID) (*models.UserResponse, error)
+	GetUserResponseById(userID string) (*models.UserResponse, error)
 
 	// RegisterUser 註冊新用戶
 	RegisterUser(user models.User) *utils.AppError
@@ -38,23 +37,17 @@ type UserServiceInterface interface {
 // ChatServiceInterface 定義了聊天服務的接口
 // 所有與聊天相關的業務邏輯方法都應該在這裡声明
 type ChatServiceInterface interface {
-	// HandleConnection 處理 WebSocket 連接
-	HandleConnection(userID primitive.ObjectID, ws *websocket.Conn)
+	// HandleWebSocket 處理 WebSocket 連接
+	HandleWebSocket(ws *websocket.Conn, userID string)
 
-	// SaveMessage 儲存聊天訊息
-	SaveMessage(message Message)
+	// UpdateDMRoom 更新聊天列表
+	// UpdateDMRoom(userID, chatWithUserID primitive.ObjectID, IsHidden bool) error
 
-	// GetChatListByUserID 獲取用戶的聊天列表
-	GetChatListByUserID(userID primitive.ObjectID, includeDeleted bool) ([]models.Chat, error)
+	// CreateDMRoom 保存聊天列表
+	// CreateDMRoom(chatList models.DMRoom) (models.DMRoomResponse, error)
 
-	// UpdateChatListDeleteStatus 更新聊天列表的刪除狀態
-	UpdateChatListDeleteStatus(userID, chatWithUserID primitive.ObjectID, isDeleted bool) error
-
-	// SaveChat 保存聊天列表
-	SaveChat(chatList models.Chat) (models.ChatResponse, error)
-
-	// GetChatResponseList 獲取聊天列表response
-	GetChatResponseList(userID primitive.ObjectID, includeDeleted bool) ([]models.ChatResponse, error)
+	// GetDMRoomResponseList 獲取聊天列表response
+	GetDMRoomResponseList(userID string, includeNotVisible bool) ([]models.DMRoomResponse, error)
 
 	// 其他已實現的方法應該添加到這裡
 	// ... 其他方法 ...
@@ -64,7 +57,7 @@ type ChatServiceInterface interface {
 // 所有與伺服器相關的業務邏輯方法都應該在這裡声明
 type ServerServiceInterface interface {
 	// GetServerListByUserId 獲取用戶的伺服器列表
-	GetServerListByUserId(objectID primitive.ObjectID) ([]models.Server, error)
+	GetServerListByUserId(userID string) ([]models.Server, error)
 
 	// CreateServer 新建測試用戶伺服器關聯
 	CreateServer(server *models.Server) (models.Server, error)
@@ -75,5 +68,5 @@ type ServerServiceInterface interface {
 
 type FriendServiceInterface interface {
 	// GetFriendById 根據ID獲取好友信息
-	GetFriendById(objectID primitive.ObjectID) (*models.Friend, error)
+	GetFriendById(userID string) (*models.Friend, error)
 }

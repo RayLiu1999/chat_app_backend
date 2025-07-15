@@ -14,10 +14,14 @@ var (
 )
 
 type Config struct {
-	Server struct {
+	Timezone string `mapstructure:"timezone"`
+	Server   struct {
 		Port string `mapstructure:"port"`
 		Mode string `mapstructure:"mode"`
 	} `mapstructure:"server"`
+	Redis struct {
+		Addr string `mapstructure:"addr"`
+	} `mapstructure:"redis"`
 	AllowedOrigins []string `mapstructure:"allowed_origins"`
 	Database       struct {
 		Type    string `mapstructure:"type"` // 資料庫類型

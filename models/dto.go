@@ -1,8 +1,6 @@
 package models
 
 import (
-	"time"
-
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -36,11 +34,18 @@ type ChannelResponse struct {
 	Description string             `json:"description" bson:"description"`
 }
 
-type ChatResponse struct {
-	ID        primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-	UserID    primitive.ObjectID `json:"user_id" bson:"user_id"`
+type DMRoomResponse struct {
+	RoomID    primitive.ObjectID `json:"room_id" bson:"room_id"`
 	Nickname  string             `json:"nickname" bson:"nickname"`
-	Picture   string             `json:"picture_url" bson:"picture_url"`
-	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
-	UpdatedAt time.Time          `json:"updated_at" bson:"updated_at"`
+	Picture   string             `json:"picture" bson:"picture"`
+	Timestamp int64              `json:"timestamp" bson:"timestamp"`
+}
+
+type MessageResponse struct {
+	ID        primitive.ObjectID `json:"id" bson:"_id"`
+	RoomType  RoomType           `json:"room_type" bson:"room_type"`
+	RoomID    string             `json:"room_id" bson:"room_id"`
+	SenderID  string             `json:"sender_id" bson:"sender_id"`
+	Content   string             `json:"content" bson:"content"`
+	Timestamp int64              `json:"timestamp" bson:"timestamp"`
 }

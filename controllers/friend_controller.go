@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 
 	"chat_app_backend/config"
 	"chat_app_backend/models"
@@ -53,7 +52,7 @@ const (
 
 // 取得用戶資訊
 func (uc *FriendController) GetFriendList(c *gin.Context) {
-	_, objectID, err := utils.GetUserIDFromHeader(c)
+	_, userObjectID, err := utils.GetUserIDFromHeader(c)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{Code: utils.ErrUnauthorized, Displayable: true})
 		return
@@ -63,11 +62,11 @@ func (uc *FriendController) GetFriendList(c *gin.Context) {
 	collection := uc.mongoConnect.Collection("friends")
 
 	// 查詢與當前用戶相關的所有好友關係（包括發送和接收的請求）
-	// filter := bson.M{"friend_id": objectID}
+	// filter := bson.M{"friend_id": userObjectID}
 	filter := bson.M{
 		"$or": []bson.M{
-			{"user_id": objectID, "status": FriendStatusAccepted},
-			{"friend_id": objectID, "status": FriendStatusAccepted},
+			{"user_id": userObjectID, "status": FriendStatusAccepted},
+			{"friend_id": userObjectID, "status": FriendStatusAccepted},
 		},
 	}
 	cursor, err := collection.Find(context.Background(), filter)
@@ -94,7 +93,7 @@ func (uc *FriendController) GetFriendList(c *gin.Context) {
 		var friendId primitive.ObjectID
 
 		// 確定哪個ID是好友的ID
-		if friend.UserID == objectID {
+		if friend.UserID == userObjectID {
 			friendId = friend.FriendID
 		} else {
 			friendId = friend.UserID
@@ -120,7 +119,7 @@ func (uc *FriendController) GetFriendList(c *gin.Context) {
 	// 用where in friend_ids取得使用者資訊
 	friendRows, err := userCollection.Find(context.Background(), bson.M{"_id": bson.M{"$in": friendIds}})
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{Code: utils.ErrInternalServer, Message: "伺服器內部錯誤"})
+		utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{Code: utils.ErrInternalServer})
 		return
 	}
 	defer friendRows.Close(context.Background())
@@ -130,7 +129,7 @@ func (uc *FriendController) GetFriendList(c *gin.Context) {
 		var user models.User
 		err := friendRows.Decode(&user)
 		if err != nil {
-			utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{Code: utils.ErrInternalServer, Message: "伺服器內部錯誤"})
+			utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{Code: utils.ErrInternalServer})
 			return
 		}
 
@@ -151,9 +150,9 @@ func (uc *FriendController) GetFriendList(c *gin.Context) {
 
 // 建立好友請求
 func (uc *FriendController) AddFriendRequest(c *gin.Context) {
-	_, objectID, err := utils.GetUserIDFromHeader(c)
+	_, userObjectID, err := utils.GetUserIDFromHeader(c)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{Code: utils.ErrUnauthorized, Message: "未授權的請求"})
+		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{Code: utils.ErrUnauthorized})
 		return
 	}
 
@@ -169,7 +168,7 @@ func (uc *FriendController) AddFriendRequest(c *gin.Context) {
 	}
 
 	// 不能加自己為好友
-	if objectID == user.ID {
+	if userObjectID == user.ID {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{Code: utils.ErrInvalidParams, Message: "不能加自己為好友"})
 		return
 	}
@@ -181,8 +180,8 @@ func (uc *FriendController) AddFriendRequest(c *gin.Context) {
 	// 檢查雙方是否已經是好友（在任一方向）
 	filter := bson.M{
 		"$or": []bson.M{
-			{"user_id": objectID, "friend_id": user.ID, "status": FriendStatusAccepted},
-			{"user_id": user.ID, "friend_id": objectID, "status": FriendStatusAccepted},
+			{"user_id": userObjectID, "friend_id": user.ID, "status": FriendStatusAccepted},
+			{"user_id": user.ID, "friend_id": userObjectID, "status": FriendStatusAccepted},
 		},
 	}
 	err = collection.FindOne(context.Background(), filter).Decode(&friend)
@@ -193,11 +192,9 @@ func (uc *FriendController) AddFriendRequest(c *gin.Context) {
 
 	// 建立好友請求
 	friend = models.Friend{
-		UserID:    objectID,
-		FriendID:  user.ID,
-		Status:    FriendStatusPending,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		UserID:   userObjectID,
+		FriendID: user.ID,
+		Status:   FriendStatusPending,
 	}
 
 	_, err = collection.InsertOne(context.Background(), friend)
@@ -211,7 +208,7 @@ func (uc *FriendController) AddFriendRequest(c *gin.Context) {
 
 // 更新好友狀態
 func (uc *FriendController) UpdateFriendStatus(c *gin.Context) {
-	_, objectID, err := utils.GetUserIDFromHeader(c)
+	_, userObjectID, err := utils.GetUserIDFromHeader(c)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{Code: utils.ErrUnauthorized})
 		return
@@ -243,7 +240,7 @@ func (uc *FriendController) UpdateFriendStatus(c *gin.Context) {
 	}
 
 	// 不能加自己為好友
-	if objectID == user.ID {
+	if userObjectID == user.ID {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{Code: utils.ErrInvalidParams, Message: "不能加自己為好友"})
 		return
 	}
@@ -255,8 +252,8 @@ func (uc *FriendController) UpdateFriendStatus(c *gin.Context) {
 	// 檢查雙方是否已經是好友（在任一方向）
 	filter := bson.M{
 		"$or": []bson.M{
-			{"user_id": objectID, "friend_id": user.ID, "status": FriendStatusAccepted},
-			{"user_id": user.ID, "friend_id": objectID, "status": FriendStatusAccepted},
+			{"user_id": userObjectID, "friend_id": user.ID, "status": FriendStatusAccepted},
+			{"user_id": user.ID, "friend_id": userObjectID, "status": FriendStatusAccepted},
 		},
 	}
 	err = collection.FindOne(context.Background(), filter).Decode(&friend)
@@ -267,7 +264,7 @@ func (uc *FriendController) UpdateFriendStatus(c *gin.Context) {
 
 	// 拒絕則刪除請求紀錄
 	if status == FriendStatusRejected {
-		_, err = collection.DeleteOne(context.Background(), bson.D{{"user_id", user.ID}, {"friend_id", objectID}, {"status", FriendStatusPending}})
+		_, err = collection.DeleteOne(context.Background(), bson.D{{"user_id", user.ID}, {"friend_id", userObjectID}, {"status", FriendStatusPending}})
 		if err != nil {
 			utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{Code: utils.ErrInternalServer})
 			return
@@ -278,14 +275,12 @@ func (uc *FriendController) UpdateFriendStatus(c *gin.Context) {
 
 	// 更新好友狀態
 	friend = models.Friend{
-		UserID:    objectID,
-		FriendID:  user.ID,
-		Status:    status,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		UserID:   userObjectID,
+		FriendID: user.ID,
+		Status:   status,
 	}
 
-	_, err = collection.UpdateOne(context.Background(), bson.D{{"user_id", user.ID}, {"friend_id", objectID}, {"status", FriendStatusPending}}, bson.M{"$set": friend})
+	_, err = collection.UpdateOne(context.Background(), bson.D{{"user_id", user.ID}, {"friend_id", userObjectID}, {"status", FriendStatusPending}}, bson.M{"$set": friend})
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{Code: utils.ErrInternalServer})
 		return

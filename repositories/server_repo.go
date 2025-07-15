@@ -24,11 +24,16 @@ func NewServerRepository(cfg *config.Config, mongodb *mongo.Database) *ServerRep
 	}
 }
 
-func (sr *ServerRepository) GetServerListByUserId(objectID primitive.ObjectID) ([]models.Server, error) {
+func (sr *ServerRepository) GetServerListByUserId(userID string) ([]models.Server, error) {
 	var servers []models.Server
 	var collection = sr.mongoConnect.Collection("servers")
 
-	cursor, err := collection.Find(context.Background(), bson.M{"members.user_id": objectID})
+	userObjectId, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	cursor, err := collection.Find(context.Background(), bson.M{"members.user_id": userObjectId})
 	if err != nil {
 		return nil, err
 	}

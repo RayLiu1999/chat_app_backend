@@ -104,13 +104,13 @@ func (uc *UserController) RefreshToken(c *gin.Context) {
 
 // 取得用戶資訊
 func (uc *UserController) GetUser(c *gin.Context) {
-	_, objectID, err := utils.GetUserIDFromHeader(c)
+	userID, _, err := utils.GetUserIDFromHeader(c)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{Code: utils.ErrUnauthorized})
 		return
 	}
 
-	userResponse, err := uc.userService.GetUserResponseById(objectID)
+	userResponse, err := uc.userService.GetUserResponseById(userID)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusNotFound, utils.MessageOptions{Code: utils.ErrUserNotFound})
 		return

@@ -121,21 +121,26 @@ func ValidateAccessToken(tokenString string) (bool, error) {
 }
 
 // 從 token 中獲取用戶 ID
-func GetUserFromToken(tokenString string) (string, error) {
+func GetUserFromToken(tokenString string) (string, primitive.ObjectID, error) {
 	// 解析和驗證 JWT token
 	token, err := jwt.ParseWithClaims(tokenString, &AccessTokenClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return jwtSecret, nil
 	})
 	if err != nil {
-		return "", err
+		return "", primitive.NilObjectID, err
 	}
 
 	claims, ok := token.Claims.(*AccessTokenClaims)
 	if !ok {
-		return "", errors.New("invalid token")
+		return "", primitive.NilObjectID, errors.New("invalid token")
 	}
 
-	return claims.UserID, nil
+	userObjectID, err := primitive.ObjectIDFromHex(claims.UserID)
+	if err != nil {
+		return "", primitive.NilObjectID, errors.New("invalid user ID")
+	}
+
+	return claims.UserID, userObjectID, nil
 }
 
 // 從 HTTP 請求頭中獲取 access token
@@ -157,16 +162,10 @@ func GetUserIDFromHeader(c *gin.Context) (string, primitive.ObjectID, error) {
 		return "", primitive.NilObjectID, err
 	}
 
-	userID, err := GetUserFromToken(accessToken)
+	userID, userObjectID, err := GetUserFromToken(accessToken)
 	if err != nil {
 		return "", primitive.NilObjectID, err
 	}
 
-	// 將 userID 從字符串轉換為 ObjectID
-	objectID, err := primitive.ObjectIDFromHex(userID)
-	if err != nil {
-		return "", primitive.NilObjectID, errors.New("invalid user ID")
-	}
-
-	return userID, objectID, nil
+	return userID, userObjectID, nil
 }

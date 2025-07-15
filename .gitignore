@@ -1,4 +1,34 @@
-/config.yaml
+# 編譯產生的二進位檔案
+/main
 /main.exe
-/tmp
-/uploads
+*.exe
+*.test
+*.out
+
+# 依賴管理
+/vendor/
+
+# 編譯暫存檔
+*.obj
+*.a
+*.so
+
+# 作業系統產生的檔案
+.DS_Store
+Thumbs.db
+
+# 設定檔
+/config.yaml
+
+# 暫存與上傳資料夾
+/tmp/
+/uploads/
+
+# IDE/編輯器相關
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 測試覆蓋率報告
+coverage.out

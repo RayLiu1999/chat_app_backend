@@ -25,10 +25,10 @@ func NewUserRepository(cfg *config.Config, mongodb *mongo.Database) *UserReposit
 	}
 }
 
-func (ur *UserRepository) GetUserById(objectId primitive.ObjectID) (*models.User, error) {
+func (ur *UserRepository) GetUserById(userID string) (*models.User, error) {
 	var user models.User
 
-	err := ur.odm.FindByID(context.Background(), objectId, &user)
+	err := ur.odm.FindByID(context.Background(), userID, &user)
 	if err != nil {
 		return nil, err
 	}
@@ -36,10 +36,15 @@ func (ur *UserRepository) GetUserById(objectId primitive.ObjectID) (*models.User
 	return &user, nil
 }
 
-func (ur *UserRepository) GetUserListByIds(objectIds []primitive.ObjectID) ([]models.User, error) {
+func (ur *UserRepository) GetUserListByIds(userIds []string) ([]models.User, error) {
 	var users []models.User
 
-	err := ur.odm.Find(context.Background(), bson.M{"_id": bson.M{"$in": objectIds}}, &users)
+	userIdsObjectIds := make([]primitive.ObjectID, len(userIds))
+	for i, userId := range userIds {
+		userIdsObjectIds[i], _ = primitive.ObjectIDFromHex(userId)
+	}
+
+	err := ur.odm.Find(context.Background(), bson.M{"_id": bson.M{"$in": userIdsObjectIds}}, &users)
 	if err != nil {
 		return nil, err
 	}
