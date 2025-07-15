@@ -16,8 +16,9 @@ var (
 type Config struct {
 	Timezone string `mapstructure:"timezone"`
 	Server   struct {
-		Port string `mapstructure:"port"`
-		Mode string `mapstructure:"mode"`
+		BaseURL string `mapstructure:"base_url"`
+		Port    string `mapstructure:"port"`
+		Mode    string `mapstructure:"mode"`
 	} `mapstructure:"server"`
 	Redis struct {
 		Addr string `mapstructure:"addr"`

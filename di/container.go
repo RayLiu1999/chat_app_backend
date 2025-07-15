@@ -48,7 +48,7 @@ func initServices(cfg *config.Config, mongodb *providers.MongoWrapper, repos *Re
 		UserService:   services.NewUserService(cfg, mongodb.DB, repos.UserRepo),
 		ChatService:   services.NewChatService(cfg, mongodb.DB, repos.ChatRepo, repos.ServerRepo, repos.UserRepo),
 		ServerService: services.NewServerService(cfg, mongodb.DB, repos.ServerRepo),
-		FriendService: services.NewFriendService(cfg, mongodb.DB, repos.FriendRepo),
+		FriendService: services.NewFriendService(cfg, mongodb.DB, repos.FriendRepo, repos.UserRepo),
 	}
 }
 

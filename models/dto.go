@@ -49,3 +49,11 @@ type MessageResponse struct {
 	Content   string             `json:"content" bson:"content"`
 	Timestamp int64              `json:"timestamp" bson:"timestamp"`
 }
+
+type APIFriend struct {
+	ID       string `json:"id" bson:"_id"`
+	Name     string `json:"name" bson:"name"`
+	Nickname string `json:"nickname" bson:"nickname"`
+	Picture  string `json:"picture" bson:"picture"`
+	Status   string `json:"status" bson:"status"`
+}

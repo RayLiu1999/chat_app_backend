@@ -1,8 +1,8 @@
 package services
 
 import (
+	"chat_app_backend/utils"
 	"context"
-	"log"
 	"sync"
 	"time"
 
@@ -67,20 +67,20 @@ func (cm *ClientManager) GetAllClients() map[*Client]bool {
 // handleRegister 處理客戶端註冊
 func (cm *ClientManager) handleRegister() {
 	for client := range cm.register {
-		log.Printf("Handling Register event for user %s", client.UserID)
+		utils.PrettyPrintf("Handling Register event for user %s", client.UserID)
 		cm.registerClient(client)
 		cm.updateClientStatus(client, "online")
-		log.Printf("Register event completed for user %s", client.UserID)
+		utils.PrettyPrintf("Register event completed for user %s", client.UserID)
 	}
 }
 
 // handleUnregister 處理客戶端註銷
 func (cm *ClientManager) handleUnregister() {
 	for client := range cm.unregister {
-		log.Printf("Handling Unregister event for user %s", client.UserID)
+		utils.PrettyPrintf("Handling Unregister event for user %s", client.UserID)
 		cm.unregisterClient(client)
 		cm.updateClientStatus(client, "offline")
-		log.Printf("Unregister event completed for user %s", client.UserID)
+		utils.PrettyPrintf("Unregister event completed for user %s", client.UserID)
 	}
 }
 
@@ -111,5 +111,5 @@ func (cm *ClientManager) unregisterClient(client *Client) {
 func (cm *ClientManager) updateClientStatus(client *Client, status string) {
 	ctx := context.Background()
 	cm.redisClient.Set(ctx, "user:"+client.UserID+":status", status, 24*time.Hour)
-	log.Printf("Update status for user %s: %s", client.UserID, status)
+	utils.PrettyPrintf("Update status for user %s: %s", client.UserID, status)
 }

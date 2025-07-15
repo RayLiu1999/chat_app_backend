@@ -9,6 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // ODM 錯誤定義
@@ -308,4 +309,92 @@ func (o *ODM) Exists(ctx context.Context, filter bson.M, model Model) (bool, err
 		return false, err
 	}
 	return count > 0, nil
+}
+
+// ExistsByID 通過ID檢查文檔是否存在
+func (o *ODM) ExistsByID(ctx context.Context, ID string, model Model) (bool, error) {
+	objectID, err := primitive.ObjectIDFromHex(ID)
+	if err != nil {
+		return false, ErrInvalidID
+	}
+	filter := bson.M{"_id": objectID}
+	return o.Exists(ctx, filter, model)
+}
+
+// FindWithOptions 使用自定義選項查找文檔
+func (o *ODM) FindWithOptions(ctx context.Context, filter bson.M, models interface{}, options *QueryOptions) error {
+	// 確保models是指向切片的指針
+	modelsValue := reflect.ValueOf(models)
+	if modelsValue.Kind() != reflect.Ptr || modelsValue.Elem().Kind() != reflect.Slice {
+		return ErrInvalidModel
+	}
+
+	// 獲取切片元素類型
+	sliceValue := modelsValue.Elem()
+	elemType := sliceValue.Type().Elem()
+
+	// 創建一個新的實例來獲取集合名稱
+	modelInstance := reflect.New(elemType).Interface()
+	model, ok := modelInstance.(Model)
+	if !ok {
+		return ErrInvalidModel
+	}
+
+	// 構建MongoDB選項
+	findOptions := options.ToFindOptions()
+
+	cursor, err := o.Collection(model).Find(ctx, filter, findOptions)
+	if err != nil {
+		return err
+	}
+	defer cursor.Close(ctx)
+
+	return cursor.All(ctx, models)
+}
+
+// Aggregate 執行聚合查詢
+func (o *ODM) Aggregate(ctx context.Context, pipeline interface{}, models interface{}, model Model) error {
+	cursor, err := o.Collection(model).Aggregate(ctx, pipeline)
+	if err != nil {
+		return err
+	}
+	defer cursor.Close(ctx)
+
+	return cursor.All(ctx, models)
+}
+
+// BulkWrite 執行批量寫入操作
+func (o *ODM) BulkWrite(ctx context.Context, operations []mongo.WriteModel, model Model) (*mongo.BulkWriteResult, error) {
+	return o.Collection(model).BulkWrite(ctx, operations)
+}
+
+// QueryOptions 定義查詢選項
+type QueryOptions struct {
+	Sort       bson.D
+	Limit      *int64
+	Skip       *int64
+	Projection bson.M
+}
+
+// ToFindOptions 將QueryOptions轉換為MongoDB的FindOptions
+func (qo *QueryOptions) ToFindOptions() *options.FindOptions {
+	opts := options.Find()
+
+	if len(qo.Sort) > 0 {
+		opts.SetSort(qo.Sort)
+	}
+
+	if qo.Limit != nil {
+		opts.SetLimit(*qo.Limit)
+	}
+
+	if qo.Skip != nil {
+		opts.SetSkip(*qo.Skip)
+	}
+
+	if len(qo.Projection) > 0 {
+		opts.SetProjection(qo.Projection)
+	}
+
+	return opts
 }

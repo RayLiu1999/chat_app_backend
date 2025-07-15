@@ -2,9 +2,9 @@ package services
 
 import (
 	"chat_app_backend/models"
+	"chat_app_backend/utils"
 	"context"
 	"encoding/json"
-	"log"
 	"sync"
 	"time"
 
@@ -48,17 +48,21 @@ func (wsh *WebSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) 
 		var msg WsMessage[json.RawMessage]
 		err := ws.ReadJSON(&msg)
 		if err != nil {
-			log.Printf("Read message failed: %v", err)
+			utils.PrettyPrintf("Read message failed: %v", err)
 			wsh.clientManager.Unregister(client)
 			break
 		}
 
+		utils.PrettyPrint("Received message:", msg)
+
 		switch msg.Action {
 		case "join_room":
+			utils.PrettyPrintf("User %s is joining room: %s", userID, msg.Data)
 			wsh.handleJoinRoom(ws, client, msg.Data)
 		case "leave_room":
 			wsh.handleLeaveRoom(ws, client, msg.Data)
 		case "send_message":
+			utils.PrettyPrintf("User %s is sending message in room: %s", userID, msg.Data)
 			wsh.handleSendMessage(ws, client, msg.Data, userID)
 		}
 	}
@@ -72,7 +76,7 @@ func (wsh *WebSocketHandler) handleJoinRoom(ws *websocket.Conn, client *Client, 
 	}
 	err := json.Unmarshal(data, &requestData)
 	if err != nil {
-		log.Printf("Failed to parse join_room data: %v", err)
+		utils.PrettyPrintf("Failed to parse join_room data: %v", err)
 		return
 	}
 
@@ -130,7 +134,7 @@ func (wsh *WebSocketHandler) handleLeaveRoom(ws *websocket.Conn, client *Client,
 	}
 	err := json.Unmarshal(data, &requestData)
 	if err != nil {
-		log.Printf("Failed to parse leave_room data: %v", err)
+		utils.PrettyPrintf("Failed to parse leave_room data: %v", err)
 		return
 	}
 
@@ -160,7 +164,7 @@ func (wsh *WebSocketHandler) handleSendMessage(ws *websocket.Conn, client *Clien
 	}
 	err := json.Unmarshal(data, &requestData)
 	if err != nil {
-		log.Printf("Failed to parse send_message data: %v", err)
+		utils.PrettyPrintf("Failed to parse send_message data: %v", err)
 		return
 	}
 
@@ -187,7 +191,7 @@ func (wsh *WebSocketHandler) handleDMRoomCreation(roomID, userID string) {
 	key := RoomKey{Type: models.RoomTypeDM, RoomID: roomID}
 	room, exists := wsh.roomManager.GetRoom(models.RoomTypeDM, roomID)
 	if !exists {
-		log.Printf("Room %s not found", key.String())
+		utils.PrettyPrintf("Room %s not found", key.String())
 		return
 	}
 
@@ -200,13 +204,13 @@ func (wsh *WebSocketHandler) handleDMRoomCreation(roomID, userID string) {
 	if isOnlyOneClient {
 		roomObjectID, err := primitive.ObjectIDFromHex(roomID)
 		if err != nil {
-			log.Printf("Failed to parse room_id: %v", err)
+			utils.PrettyPrintf("Failed to parse room_id: %v", err)
 			return
 		}
 
 		userObjectID, err := primitive.ObjectIDFromHex(userID)
 		if err != nil {
-			log.Printf("Failed to parse user_id: %v", err)
+			utils.PrettyPrintf("Failed to parse user_id: %v", err)
 			return
 		}
 
@@ -221,7 +225,7 @@ func (wsh *WebSocketHandler) handleDMRoomCreation(roomID, userID string) {
 			},
 		})
 		if err != nil {
-			log.Printf("Failed to find dm room: %v", err)
+			utils.PrettyPrintf("Failed to find dm room: %v", err)
 			return
 		}
 
@@ -236,8 +240,6 @@ func (wsh *WebSocketHandler) handleDMRoomCreation(roomID, userID string) {
 					UserID:         dmRoom.ChatWithUserID,
 					ChatWithUserID: dmRoom.UserID,
 					IsHidden:       false,
-					CreatedAt:      time.Now(),
-					UpdatedAt:      time.Now(),
 				})
 			}
 		}

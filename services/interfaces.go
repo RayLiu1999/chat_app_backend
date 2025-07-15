@@ -40,14 +40,17 @@ type ChatServiceInterface interface {
 	// HandleWebSocket 處理 WebSocket 連接
 	HandleWebSocket(ws *websocket.Conn, userID string)
 
-	// UpdateDMRoom 更新聊天列表
-	// UpdateDMRoom(userID, chatWithUserID primitive.ObjectID, IsHidden bool) error
-
-	// CreateDMRoom 保存聊天列表
-	// CreateDMRoom(chatList models.DMRoom) (models.DMRoomResponse, error)
-
 	// GetDMRoomResponseList 獲取聊天列表response
 	GetDMRoomResponseList(userID string, includeNotVisible bool) ([]models.DMRoomResponse, error)
+
+	// UpdateDMRoom 更新聊天房間狀態
+	UpdateDMRoom(userID string, roomID string, isHidden bool) error
+
+	// CreateDMRoom 創建私聊房間
+	CreateDMRoom(userID string, chatWithUserID string) (*models.DMRoomResponse, error)
+
+	// GetDMMessages 獲取私聊訊息
+	GetDMMessages(userID string, roomID string, before string, after string, limit string) ([]models.MessageResponse, error)
 
 	// 其他已實現的方法應該添加到這裡
 	// ... 其他方法 ...
@@ -69,4 +72,13 @@ type ServerServiceInterface interface {
 type FriendServiceInterface interface {
 	// GetFriendById 根據ID獲取好友信息
 	GetFriendById(userID string) (*models.Friend, error)
+
+	// GetFriendList 獲取好友列表
+	GetFriendList(userID string) ([]models.APIFriend, error)
+
+	// AddFriendRequest 發送好友請求
+	AddFriendRequest(userID string, username string) error
+
+	// UpdateFriendStatus 更新好友狀態
+	UpdateFriendStatus(userID string, friendID string, status string) error
 }

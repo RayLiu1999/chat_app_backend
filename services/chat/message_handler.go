@@ -76,11 +76,9 @@ func (mh *MessageHandler) saveMessageToDB(data MessageResponse) {
 	}
 
 	message := models.Message{
-		RoomID:    roomObjectID,
-		SenderID:  senderObjectID,
-		Content:   data.Content,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		RoomID:   roomObjectID,
+		SenderID: senderObjectID,
+		Content:  data.Content,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"chat_app_backend/providers"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -33,14 +34,6 @@ type Member struct {
 // 	UpdatedAt time.Time `json:"updated_at" bson:"updated_at"`
 // }
 
-// 房間已讀時間
-type RoomReads struct {
-	ID         primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-	UserID     primitive.ObjectID `json:"user_id" bson:"user_id"`
-	RoomID     primitive.ObjectID `json:"room_id" bson:"room_id"`
-	LastReadAt time.Time          `json:"last_read_at" bson:"last_read_at"`
-}
-
 // 聊天室與使用者關聯
 // type RoomParticipants struct {
 // 	ID        primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
@@ -52,22 +45,41 @@ type RoomReads struct {
 
 // 訊息
 type Message struct {
-	ID        primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-	RoomType  RoomType           `json:"room_type" bson:"room_type"` // "channel" or "dm"
-	Content   string             `json:"content" bson:"content"`
-	SenderID  primitive.ObjectID `json:"sender_id" bson:"sender_id"`
-	RoomID    primitive.ObjectID `json:"room_id" bson:"room_id"`
-	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
-	UpdatedAt time.Time          `json:"updated_at" bson:"updated_at"`
+	providers.BaseModel `bson:",inline"`
+	RoomType            RoomType           `json:"room_type" bson:"room_type"` // "channel" or "dm"
+	Content             string             `json:"content" bson:"content"`
+	SenderID            primitive.ObjectID `json:"sender_id" bson:"sender_id"`
+	RoomID              primitive.ObjectID `json:"room_id" bson:"room_id"`
+}
+
+// GetCollectionName 返回Message的集合名稱
+func (m *Message) GetCollectionName() string {
+	return "messages"
 }
 
 // 私聊房間
 type DMRoom struct {
-	ID             primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-	RoomID         primitive.ObjectID `json:"room_id" bson:"room_id"`
-	UserID         primitive.ObjectID `json:"user_id" bson:"user_id"`
-	ChatWithUserID primitive.ObjectID `json:"chat_with_user_id" bson:"chat_with_user_id"`
-	IsHidden       bool               `json:"is_hidden" bson:"is_hidden"` // 是否隱藏
-	CreatedAt      time.Time          `json:"created_at" bson:"created_at"`
-	UpdatedAt      time.Time          `json:"updated_at" bson:"updated_at"` // 最後聊天時間(用來排序)
+	providers.BaseModel `bson:",inline"`
+	RoomID              primitive.ObjectID `json:"room_id" bson:"room_id"`
+	UserID              primitive.ObjectID `json:"user_id" bson:"user_id"`
+	ChatWithUserID      primitive.ObjectID `json:"chat_with_user_id" bson:"chat_with_user_id"`
+	IsHidden            bool               `json:"is_hidden" bson:"is_hidden"` // 是否隱藏
+}
+
+// GetCollectionName 返回DMRoom的集合名稱
+func (dm *DMRoom) GetCollectionName() string {
+	return "dm_rooms"
+}
+
+// 房間已讀時間
+type RoomReads struct {
+	providers.BaseModel `bson:",inline"`
+	UserID              primitive.ObjectID `json:"user_id" bson:"user_id"`
+	RoomID              primitive.ObjectID `json:"room_id" bson:"room_id"`
+	LastReadAt          time.Time          `json:"last_read_at" bson:"last_read_at"`
+}
+
+// GetCollectionName 返回RoomReads的集合名稱
+func (rr *RoomReads) GetCollectionName() string {
+	return "room_reads"
 }

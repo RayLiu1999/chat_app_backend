@@ -10,6 +10,8 @@ import (
 	"os"
 	"path"
 	"time"
+
+	"chat_app_backend/config"
 )
 
 // SimpleGet 發送簡單的 GET 請求並返回響應內容
@@ -190,7 +192,8 @@ func ParseURLParams(urlStr string) (map[string]string, error) {
 // 返回：
 //   - URL 字串
 func GetUploadURL(path string, params map[string]string) string {
-	baseURL := "http://localhost:8080"
+	cfg := config.GetConfig()
+	baseURL := cfg.Server.BaseURL
 	uploadPath := "/uploads/"
 	url := baseURL + uploadPath + path
 
