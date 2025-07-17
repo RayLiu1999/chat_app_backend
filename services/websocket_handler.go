@@ -2,6 +2,7 @@ package services
 
 import (
 	"chat_app_backend/models"
+	"chat_app_backend/providers"
 	"chat_app_backend/utils"
 	"context"
 	"encoding/json"
@@ -9,23 +10,21 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // WebSocketHandler 處理 WebSocket 相關操作
 type WebSocketHandler struct {
-	mongoConnect   *mongo.Database
+	odm            *providers.ODM
 	clientManager  *ClientManager
 	roomManager    *RoomManager
 	messageHandler *MessageHandler
 }
 
 // NewWebSocketHandler 創建新的 WebSocket 處理器
-func NewWebSocketHandler(mongoConnect *mongo.Database, clientManager *ClientManager, roomManager *RoomManager, messageHandler *MessageHandler) *WebSocketHandler {
+func NewWebSocketHandler(odm *providers.ODM, clientManager *ClientManager, roomManager *RoomManager, messageHandler *MessageHandler) *WebSocketHandler {
 	return &WebSocketHandler{
-		mongoConnect:   mongoConnect,
+		odm:            odm,
 		clientManager:  clientManager,
 		roomManager:    roomManager,
 		messageHandler: messageHandler,
@@ -34,6 +33,14 @@ func NewWebSocketHandler(mongoConnect *mongo.Database, clientManager *ClientMana
 
 // HandleWebSocket 處理 WebSocket 連線
 func (wsh *WebSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) {
+	// 設置連接參數
+	ws.SetReadLimit(512)
+	ws.SetReadDeadline(time.Now().Add(60 * time.Second))
+	ws.SetPongHandler(func(string) error {
+		ws.SetReadDeadline(time.Now().Add(60 * time.Second))
+		return nil
+	})
+
 	// 初始化用戶
 	client := &Client{
 		UserID:        userID,
@@ -44,16 +51,38 @@ func (wsh *WebSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) 
 	}
 	wsh.clientManager.Register(client)
 
+	// 啟動心跳檢測
+	go wsh.pingHandler(ws, client)
+
+	// 處理消息循環
+	defer func() {
+		if r := recover(); r != nil {
+			utils.PrettyPrintf("WebSocket handler panic recovered: %v", r)
+		}
+		wsh.clientManager.Unregister(client)
+		ws.Close()
+	}()
+
 	for {
 		var msg WsMessage[json.RawMessage]
+
+		// 設置讀取截止時間
+		ws.SetReadDeadline(time.Now().Add(60 * time.Second))
+
 		err := ws.ReadJSON(&msg)
 		if err != nil {
-			utils.PrettyPrintf("Read message failed: %v", err)
-			wsh.clientManager.Unregister(client)
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				utils.PrettyPrintf("WebSocket unexpected close error: %v", err)
+			} else {
+				utils.PrettyPrintf("Read message failed: %v", err)
+			}
 			break
 		}
 
 		utils.PrettyPrint("Received message:", msg)
+
+		// 重置讀取截止時間
+		ws.SetReadDeadline(time.Now().Add(60 * time.Second))
 
 		switch msg.Action {
 		case "join_room":
@@ -64,7 +93,39 @@ func (wsh *WebSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) 
 		case "send_message":
 			utils.PrettyPrintf("User %s is sending message in room: %s", userID, msg.Data)
 			wsh.handleSendMessage(ws, client, msg.Data, userID)
+		case "ping":
+			// 處理客戶端ping
+			wsh.handlePing(ws)
+		default:
+			utils.PrettyPrintf("Unknown action: %s", msg.Action)
 		}
+	}
+}
+
+// pingHandler 處理心跳檢測
+func (wsh *WebSocketHandler) pingHandler(ws *websocket.Conn, client *Client) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		ws.SetWriteDeadline(time.Now().Add(10 * time.Second))
+		if err := ws.WriteMessage(websocket.PingMessage, nil); err != nil {
+			utils.PrettyPrintf("Ping failed for user %s: %v", client.UserID, err)
+			return
+		}
+	}
+}
+
+// handlePing 處理ping請求
+func (wsh *WebSocketHandler) handlePing(ws *websocket.Conn) {
+	pongMsg := &WsMessage[map[string]string]{
+		Action: "pong",
+		Data:   map[string]string{"message": "pong"},
+	}
+
+	ws.SetWriteDeadline(time.Now().Add(10 * time.Second))
+	if err := ws.WriteJSON(pongMsg); err != nil {
+		utils.PrettyPrintf("Failed to send pong: %v", err)
 	}
 }
 
@@ -168,6 +229,9 @@ func (wsh *WebSocketHandler) handleSendMessage(ws *websocket.Conn, client *Clien
 		return
 	}
 
+	// 確保房間存在
+	wsh.roomManager.InitRoom(requestData.RoomType, requestData.RoomID)
+
 	// 處理私聊房間邏輯
 	if requestData.RoomType == models.RoomTypeDM {
 		wsh.handleDMRoomCreation(requestData.RoomID, userID)
@@ -183,65 +247,72 @@ func (wsh *WebSocketHandler) handleSendMessage(ws *websocket.Conn, client *Clien
 			Timestamp: time.Now().UnixMilli(),
 		},
 	}
+
+	// 使用MessageHandler處理消息
 	wsh.messageHandler.HandleMessage(message)
 }
 
 // handleDMRoomCreation 處理私聊房間創建邏輯
 func (wsh *WebSocketHandler) handleDMRoomCreation(roomID, userID string) {
-	key := RoomKey{Type: models.RoomTypeDM, RoomID: roomID}
-	room, exists := wsh.roomManager.GetRoom(models.RoomTypeDM, roomID)
-	if !exists {
-		utils.PrettyPrintf("Room %s not found", key.String())
+	roomObjectID, err := primitive.ObjectIDFromHex(roomID)
+	if err != nil {
+		utils.PrettyPrintf("Failed to parse room_id: %v", err)
 		return
 	}
 
-	// 檢查房間是否只有一個客戶端
-	room.Mutex.RLock()
-	isOnlyOneClient := len(room.Clients) == 1
-	room.Mutex.RUnlock()
+	userObjectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		utils.PrettyPrintf("Failed to parse user_id: %v", err)
+		return
+	}
 
-	// 如果是私聊且只有一個客戶端，則判斷是否建立房間
-	if isOnlyOneClient {
-		roomObjectID, err := primitive.ObjectIDFromHex(roomID)
+	ctx := context.Background()
+	var dmRoomList []models.DMRoom
+	err = wsh.odm.Find(ctx, map[string]interface{}{"room_id": roomObjectID}, &dmRoomList)
+	if err != nil {
+		utils.PrettyPrintf("Failed to find dm room: %v", err)
+		return
+	}
+
+	var currentUserRoom *models.DMRoom
+	var partnerUserRoom *models.DMRoom
+
+	for i := range dmRoomList {
+		room := &dmRoomList[i]
+		if room.UserID == userObjectID {
+			currentUserRoom = room
+		} else {
+			partnerUserRoom = room
+		}
+	}
+
+	if currentUserRoom == nil && partnerUserRoom != nil {
+		newRoom := &models.DMRoom{
+			RoomID:         roomObjectID,
+			UserID:         userObjectID,
+			ChatWithUserID: partnerUserRoom.UserID,
+			IsHidden:       false,
+		}
+		err := wsh.odm.InsertOne(ctx, newRoom)
 		if err != nil {
-			utils.PrettyPrintf("Failed to parse room_id: %v", err)
+			utils.PrettyPrintf("Failed to create dm room for user %s: %v", userID, err)
 			return
 		}
+		utils.PrettyPrintf("Created DM room record for user %s in room %s", userID, roomID)
+	}
 
-		userObjectID, err := primitive.ObjectIDFromHex(userID)
+	if partnerUserRoom == nil && currentUserRoom != nil {
+		newRoom := &models.DMRoom{
+			RoomID:         roomObjectID,
+			UserID:         currentUserRoom.ChatWithUserID,
+			ChatWithUserID: userObjectID,
+			IsHidden:       false,
+		}
+		err := wsh.odm.InsertOne(ctx, newRoom)
 		if err != nil {
-			utils.PrettyPrintf("Failed to parse user_id: %v", err)
+			utils.PrettyPrintf("Failed to create dm room for partner: %v", err)
 			return
 		}
-
-		// 先用RoomID找到ChatWithUserID
-		var dmRoomList []models.DMRoom
-		dbRoomCollection := wsh.mongoConnect.Collection("dm_rooms")
-		cursor, err := dbRoomCollection.Find(context.Background(), bson.M{
-			"room_id": roomObjectID,
-			"$or": []bson.M{
-				{"user_id": userObjectID},
-				{"chat_with_user_id": userObjectID},
-			},
-		})
-		if err != nil {
-			utils.PrettyPrintf("Failed to find dm room: %v", err)
-			return
-		}
-
-		cursor.All(context.Background(), &dmRoomList)
-
-		// 如果對方房間不存在，則建立
-		if len(dmRoomList) == 1 {
-			for _, dmRoom := range dmRoomList {
-				RoomID := dmRoom.RoomID
-				dbRoomCollection.InsertOne(context.Background(), models.DMRoom{
-					RoomID:         RoomID,
-					UserID:         dmRoom.ChatWithUserID,
-					ChatWithUserID: dmRoom.UserID,
-					IsHidden:       false,
-				})
-			}
-		}
+		utils.PrettyPrintf("Created DM room record for partner in room %s", roomID)
 	}
 }

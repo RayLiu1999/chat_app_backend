@@ -3,21 +3,21 @@ package services
 import (
 	"chat_app_backend/config"
 	"chat_app_backend/models"
-
-	"go.mongodb.org/mongo-driver/mongo"
+	"chat_app_backend/providers"
+	"chat_app_backend/repositories"
 )
 
 type ServerService struct {
-	config       *config.Config
-	mongoConnect *mongo.Database
-	serverRepo   ServerServiceInterface
+	config     *config.Config
+	serverRepo repositories.ServerRepositoryInterface
+	odm        *providers.ODM
 }
 
-func NewServerService(cfg *config.Config, mongodb *mongo.Database, serverRepo ServerServiceInterface) *ServerService {
+func NewServerService(cfg *config.Config, odm *providers.ODM, serverRepo repositories.ServerRepositoryInterface) *ServerService {
 	return &ServerService{
-		config:       cfg,
-		mongoConnect: mongodb,
-		serverRepo:   serverRepo,
+		config:     cfg,
+		serverRepo: serverRepo,
+		odm:        odm,
 	}
 }
 

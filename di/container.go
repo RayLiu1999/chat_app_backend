@@ -33,22 +33,22 @@ type ControllerContainer struct {
 }
 
 // 初始化儲存庫
-func initRepositories(cfg *config.Config, mongodb *providers.MongoWrapper) *RepositoryContainer {
+func initRepositories(cfg *config.Config, odm *providers.ODM) *RepositoryContainer {
 	return &RepositoryContainer{
-		UserRepo:   repositories.NewUserRepository(cfg, mongodb.DB),
-		ChatRepo:   repositories.NewChatRepository(cfg, mongodb.DB),
-		ServerRepo: repositories.NewServerRepository(cfg, mongodb.DB),
-		FriendRepo: repositories.NewFriendRepository(cfg, mongodb.DB),
+		UserRepo:   repositories.NewUserRepository(cfg, odm),
+		ChatRepo:   repositories.NewChatRepository(cfg, odm),
+		ServerRepo: repositories.NewServerRepository(cfg, odm),
+		FriendRepo: repositories.NewFriendRepository(cfg, odm),
 	}
 }
 
 // 初始化服務
-func initServices(cfg *config.Config, mongodb *providers.MongoWrapper, repos *RepositoryContainer) *ServiceContainer {
+func initServices(cfg *config.Config, odm *providers.ODM, repos *RepositoryContainer) *ServiceContainer {
 	return &ServiceContainer{
-		UserService:   services.NewUserService(cfg, mongodb.DB, repos.UserRepo),
-		ChatService:   services.NewChatService(cfg, mongodb.DB, repos.ChatRepo, repos.ServerRepo, repos.UserRepo),
-		ServerService: services.NewServerService(cfg, mongodb.DB, repos.ServerRepo),
-		FriendService: services.NewFriendService(cfg, mongodb.DB, repos.FriendRepo, repos.UserRepo),
+		UserService:   services.NewUserService(cfg, odm, repos.UserRepo),
+		ChatService:   services.NewChatService(cfg, odm, repos.ChatRepo, repos.ServerRepo, repos.UserRepo),
+		ServerService: services.NewServerService(cfg, odm, repos.ServerRepo),
+		FriendService: services.NewFriendService(cfg, odm, repos.FriendRepo, repos.UserRepo),
 	}
 }
 
@@ -64,7 +64,8 @@ func initControllers(cfg *config.Config, mongodb *providers.MongoWrapper, servic
 
 // 創建應用程式依賴
 func BuildDependencies(cfg *config.Config, mongodb *providers.MongoWrapper) *ControllerContainer {
-	repos := initRepositories(cfg, mongodb)
-	services := initServices(cfg, mongodb, repos)
+	odm := providers.NewODM(mongodb.DB)
+	repos := initRepositories(cfg, odm)
+	services := initServices(cfg, odm, repos)
 	return initControllers(cfg, mongodb, services, repos)
 }

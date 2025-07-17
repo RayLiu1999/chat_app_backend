@@ -8,20 +8,17 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type UserRepository struct {
-	config       *config.Config
-	mongoConnect *mongo.Database
-	odm          *providers.ODM
+	config *config.Config
+	odm    *providers.ODM
 }
 
-func NewUserRepository(cfg *config.Config, mongodb *mongo.Database) *UserRepository {
+func NewUserRepository(cfg *config.Config, odm *providers.ODM) *UserRepository {
 	return &UserRepository{
-		config:       cfg,
-		mongoConnect: mongodb,
-		odm:          providers.NewODM(mongodb),
+		config: cfg,
+		odm:    odm,
 	}
 }
 

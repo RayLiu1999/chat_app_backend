@@ -2,51 +2,59 @@ package services
 
 import (
 	"chat_app_backend/models"
+	"chat_app_backend/providers"
 	"context"
 	"log"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // MessageHandler 處理消息相關邏輯
 type MessageHandler struct {
-	mongoConnect *mongo.Database
-	roomManager  *RoomManager
+	odm         *providers.ODM
+	roomManager *RoomManager
 }
 
 // NewMessageHandler 創建新的消息處理器
-func NewMessageHandler(mongoConnect *mongo.Database, roomManager *RoomManager) *MessageHandler {
+func NewMessageHandler(odm *providers.ODM, roomManager *RoomManager) *MessageHandler {
 	return &MessageHandler{
-		mongoConnect: mongoConnect,
-		roomManager:  roomManager,
+		odm:         odm,
+		roomManager: roomManager,
 	}
 }
 
 // HandleMessage 處理消息邏輯
 func (mh *MessageHandler) HandleMessage(message *WsMessage[MessageResponse]) {
+	// 先儲存消息到資料庫（不管房間是否存在客戶端）
+	mh.saveMessageToDB(message.Data)
+
 	// 檢查房間是否存在
 	room, exists := mh.roomManager.GetRoom(message.Data.RoomType, message.Data.RoomID)
 	if !exists {
-		log.Printf("Room %s not found", message.Data.RoomID)
+		log.Printf("Room %s not found, message saved to DB but no clients to broadcast", message.Data.RoomID)
 		return
 	}
 
-	// 儲存消息到資料庫
-	mh.saveMessageToDB(message.Data)
-
 	// 發送消息給房間內的所有客戶端
 	room.Mutex.RLock()
-	defer room.Mutex.RUnlock()
-
+	clients := make([]*Client, 0, len(room.Clients))
 	for client := range room.Clients {
-		err := client.Conn.WriteJSON(message)
-		if err != nil {
-			log.Printf("Failed to send message to client %s: %v", client.UserID, err)
-			mh.roomManager.LeaveRoom(client, message.Data.RoomType, message.Data.RoomID)
-		}
+		clients = append(clients, client)
+	}
+	room.Mutex.RUnlock()
+
+	// 在外部發送消息，避免長時間持有鎖
+	for _, client := range clients {
+		go func(c *Client) {
+			err := c.Conn.WriteJSON(message)
+			if err != nil {
+				log.Printf("Failed to send message to client %s: %v", c.UserID, err)
+				// 異步移除有問題的客戶端
+				go mh.roomManager.LeaveRoom(c, message.Data.RoomType, message.Data.RoomID)
+			}
+		}(client)
 	}
 }
 
@@ -64,34 +72,24 @@ func (mh *MessageHandler) saveMessageToDB(data MessageResponse) {
 		return
 	}
 
-	var collectionName string
-	switch data.RoomType {
-	case models.RoomTypeDM:
-		collectionName = "dm_messages"
-	case models.RoomTypeChannel:
-		collectionName = "channel_messages"
-	default:
-		log.Printf("Unknown room type: %s", data.RoomType)
-		return
-	}
-
-	message := models.Message{
+	message := &models.Message{
 		RoomID:   roomObjectID,
 		SenderID: senderObjectID,
 		Content:  data.Content,
+		RoomType: data.RoomType,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	collection := mh.mongoConnect.Collection(collectionName)
-	_, err = collection.InsertOne(ctx, message)
+	err = mh.odm.InsertOne(ctx, message)
 	if err != nil {
 		log.Printf("Failed to save message: %v", err)
 		return
 	}
 
-	// 更新房間的最後訊息時間
+	log.Printf("Message saved to DB: room=%s, sender=%s, content=%s", data.RoomID, data.SenderID, data.Content)
+
 	mh.updateRoomLastMessage(data.RoomID, data.RoomType)
 }
 
@@ -108,20 +106,15 @@ func (mh *MessageHandler) updateRoomLastMessage(roomID string, roomType models.R
 
 	switch roomType {
 	case models.RoomTypeDM:
-		collection := mh.mongoConnect.Collection("dm_rooms")
-		_, err = collection.UpdateMany(ctx,
-			bson.M{"room_id": roomObjectID},
-			bson.M{"$set": bson.M{"updated_at": time.Now()}},
-		)
+		// 更新 dm_rooms 的 updated_at
+		dmRoom := &models.DMRoom{}
+		err = mh.odm.UpdateMany(ctx, dmRoom, map[string]interface{}{"room_id": roomObjectID}, map[string]interface{}{"$set": map[string]interface{}{"updated_at": time.Now()}})
 		if err != nil {
 			log.Printf("Failed to update dm room last message time: %v", err)
 		}
 	case models.RoomTypeChannel:
-		collection := mh.mongoConnect.Collection("channels")
-		_, err = collection.UpdateOne(ctx,
-			bson.M{"_id": roomObjectID},
-			bson.M{"$set": bson.M{"last_message_at": time.Now()}},
-		)
+		channel := &models.Channel{}
+		err = mh.odm.UpdateFields(ctx, channel, bson.M{"last_message_at": time.Now()})
 		if err != nil {
 			log.Printf("Failed to update channel last message time: %v", err)
 		}

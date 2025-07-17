@@ -11,23 +11,20 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type UserService struct {
-	config       *config.Config
-	mongoConnect *mongo.Database
-	userRepo     repositories.UserRepositoryInterface
-	odm          *providers.ODM
+	config   *config.Config
+	userRepo repositories.UserRepositoryInterface
+	odm      *providers.ODM
 }
 
-func NewUserService(cfg *config.Config, mongodb *mongo.Database, userRepo repositories.UserRepositoryInterface) *UserService {
+func NewUserService(cfg *config.Config, odm *providers.ODM, userRepo repositories.UserRepositoryInterface) *UserService {
 	return &UserService{
-		config:       cfg,
-		mongoConnect: mongodb,
-		userRepo:     userRepo,
-		odm:          providers.NewODM(mongodb),
+		config:   cfg,
+		userRepo: userRepo,
+		odm:      odm,
 	}
 }
 

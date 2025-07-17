@@ -10,24 +10,21 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type FriendService struct {
-	config       *config.Config
-	mongoConnect *mongo.Database
-	friendRepo   repositories.FriendRepositoryInterface
-	userRepo     repositories.UserRepositoryInterface
-	odm          *providers.ODM
+	config     *config.Config
+	friendRepo repositories.FriendRepositoryInterface
+	userRepo   repositories.UserRepositoryInterface
+	odm        *providers.ODM
 }
 
-func NewFriendService(cfg *config.Config, mongodb *mongo.Database, friendRepo repositories.FriendRepositoryInterface, userRepo repositories.UserRepositoryInterface) *FriendService {
+func NewFriendService(cfg *config.Config, odm *providers.ODM, friendRepo repositories.FriendRepositoryInterface, userRepo repositories.UserRepositoryInterface) *FriendService {
 	return &FriendService{
-		config:       cfg,
-		mongoConnect: mongodb,
-		friendRepo:   friendRepo,
-		userRepo:     userRepo,
-		odm:          providers.NewODM(mongodb),
+		config:     cfg,
+		friendRepo: friendRepo,
+		userRepo:   userRepo,
+		odm:        odm,
 	}
 }
 

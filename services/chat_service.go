@@ -10,23 +10,22 @@ import (
 	"errors"
 	"log"
 	"strconv"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // ChatService 管理所有的聊天功能
 type ChatService struct {
-	config       *config.Config
-	mongoConnect *mongo.Database
-	redisClient  *redis.Client
-	chatRepo     repositories.ChatRepositoryInterface
-	serverRepo   repositories.ServerRepositoryInterface
-	userRepo     repositories.UserRepositoryInterface
-	odm          *providers.ODM
+	config      *config.Config
+	redisClient *redis.Client
+	chatRepo    repositories.ChatRepositoryInterface
+	serverRepo  repositories.ServerRepositoryInterface
+	userRepo    repositories.UserRepositoryInterface
+	odm         *providers.ODM
 
 	// 新增的模組化組件
 	clientManager    *ClientManager
@@ -36,26 +35,21 @@ type ChatService struct {
 }
 
 // NewChatService 初始化聊天室服務
-func NewChatService(cfg *config.Config, mongodb *mongo.Database, chatRepo repositories.ChatRepositoryInterface, serverRepo repositories.ServerRepositoryInterface, userRepo repositories.UserRepositoryInterface) *ChatService {
+func NewChatService(cfg *config.Config, odm *providers.ODM, chatRepo repositories.ChatRepositoryInterface, serverRepo repositories.ServerRepositoryInterface, userRepo repositories.UserRepositoryInterface) *ChatService {
 	redisClient := redis.NewClient(&redis.Options{Addr: cfg.Redis.Addr})
 	if _, err := redisClient.Ping(context.Background()).Result(); err != nil {
-		log.Fatalf("Failed to ping Redis: %v", err)
+		log.Printf("Failed to ping Redis: %v", err)
 		utils.PrettyPrint("Failed to ping Redis:", err)
-		return nil
 	}
-
-	// 創建ODM實例
-	odm := providers.NewODM(mongodb)
 
 	// 創建模組化組件
 	clientManager := NewClientManager(redisClient)
-	roomManager := NewRoomManager(mongodb, redisClient)
-	messageHandler := NewMessageHandler(mongodb, roomManager)
-	websocketHandler := NewWebSocketHandler(mongodb, clientManager, roomManager, messageHandler)
+	roomManager := NewRoomManager(odm, redisClient)
+	messageHandler := NewMessageHandler(odm, roomManager)
+	websocketHandler := NewWebSocketHandler(odm, clientManager, roomManager, messageHandler)
 
 	cs := &ChatService{
 		config:           cfg,
-		mongoConnect:     mongodb,
 		redisClient:      redisClient,
 		chatRepo:         chatRepo,
 		serverRepo:       serverRepo,
@@ -119,30 +113,34 @@ func (cs *ChatService) GetDMRoomResponseList(userID string, includeHidden bool) 
 
 // UpdateDMRoom 更新聊天房間狀態
 func (cs *ChatService) UpdateDMRoom(userID string, roomID string, isHidden bool) error {
-	userObjectID, err := primitive.ObjectIDFromHex(userID)
+	// 使用ODM直接操作
+	ctx := context.Background()
+
+	userObjID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return err
 	}
 
-	roomObjectID, err := primitive.ObjectIDFromHex(roomID)
+	roomObjID, err := primitive.ObjectIDFromHex(roomID)
 	if err != nil {
 		return err
 	}
 
-	// 使用QueryBuilder構建查詢
-	qb := providers.NewQueryBuilder()
-	qb.Where("room_id", roomObjectID).Where("user_id", userObjectID)
-
-	// 檢查room_id是否存在
 	var dmRoom models.DMRoom
-	err = cs.odm.FindOne(context.Background(), qb.GetFilter(), &dmRoom)
+	filter := map[string]interface{}{
+		"user_id": userObjID,
+		"room_id": roomObjID,
+	}
+
+	err = cs.odm.FindOne(ctx, filter, &dmRoom)
 	if err != nil {
 		return err
 	}
 
-	// 更新狀態
-	updateFields := bson.M{"is_hidden": isHidden}
-	return cs.odm.UpdateFields(context.Background(), &dmRoom, updateFields)
+	dmRoom.IsHidden = isHidden
+	dmRoom.UpdatedAt = time.Now()
+
+	return cs.odm.Update(ctx, &dmRoom)
 }
 
 // CreateDMRoom 創建私聊房間

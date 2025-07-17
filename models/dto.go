@@ -57,3 +57,11 @@ type APIFriend struct {
 	Picture  string `json:"picture" bson:"picture"`
 	Status   string `json:"status" bson:"status"`
 }
+
+func (d *DMRoom) GetID() primitive.ObjectID {
+	return d.ID
+}
+
+func (d *DMRoom) SetID(id primitive.ObjectID) {
+	d.ID = id
+}

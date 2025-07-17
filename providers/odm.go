@@ -61,6 +61,11 @@ func NewODM(db *mongo.Database) *ODM {
 	}
 }
 
+// GetDatabase 返回數據庫連接
+func (o *ODM) GetDatabase() *mongo.Database {
+	return o.db
+}
+
 // Collection 獲取模型對應的集合
 func (o *ODM) Collection(model Model) *mongo.Collection {
 	return o.db.Collection(model.GetCollectionName())

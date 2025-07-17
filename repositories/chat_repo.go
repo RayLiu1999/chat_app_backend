@@ -11,50 +11,40 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // ChatRepository 處理聊天相關的數據庫操作
 type ChatRepository struct {
-	config       *config.Config
-	mongoConnect *mongo.Database
-	odm          *providers.ODM
+	config *config.Config
+	odm    *providers.ODM
+	// queryBuilder *providers.QueryBuilder // 如有需要可加
 }
 
 // NewChatRepository 創建一個新的聊天存儲庫實例
-func NewChatRepository(cfg *config.Config, mongodb *mongo.Database) *ChatRepository {
+func NewChatRepository(cfg *config.Config, odm *providers.ODM) *ChatRepository {
 	return &ChatRepository{
-		config:       cfg,
-		mongoConnect: mongodb,
-		odm:          providers.NewODM(mongodb),
+		config: cfg,
+		odm:    odm,
+		// queryBuilder: qb, // 如有需要
 	}
 }
 
 // SaveMessage 將聊天消息保存到數據庫
 func (cr *ChatRepository) SaveMessage(message models.Message) (string, error) {
-	collection := cr.mongoConnect.Collection("messages")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	result, err := collection.InsertOne(ctx, message)
+	err := cr.odm.InsertOne(ctx, &message)
 	if err != nil {
 		log.Printf("保存聊天消息失敗: %v", err)
 		return "", err
 	}
 
-	// 將插入結果的ID轉換為ObjectID
-	id, ok := result.InsertedID.(primitive.ObjectID)
-	if !ok {
-		log.Printf("無法獲取插入的消息ID")
-		return "", err
-	}
-
-	return id.Hex(), nil
+	return message.ID.Hex(), nil
 }
 
 // GetMessagesByRoomID 根據房間ID獲取消息
 func (cr *ChatRepository) GetMessagesByRoomID(roomID string, limit int64) ([]models.Message, error) {
-	collection := cr.mongoConnect.Collection("messages")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -68,20 +58,15 @@ func (cr *ChatRepository) GetMessagesByRoomID(roomID string, limit int64) ([]mod
 		"room_id": roomObjectID,
 	}
 
-	findOptions := options.Find()
-	findOptions.SetSort(map[string]interface{}{"created_at": -1}) // 按時間倒序
-	findOptions.SetLimit(limit)
-
-	cursor, err := collection.Find(ctx, filter, findOptions)
-	if err != nil {
-		log.Printf("查詢房間消息失敗: %v", err)
-		return nil, err
+	queryOptions := providers.QueryOptions{
+		Sort:  bson.D{{Key: "created_at", Value: -1}},
+		Limit: &limit,
 	}
-	defer cursor.Close(ctx)
 
 	var messages []models.Message
-	if err = cursor.All(ctx, &messages); err != nil {
-		log.Printf("解析消息數據失敗: %v", err)
+	err = cr.odm.FindWithOptions(ctx, filter, &messages, &queryOptions)
+	if err != nil {
+		log.Printf("查詢房間消息失敗: %v", err)
 		return nil, err
 	}
 
@@ -90,7 +75,6 @@ func (cr *ChatRepository) GetMessagesByRoomID(roomID string, limit int64) ([]mod
 
 // GetDMRoomListByUserID 獲取用戶的聊天列表
 func (cr *ChatRepository) GetDMRoomListByUserID(userID string, includeHidden bool) ([]models.DMRoom, error) {
-	collection := cr.mongoConnect.Collection("dm_rooms")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -109,19 +93,14 @@ func (cr *ChatRepository) GetDMRoomListByUserID(userID string, includeHidden boo
 		filter["is_hidden"] = false
 	}
 
-	findOptions := options.Find()
-	findOptions.SetSort(map[string]interface{}{"updated_at": -1}) // 按最後聊天時間倒序
-
-	cursor, err := collection.Find(ctx, filter, findOptions)
-	if err != nil {
-		log.Printf("查詢聊天列表失敗: %v", err)
-		return nil, err
+	queryOptions := providers.QueryOptions{
+		Sort: bson.D{{Key: "updated_at", Value: -1}},
 	}
-	defer cursor.Close(ctx)
 
 	var chatLists []models.DMRoom
-	if err = cursor.All(ctx, &chatLists); err != nil {
-		log.Printf("解析聊天列表數據失敗: %v", err)
+	err = cr.odm.FindWithOptions(ctx, filter, &chatLists, &queryOptions)
+	if err != nil {
+		log.Printf("查詢聊天列表失敗: %v", err)
 		return nil, err
 	}
 
@@ -130,7 +109,6 @@ func (cr *ChatRepository) GetDMRoomListByUserID(userID string, includeHidden boo
 
 // UpdateDMRoom 更新聊天列表的刪除狀態
 func (cr *ChatRepository) UpdateDMRoom(userID string, chatWithUserID string, IsHidden bool) error {
-	collection := cr.mongoConnect.Collection("dm_rooms")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -157,7 +135,7 @@ func (cr *ChatRepository) UpdateDMRoom(userID string, chatWithUserID string, IsH
 		},
 	}
 
-	_, err = collection.UpdateOne(ctx, filter, update)
+	err = cr.odm.UpdateMany(ctx, &models.DMRoom{}, filter, update)
 	if err != nil {
 		log.Printf("更新聊天列表刪除狀態失敗: %v", err)
 		return err
@@ -168,7 +146,6 @@ func (cr *ChatRepository) UpdateDMRoom(userID string, chatWithUserID string, IsH
 
 // SaveOrUpdateDMRoom 保存或更新聊天列表
 func (cr *ChatRepository) SaveOrUpdateDMRoom(chat models.DMRoom) (models.DMRoom, error) {
-	collection := cr.mongoConnect.Collection("dm_rooms")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -179,7 +156,7 @@ func (cr *ChatRepository) SaveOrUpdateDMRoom(chat models.DMRoom) (models.DMRoom,
 
 	// 檢查是否已存在該聊天列表
 	var existingChatList models.DMRoom
-	err := collection.FindOne(ctx, filter).Decode(&existingChatList)
+	err := cr.odm.FindOne(ctx, filter, &existingChatList)
 	date := time.Now()
 
 	if err == nil {
@@ -194,7 +171,7 @@ func (cr *ChatRepository) SaveOrUpdateDMRoom(chat models.DMRoom) (models.DMRoom,
 		chat.ID = existingChatList.ID
 		chat.UpdatedAt = date
 
-		_, err = collection.UpdateOne(ctx, filter, update)
+		err = cr.odm.UpdateMany(ctx, &models.DMRoom{}, filter, update)
 		if err != nil {
 			log.Printf("更新聊天列表失敗: %v", err)
 			return models.DMRoom{}, err
@@ -206,7 +183,7 @@ func (cr *ChatRepository) SaveOrUpdateDMRoom(chat models.DMRoom) (models.DMRoom,
 		chat.UpdatedAt = date
 		chat.IsHidden = false // 初始化為未刪除狀態
 
-		_, err = collection.InsertOne(ctx, chat)
+		err = cr.odm.InsertOne(ctx, &chat)
 		if err != nil {
 			log.Printf("創建聊天列表失敗: %v", err)
 			return models.DMRoom{}, err

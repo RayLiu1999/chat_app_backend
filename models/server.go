@@ -29,3 +29,11 @@ type UserServer struct {
 func (s *Server) GetCollectionName() string {
 	return "servers"
 }
+
+func (s *Server) GetID() primitive.ObjectID {
+	return s.ID
+}
+
+func (s *Server) SetID(id primitive.ObjectID) {
+	s.ID = id
+}

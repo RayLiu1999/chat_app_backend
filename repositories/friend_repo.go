@@ -3,35 +3,34 @@ package repositories
 import (
 	"chat_app_backend/config"
 	"chat_app_backend/models"
+	"chat_app_backend/providers"
 	"context"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type FriendRepository struct {
-	config       *config.Config
-	mongoConnect *mongo.Database
+	config *config.Config
+	odm    *providers.ODM
 }
 
-func NewFriendRepository(cfg *config.Config, mongodb *mongo.Database) *FriendRepository {
+func NewFriendRepository(cfg *config.Config, odm *providers.ODM) *FriendRepository {
 	return &FriendRepository{
-		config:       cfg,
-		mongoConnect: mongodb,
+		config: cfg,
+		odm:    odm,
 	}
 }
 
 func (fr *FriendRepository) GetFriendById(userID string) (*models.Friend, error) {
 	var friend models.Friend
-	var collection = fr.mongoConnect.Collection("friends")
 
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return nil, err
 	}
 
-	err = collection.FindOne(context.Background(), bson.M{"_id": userObjectID}).Decode(&friend)
+	err = fr.odm.FindOne(context.Background(), bson.M{"_id": userObjectID}, &friend)
 	if err != nil {
 		return nil, err
 	}

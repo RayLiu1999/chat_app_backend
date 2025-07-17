@@ -16,6 +16,18 @@ type Channel struct {
 	// Members             []Member           `json:"members" bson:"members"` // 頻道成員
 }
 
+func (c *Channel) GetCollectionName() string {
+	return "channels"
+}
+
+func (c *Channel) GetID() primitive.ObjectID {
+	return c.ID
+}
+
+func (c *Channel) SetID(id primitive.ObjectID) {
+	c.ID = id
+}
+
 type ChannelCategory struct {
 	providers.BaseModel `bson:",inline"`
 	Name                string             `json:"name" bson:"name"`

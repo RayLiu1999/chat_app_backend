@@ -2,6 +2,7 @@ package services
 
 import (
 	"chat_app_backend/models"
+	"chat_app_backend/providers"
 	"context"
 	"encoding/json"
 	"log"
@@ -11,26 +12,25 @@ import (
 	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // RoomManager 管理房間的創建、加入、離開等操作
 type RoomManager struct {
-	mongoConnect *mongo.Database
-	rooms        map[string]*Room
-	roomPubSubs  map[string]*redis.PubSub
-	redisClient  *redis.Client
-	mutex        sync.RWMutex
-	pubSubMutex  sync.RWMutex
+	odm         *providers.ODM
+	rooms       map[string]*Room
+	roomPubSubs map[string]*redis.PubSub
+	redisClient *redis.Client
+	mutex       sync.RWMutex
+	pubSubMutex sync.RWMutex
 }
 
 // NewRoomManager 創建新的房間管理器
-func NewRoomManager(mongoConnect *mongo.Database, redisClient *redis.Client) *RoomManager {
+func NewRoomManager(odm *providers.ODM, redisClient *redis.Client) *RoomManager {
 	return &RoomManager{
-		mongoConnect: mongoConnect,
-		rooms:        make(map[string]*Room, 1000),
-		roomPubSubs:  make(map[string]*redis.PubSub),
-		redisClient:  redisClient,
+		odm:         odm,
+		rooms:       make(map[string]*Room, 1000),
+		roomPubSubs: make(map[string]*redis.PubSub),
+		redisClient: redisClient,
 	}
 }
 
@@ -211,45 +211,44 @@ func (rm *RoomManager) checkUserAllowedJoinRoom(userID string, roomID string, ro
 		return false, err
 	}
 
+	ctx := context.Background()
+
 	if roomType == models.RoomTypeDM {
-		var dmRoom models.DMRoom
-		err := rm.mongoConnect.Collection("dm_rooms").FindOne(context.Background(), bson.M{"room_id": roomObjectID, "user_id": userObjectID}).Decode(&dmRoom)
+		dmRoom := &models.DMRoom{}
+		err := rm.odm.FindOne(ctx, bson.M{"room_id": roomObjectID, "user_id": userObjectID}, dmRoom)
 		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				return false, nil // 找不到記錄，不允許加入
+			if err == providers.ErrDocumentNotFound {
+				return false, nil
 			}
 			return false, err
 		}
 		return true, nil
 	} else if roomType == models.RoomTypeChannel {
-		var channel models.Channel
-		err := rm.mongoConnect.Collection("channels").FindOne(context.Background(), bson.M{"_id": roomObjectID}).Decode(&channel)
+		channel := &models.Channel{}
+		err := rm.odm.FindOne(ctx, bson.M{"_id": roomObjectID}, channel)
 		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				return false, nil // 找不到頻道
+			if err == providers.ErrDocumentNotFound {
+				return false, nil
 			}
 			return false, err
 		}
 
-		var server models.Server
-		err = rm.mongoConnect.Collection("servers").FindOne(context.Background(), bson.M{"_id": channel.ServerID}).Decode(&server)
+		server := &models.Server{}
+		err = rm.odm.FindOne(ctx, bson.M{"_id": channel.ServerID}, server)
 		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				return false, nil // 找不到伺服器
+			if err == providers.ErrDocumentNotFound {
+				return false, nil
 			}
 			return false, err
 		}
 
-		// 檢查用戶是否為伺服器成員
 		for _, member := range server.Members {
 			if member.UserID.Hex() == userID {
 				return true, nil
 			}
 		}
-
 		return false, nil
 	}
-
 	return false, nil
 }
 
