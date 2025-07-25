@@ -48,7 +48,10 @@ func (mh *MessageHandler) HandleMessage(message *WsMessage[MessageResponse]) {
 	// 在外部發送消息，避免長時間持有鎖
 	for _, client := range clients {
 		go func(c *Client) {
+			c.WriteMutex.Lock()
 			err := c.Conn.WriteJSON(message)
+			c.WriteMutex.Unlock()
+
 			if err != nil {
 				log.Printf("Failed to send message to client %s: %v", c.UserID, err)
 				// 異步移除有問題的客戶端
@@ -82,7 +85,7 @@ func (mh *MessageHandler) saveMessageToDB(data MessageResponse) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	err = mh.odm.InsertOne(ctx, message)
+	err = mh.odm.Create(ctx, message)
 	if err != nil {
 		log.Printf("Failed to save message: %v", err)
 		return

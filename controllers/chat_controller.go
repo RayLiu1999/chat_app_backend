@@ -164,3 +164,39 @@ func (cc *ChatController) GetDMMessages(c *gin.Context) {
 
 	utils.SuccessResponse(c, messages, utils.MessageOptions{Message: "獲取訊息成功"})
 }
+
+// GetChannelMessages 獲取頻道訊息
+func (cc *ChatController) GetChannelMessages(c *gin.Context) {
+	userID, _, err := utils.GetUserIDFromHeader(c)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{Code: utils.ErrUnauthorized})
+		return
+	}
+
+	channelID := c.Param("channel_id")
+	if channelID == "" {
+		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
+			Code:        utils.ErrInvalidParams,
+			Message:     "頻道ID不能為空",
+			Displayable: true,
+		})
+		return
+	}
+
+	before := c.Query("before")
+	after := c.Query("after")
+	limit := c.Query("limit")
+
+	// 使用service層的業務邏輯
+	messages, err := cc.chatService.GetChannelMessages(userID, channelID, before, after, limit)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
+			Code:        utils.ErrInternalServer,
+			Message:     err.Error(),
+			Displayable: true,
+		})
+		return
+	}
+
+	utils.SuccessResponse(c, messages, utils.MessageOptions{Message: "獲取頻道訊息成功"})
+}

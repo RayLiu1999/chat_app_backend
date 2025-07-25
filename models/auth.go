@@ -14,6 +14,8 @@ type User struct {
 	Nickname            string               `json:"nickname" bson:"nickname"`
 	Friends             []primitive.ObjectID `json:"friends" bson:"friends"`
 	Picture             string               `json:"picture" bson:"picture"`
+	IsOnline            bool                 `json:"is_online" bson:"is_online"`           // 在線狀態
+	LastActiveAt        int64                `json:"last_active_at" bson:"last_active_at"` // 最後活動時間戳
 }
 
 // 好友

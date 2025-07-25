@@ -1,7 +1,7 @@
-version: '3'
 services:
   app:
-    # 您的應用配置...
+    image: golang:1.22.4
+    # 若有 Dockerfile 可改用 build: .
     depends_on:
       - redis
   

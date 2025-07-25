@@ -57,14 +57,6 @@ func (m *Message) GetCollectionName() string {
 	return "messages"
 }
 
-func (m *Message) GetID() primitive.ObjectID {
-	return m.ID
-}
-
-func (m *Message) SetID(id primitive.ObjectID) {
-	m.ID = id
-}
-
 // 私聊房間
 type DMRoom struct {
 	providers.BaseModel `bson:",inline"`

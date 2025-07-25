@@ -5,6 +5,7 @@ import (
 	"chat_app_backend/models"
 	"chat_app_backend/providers"
 	"context"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -77,4 +78,41 @@ func (ur *UserRepository) CheckUsernameExists(username string) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+// UpdateUserOnlineStatus 更新用戶在線狀態
+func (ur *UserRepository) UpdateUserOnlineStatus(userID string, isOnline bool) error {
+	objectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return err
+	}
+
+	filter := bson.M{"_id": objectID}
+	update := bson.M{
+		"$set": bson.M{
+			"is_online":      isOnline,
+			"last_active_at": time.Now().Unix(),
+			"updated_at":     time.Now(),
+		},
+	}
+
+	return ur.odm.UpdateMany(context.Background(), &models.User{}, filter, update)
+}
+
+// UpdateUserLastActiveTime 更新用戶最後活動時間
+func (ur *UserRepository) UpdateUserLastActiveTime(userID string, timestamp int64) error {
+	objectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return err
+	}
+
+	filter := bson.M{"_id": objectID}
+	update := bson.M{
+		"$set": bson.M{
+			"last_active_at": timestamp,
+			"updated_at":     time.Now(),
+		},
+	}
+
+	return ur.odm.UpdateMany(context.Background(), &models.User{}, filter, update)
 }

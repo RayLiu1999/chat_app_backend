@@ -8,6 +8,7 @@ import (
 	"chat_app_backend/utils"
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"strconv"
 	"time"
@@ -20,12 +21,14 @@ import (
 
 // ChatService 管理所有的聊天功能
 type ChatService struct {
-	config      *config.Config
-	redisClient *redis.Client
-	chatRepo    repositories.ChatRepositoryInterface
-	serverRepo  repositories.ServerRepositoryInterface
-	userRepo    repositories.UserRepositoryInterface
-	odm         *providers.ODM
+	config           *config.Config
+	redisClient      *redis.Client
+	chatRepo         repositories.ChatRepositoryInterface
+	serverRepo       repositories.ServerRepositoryInterface
+	serverMemberRepo repositories.ServerMemberRepositoryInterface
+	userRepo         repositories.UserRepositoryInterface
+	odm              *providers.ODM
+	userService      UserServiceInterface
 
 	// 新增的模組化組件
 	clientManager    *ClientManager
@@ -35,7 +38,7 @@ type ChatService struct {
 }
 
 // NewChatService 初始化聊天室服務
-func NewChatService(cfg *config.Config, odm *providers.ODM, chatRepo repositories.ChatRepositoryInterface, serverRepo repositories.ServerRepositoryInterface, userRepo repositories.UserRepositoryInterface) *ChatService {
+func NewChatService(cfg *config.Config, odm *providers.ODM, chatRepo repositories.ChatRepositoryInterface, serverRepo repositories.ServerRepositoryInterface, serverMemberRepo repositories.ServerMemberRepositoryInterface, userRepo repositories.UserRepositoryInterface, userService UserServiceInterface) *ChatService {
 	redisClient := redis.NewClient(&redis.Options{Addr: cfg.Redis.Addr})
 	if _, err := redisClient.Ping(context.Background()).Result(); err != nil {
 		log.Printf("Failed to ping Redis: %v", err)
@@ -44,17 +47,19 @@ func NewChatService(cfg *config.Config, odm *providers.ODM, chatRepo repositorie
 
 	// 創建模組化組件
 	clientManager := NewClientManager(redisClient)
-	roomManager := NewRoomManager(odm, redisClient)
+	roomManager := NewRoomManager(odm, redisClient, serverMemberRepo)
 	messageHandler := NewMessageHandler(odm, roomManager)
-	websocketHandler := NewWebSocketHandler(odm, clientManager, roomManager, messageHandler)
+	websocketHandler := NewWebSocketHandler(odm, clientManager, roomManager, messageHandler, userService)
 
 	cs := &ChatService{
 		config:           cfg,
 		redisClient:      redisClient,
 		chatRepo:         chatRepo,
 		serverRepo:       serverRepo,
+		serverMemberRepo: serverMemberRepo,
 		userRepo:         userRepo,
 		odm:              odm,
+		userService:      userService,
 		clientManager:    clientManager,
 		roomManager:      roomManager,
 		messageHandler:   messageHandler,
@@ -68,6 +73,17 @@ func NewChatService(cfg *config.Config, odm *providers.ODM, chatRepo repositorie
 func (cs *ChatService) HandleWebSocket(ws *websocket.Conn, userID string) {
 	cs.websocketHandler.HandleWebSocket(ws, userID)
 	utils.PrettyPrintf("WebSocket connection established for user: %s", userID)
+}
+
+// GetClientManager 獲取客戶端管理器
+func (cs *ChatService) GetClientManager() *ClientManager {
+	return cs.clientManager
+}
+
+// UpdateUserService 更新 UserService 引用
+func (cs *ChatService) UpdateUserService(userService UserServiceInterface) {
+	cs.userService = userService
+	cs.websocketHandler.userService = userService
 }
 
 // 取得聊天記錄response
@@ -100,11 +116,19 @@ func (cs *ChatService) GetDMRoomResponseList(userID string, includeHidden bool) 
 		if !ok {
 			continue
 		}
+
+		// 檢查用戶在線狀態
+		isOnline := false
+		if cs.userService != nil {
+			isOnline = cs.userService.IsUserOnlineByWebSocket(chat.ChatWithUserID.Hex())
+		}
+
 		chatResponseList = append(chatResponseList, models.DMRoomResponse{
 			RoomID:    chat.RoomID,
 			Nickname:  user.Nickname,
 			Picture:   user.Picture,
 			Timestamp: chat.UpdatedAt.Unix(),
+			IsOnline:  isOnline,
 		})
 	}
 
@@ -347,4 +371,107 @@ func (cs *ChatService) GetDMMessages(userID string, roomID string, before string
 	}
 
 	return messageResponse, nil
+}
+
+// GetChannelMessages 獲取頻道訊息
+func (cs *ChatService) GetChannelMessages(userID string, channelID string, before string, after string, limit string) ([]models.MessageResponse, error) {
+	channelObjectID, err := primitive.ObjectIDFromHex(channelID)
+	if err != nil {
+		return nil, fmt.Errorf("無效的頻道ID: %v", err)
+	}
+
+	// 首先檢查頻道是否存在
+	var channel models.Channel
+	err = cs.odm.FindByID(context.Background(), channelID, &channel)
+	if err != nil {
+		return nil, fmt.Errorf("頻道不存在: %v", err)
+	}
+
+	// 檢查用戶是否有權限訪問此頻道（檢查是否為伺服器成員）
+	// 這裡我們需要檢查用戶是否是該伺服器的成員
+	isMember, err := cs.checkUserServerMembership(userID, channel.ServerID.Hex())
+	if err != nil {
+		return nil, fmt.Errorf("檢查伺服器成員身份失敗: %v", err)
+	}
+	if !isMember {
+		return nil, fmt.Errorf("您沒有權限訪問此頻道")
+	}
+
+	// 構建訊息查詢
+	messageQb := providers.NewQueryBuilder()
+	messageQb.Where("room_id", channelObjectID).Where("room_type", string(models.RoomTypeChannel))
+
+	if before != "" {
+		beforeObjectID, err := primitive.ObjectIDFromHex(before)
+		if err != nil {
+			return nil, fmt.Errorf("無效的 before 參數: %v", err)
+		}
+		messageQb.WhereLt("_id", beforeObjectID)
+	}
+
+	if after != "" {
+		afterObjectID, err := primitive.ObjectIDFromHex(after)
+		if err != nil {
+			return nil, fmt.Errorf("無效的 after 參數: %v", err)
+		}
+		messageQb.WhereGt("_id", afterObjectID)
+	}
+
+	messageQb.SortDesc("_id")
+
+	if limit != "" {
+		limitVal, err := strconv.ParseInt(limit, 10, 64)
+		if err == nil && limitVal > 0 {
+			// 限制最大獲取數量為100
+			if limitVal > 100 {
+				limitVal = 100
+			}
+			messageQb.Limit(limitVal)
+		}
+	} else {
+		// 如果沒有指定 limit，默認返回最近 50 條訊息
+		messageQb.Limit(50)
+	}
+
+	var messageList []models.Message
+	err = cs.odm.FindWithOptions(context.Background(), messageQb.GetFilter(), &messageList, messageQb.GetQueryOptions())
+	if err != nil {
+		return nil, fmt.Errorf("獲取頻道訊息失敗: %v", err)
+	}
+
+	// 轉換為響應格式
+	var messageResponse []models.MessageResponse
+	for _, message := range messageList {
+		messageResponse = append(messageResponse, models.MessageResponse{
+			ID:        message.ID,
+			RoomType:  models.RoomType(message.RoomType),
+			RoomID:    message.RoomID.Hex(),
+			SenderID:  message.SenderID.Hex(),
+			Content:   message.Content,
+			Timestamp: message.UpdatedAt.UnixMilli(),
+		})
+	}
+
+	return messageResponse, nil
+}
+
+// checkUserServerMembership 檢查用戶是否為伺服器成員
+func (cs *ChatService) checkUserServerMembership(userID, serverID string) (bool, error) {
+	userObjectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return false, err
+	}
+
+	serverObjectID, err := primitive.ObjectIDFromHex(serverID)
+	if err != nil {
+		return false, err
+	}
+
+	// 檢查 server_members 集合
+	filter := bson.M{
+		"user_id":   userObjectID,
+		"server_id": serverObjectID,
+	}
+
+	return cs.odm.Exists(context.Background(), filter, &models.ServerMember{})
 }

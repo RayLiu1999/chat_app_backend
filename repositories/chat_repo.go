@@ -34,7 +34,7 @@ func (cr *ChatRepository) SaveMessage(message models.Message) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	err := cr.odm.InsertOne(ctx, &message)
+	err := cr.odm.Create(ctx, &message)
 	if err != nil {
 		log.Printf("保存聊天消息失敗: %v", err)
 		return "", err
@@ -183,7 +183,7 @@ func (cr *ChatRepository) SaveOrUpdateDMRoom(chat models.DMRoom) (models.DMRoom,
 		chat.UpdatedAt = date
 		chat.IsHidden = false // 初始化為未刪除狀態
 
-		err = cr.odm.InsertOne(ctx, &chat)
+		err = cr.odm.Create(ctx, &chat)
 		if err != nil {
 			log.Printf("創建聊天列表失敗: %v", err)
 			return models.DMRoom{}, err

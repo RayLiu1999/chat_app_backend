@@ -37,6 +37,7 @@ type Notification struct {
 type Client struct {
 	UserID        string
 	Conn          *websocket.Conn
+	WriteMutex    sync.Mutex // 保護 WebSocket 寫入操作
 	Subscribed    map[string]bool
 	SubscribedMux sync.RWMutex
 	// 新增房間活躍時間追蹤

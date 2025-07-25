@@ -12,10 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRoutes(r *gin.Engine, cfg *config.Config, mongodb *providers.MongoWrapper) {
-	// 建立依賴
-	controllers := di.BuildDependencies(cfg, mongodb)
-
+func SetupRoutes(r *gin.Engine, cfg *config.Config, mongodb *providers.MongoWrapper, controllers *di.ControllerContainer) {
 	// 設定靜態文件服務
 	// 使用絕對路徑，確保在任何環境下都可以正確訪問上傳的文件
 	uploadsAbsPath := filepath.Join(".", "uploads")
@@ -51,6 +48,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, mongodb *providers.MongoWrap
 
 	// user
 	auth.GET("/user", controllers.UserController.GetUser)
+	// auth.GET("/users/:id/online-status", controllers.UserController.CheckUserOnlineStatus) // 檢查特定用戶在線狀態
 
 	// friend
 	auth.GET("/friends", controllers.FriendController.GetFriendList)                 // 取得好友清單
@@ -67,8 +65,26 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, mongodb *providers.MongoWrap
 	// server
 	auth.GET("/servers", controllers.ServerController.GetServerList)
 	auth.POST("/servers", controllers.ServerController.CreateServer)
-	// auth.DELETE("/servers/:server_id", controllers.ServerController.DeleteServer)
+	auth.GET("/servers/search", controllers.ServerController.SearchPublicServers)            // 搜尋公開伺服器
+	auth.GET("/servers/:server_id", controllers.ServerController.GetServerByID)              // 獲取單個伺服器信息
+	auth.GET("/servers/:server_id/detail", controllers.ServerController.GetServerDetailByID) // 獲取伺服器詳細信息（含成員）
+	auth.PUT("/servers/:server_id", controllers.ServerController.UpdateServer)               // 更新伺服器信息
+	auth.DELETE("/servers/:server_id", controllers.ServerController.DeleteServer)            // 刪除伺服器
+	auth.POST("/servers/:server_id/join", controllers.ServerController.JoinServer)           // 請求加入伺服器
+	auth.POST("/servers/:server_id/leave", controllers.ServerController.LeaveServer)         // 離開伺服器
 
 	// channel
-	// auth.GET("/channels/:server_id", controllers.ChatController.GetChannelList)
+	auth.GET("/servers/:server_id/channels", controllers.ChannelController.GetChannelsByServerID) // 獲取伺服器頻道列表
+	auth.GET("/channels/:channel_id", controllers.ChannelController.GetChannelByID)               // 獲取單個頻道信息
+	auth.POST("/servers/:server_id/channels", controllers.ChannelController.CreateChannel)        // 創建新頻道
+	auth.PUT("/channels/:channel_id", controllers.ChannelController.UpdateChannel)                // 更新頻道信息
+	auth.DELETE("/channels/:channel_id", controllers.ChannelController.DeleteChannel)             // 刪除頻道
+	auth.GET("/channels/:channel_id/messages", controllers.ChatController.GetChannelMessages)     // 獲取頻道訊息
+
+	// file upload
+	auth.POST("/upload/file", controllers.FileController.UploadFile)         // 通用檔案上傳
+	auth.POST("/upload/avatar", controllers.FileController.UploadAvatar)     // 頭像上傳
+	auth.POST("/upload/document", controllers.FileController.UploadDocument) // 文件上傳
+	auth.GET("/files", controllers.FileController.GetUserFiles)              // 獲取用戶檔案列表
+	auth.DELETE("/files/:file_id", controllers.FileController.DeleteFile)    // 刪除檔案
 }

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"chat_app_backend/config"
+	"chat_app_backend/di"
 	"chat_app_backend/providers"
 	"chat_app_backend/routes"
 
@@ -39,8 +40,15 @@ func main() {
 	// 初始化 Gin
 	r := gin.Default()
 
+	// 構建依賴
+	deps := di.BuildDependencies(cfg, mongodb)
+
+	// // 使用依賴容器中的 UserService 來啟動後台任務
+	// backgroundTasks := services.NewBackgroundTasks(deps.Services.UserService)
+	// go backgroundTasks.StartAllBackgroundTasks()
+
 	// 設置路由
-	routes.SetupRoutes(r, cfg, mongodb)
+	routes.SetupRoutes(r, cfg, mongodb, deps.Controllers)
 
 	// 確保上傳目錄存在
 	err = os.MkdirAll("uploads", 0755)

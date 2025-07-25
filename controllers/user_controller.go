@@ -118,3 +118,18 @@ func (uc *UserController) GetUser(c *gin.Context) {
 
 	utils.SuccessResponse(c, userResponse, utils.MessageOptions{Message: "使用者資訊獲取成功"})
 }
+
+// CheckUserOnlineStatus 檢查特定用戶是否在線
+func (uc *UserController) CheckUserOnlineStatus(c *gin.Context) {
+	userID := c.Param("id")
+	if userID == "" {
+		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{Message: "用戶 ID 不能為空"})
+		return
+	}
+
+	isOnline := uc.userService.IsUserOnlineByWebSocket(userID)
+	utils.SuccessResponse(c, map[string]interface{}{
+		"user_id":   userID,
+		"is_online": isOnline,
+	}, utils.MessageOptions{Message: "用戶在線狀態檢查完成"})
+}

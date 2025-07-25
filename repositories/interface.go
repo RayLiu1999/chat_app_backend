@@ -22,11 +22,52 @@ type ChatRepositoryInterface interface {
 }
 
 type ServerRepositoryInterface interface {
-	// GetServerListByUserId 獲取用戶的伺服器列表
-	GetServerListByUserId(userID string) ([]models.Server, error)
-
 	// CreateServer 新建測試用戶伺服器關聯
 	CreateServer(server *models.Server) (models.Server, error)
+
+	// SearchPublicServers 搜尋公開伺服器
+	SearchPublicServers(request models.ServerSearchRequest) ([]models.Server, int64, error)
+
+	// GetServerWithOwnerInfo 獲取包含擁有者信息的伺服器
+	GetServerWithOwnerInfo(serverID string) (*models.Server, *models.User, error)
+
+	// CheckUserInServer 檢查用戶是否在伺服器中
+	CheckUserInServer(userID, serverID string) (bool, error)
+
+	// UpdateServer 更新伺服器信息
+	UpdateServer(serverID string, updates map[string]interface{}) error
+
+	// DeleteServer 刪除伺服器
+	DeleteServer(serverID string) error
+
+	// GetServerByID 根據ID獲取伺服器
+	GetServerByID(serverID string) (*models.Server, error)
+
+	// UpdateMemberCount 更新成員數量快取
+	UpdateMemberCount(serverID string, count int) error
+}
+
+type ServerMemberRepositoryInterface interface {
+	// AddMemberToServer 將用戶添加到伺服器
+	AddMemberToServer(serverID, userID string, role string) error
+
+	// RemoveMemberFromServer 從伺服器移除用戶
+	RemoveMemberFromServer(serverID, userID string) error
+
+	// GetServerMembers 獲取伺服器所有成員
+	GetServerMembers(serverID string, page, limit int) ([]models.ServerMember, int64, error)
+
+	// GetUserServers 獲取用戶加入的所有伺服器
+	GetUserServers(userID string) ([]models.ServerMember, error)
+
+	// IsMemberOfServer 檢查用戶是否為伺服器成員
+	IsMemberOfServer(serverID, userID string) (bool, error)
+
+	// UpdateMemberRole 更新成員角色
+	UpdateMemberRole(serverID, userID, newRole string) error
+
+	// GetMemberCount 獲取伺服器成員數量
+	GetMemberCount(serverID string) (int64, error)
 }
 
 type UserRepositoryInterface interface {
@@ -44,9 +85,84 @@ type UserRepositoryInterface interface {
 
 	// CreateUser 創建用戶
 	CreateUser(user models.User) error
+
+	// UpdateUserOnlineStatus 更新用戶在線狀態
+	UpdateUserOnlineStatus(userID string, isOnline bool) error
+
+	// UpdateUserLastActiveTime 更新用戶最後活動時間
+	UpdateUserLastActiveTime(userID string, timestamp int64) error
 }
 
 type FriendRepositoryInterface interface {
 	// GetFriendById 根據用戶ID獲取用戶
 	GetFriendById(userID string) (*models.Friend, error)
+}
+
+type ChannelRepositoryInterface interface {
+	// GetChannelsByServerID 根據伺服器ID獲取頻道列表
+	GetChannelsByServerID(serverID string) ([]models.Channel, error)
+
+	// GetChannelByID 根據頻道ID獲取頻道
+	GetChannelByID(channelID string) (*models.Channel, error)
+
+	// CreateChannel 創建新頻道
+	CreateChannel(channel *models.Channel) error
+
+	// UpdateChannel 更新頻道
+	UpdateChannel(channelID string, updates map[string]interface{}) error
+
+	// DeleteChannel 刪除頻道
+	DeleteChannel(channelID string) error
+
+	// CheckChannelExists 檢查頻道是否存在
+	CheckChannelExists(channelID string) (bool, error)
+}
+
+type FileRepositoryInterface interface {
+	// CreateFile 創建檔案記錄
+	CreateFile(file *models.UploadedFile) error
+
+	// GetFileByID 根據檔案ID獲取檔案
+	GetFileByID(fileID string) (*models.UploadedFile, error)
+
+	// GetFileByPath 根據檔案路徑獲取檔案
+	GetFileByPath(filePath string) (*models.UploadedFile, error)
+
+	// GetFilesByUserID 根據用戶ID獲取檔案列表
+	GetFilesByUserID(userID string) ([]models.UploadedFile, error)
+
+	// UpdateFileStatus 更新檔案狀態
+	UpdateFileStatus(fileID string, status string) error
+
+	// DeleteFileByID 根據檔案ID刪除檔案記錄
+	DeleteFileByID(fileID string) error
+
+	// DeleteFileByPath 根據檔案路徑刪除檔案記錄
+	DeleteFileByPath(filePath string) error
+
+	// GetExpiredFiles 獲取過期檔案列表
+	GetExpiredFiles() ([]models.UploadedFile, error)
+
+	// CleanupExpiredFiles 清理過期檔案記錄
+	CleanupExpiredFiles() error
+}
+
+type ChannelCategoryRepositoryInterface interface {
+	// CreateChannelCategory 創建頻道類別
+	CreateChannelCategory(category *models.ChannelCategory) error
+
+	// GetChannelCategoriesByServerID 根據伺服器ID獲取頻道類別列表
+	GetChannelCategoriesByServerID(serverID string) ([]models.ChannelCategory, error)
+
+	// GetChannelCategoryByID 根據類別ID獲取頻道類別
+	GetChannelCategoryByID(categoryID string) (*models.ChannelCategory, error)
+
+	// UpdateChannelCategory 更新頻道類別
+	UpdateChannelCategory(categoryID string, updates map[string]interface{}) error
+
+	// DeleteChannelCategory 刪除頻道類別
+	DeleteChannelCategory(categoryID string) error
+
+	// CheckChannelCategoryExists 檢查頻道類別是否存在
+	CheckChannelCategoryExists(categoryID string) (bool, error)
 }

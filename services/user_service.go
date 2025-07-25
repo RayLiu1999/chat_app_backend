@@ -15,16 +15,18 @@ import (
 )
 
 type UserService struct {
-	config   *config.Config
-	userRepo repositories.UserRepositoryInterface
-	odm      *providers.ODM
+	config        *config.Config
+	userRepo      repositories.UserRepositoryInterface
+	odm           *providers.ODM
+	clientManager *ClientManager // 添加 ClientManager 依賴
 }
 
-func NewUserService(cfg *config.Config, odm *providers.ODM, userRepo repositories.UserRepositoryInterface) *UserService {
+func NewUserService(cfg *config.Config, odm *providers.ODM, userRepo repositories.UserRepositoryInterface, clientManager *ClientManager) *UserService {
 	return &UserService{
-		config:   cfg,
-		userRepo: userRepo,
-		odm:      odm,
+		config:        cfg,
+		userRepo:      userRepo,
+		odm:           odm,
+		clientManager: clientManager,
 	}
 }
 
@@ -151,7 +153,7 @@ func (us *UserService) Login(loginUser models.User) (*models.LoginResponse, *uti
 		Revoked:   false,
 	}
 
-	err = us.odm.InsertOne(context.Background(), &refreshTokenDoc)
+	err = us.odm.Create(context.Background(), &refreshTokenDoc)
 	if err != nil {
 		return nil, &utils.AppError{
 			Code: utils.ErrInternalServer,
@@ -260,4 +262,48 @@ func (us *UserService) ClearExpiredRefreshTokens() error {
 	}}
 	err := us.odm.DeleteMany(context.Background(), &models.RefreshToken{}, filter)
 	return err
+}
+
+// SetUserOnline 設置用戶為在線狀態
+func (us *UserService) SetUserOnline(userID string) error {
+	return us.userRepo.UpdateUserOnlineStatus(userID, true)
+}
+
+// SetUserOffline 設置用戶為離線狀態
+func (us *UserService) SetUserOffline(userID string) error {
+	return us.userRepo.UpdateUserOnlineStatus(userID, false)
+}
+
+// UpdateUserActivity 更新用戶活動時間（保持在線狀態）
+func (us *UserService) UpdateUserActivity(userID string) error {
+	timestamp := time.Now().Unix()
+	return us.userRepo.UpdateUserLastActiveTime(userID, timestamp)
+}
+
+// IsUserOnlineByWebSocket 基於 WebSocket 連線檢查用戶是否在線
+func (us *UserService) IsUserOnlineByWebSocket(userID string) bool {
+	_, exists := us.clientManager.GetClient(userID)
+	return exists
+}
+
+// CheckAndSetOfflineUsers 檢查並設置離線用戶（定期任務用）
+// 現在這個方法主要用於數據庫狀態同步，實際在線狀態以 WebSocket 為準
+func (us *UserService) CheckAndSetOfflineUsers(offlineThresholdMinutes int) error {
+	// 計算離線閾值時間戳
+	thresholdTimestamp := time.Now().Add(-time.Duration(offlineThresholdMinutes) * time.Minute).Unix()
+
+	// 查找超過閾值時間未活動的在線用戶
+	filter := bson.M{
+		"is_online":      true,
+		"last_active_at": bson.M{"$lt": thresholdTimestamp},
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"is_online":  false,
+			"updated_at": time.Now(),
+		},
+	}
+
+	return us.odm.UpdateMany(context.Background(), &models.User{}, filter, update)
 }

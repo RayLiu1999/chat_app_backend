@@ -25,6 +25,31 @@ type ServerResponse struct {
 	Description string             `json:"description" bson:"description"`
 }
 
+// ServerMemberResponse 伺服器成員響應模型
+type ServerMemberResponse struct {
+	UserID       string `json:"user_id" bson:"user_id"`
+	Username     string `json:"username" bson:"username"`
+	Nickname     string `json:"nickname" bson:"nickname"` // 伺服器內暱稱
+	Picture      string `json:"picture" bson:"picture"`
+	Role         string `json:"role" bson:"role"`                     // "owner", "admin", "member"
+	IsOnline     bool   `json:"is_online" bson:"is_online"`           // 在線狀態
+	LastActiveAt int64  `json:"last_active_at" bson:"last_active_at"` // 最後活動時間
+	JoinedAt     int64  `json:"joined_at" bson:"joined_at"`           // 加入時間
+}
+
+// ServerDetailResponse 伺服器詳細信息響應（包含成員列表）
+type ServerDetailResponse struct {
+	ID          primitive.ObjectID     `json:"id" bson:"_id"`
+	Name        string                 `json:"name" bson:"name"`
+	PictureURL  string                 `json:"picture_url" bson:"picture_url"`
+	Description string                 `json:"description" bson:"description"`
+	MemberCount int                    `json:"member_count" bson:"member_count"`
+	IsPublic    bool                   `json:"is_public" bson:"is_public"`
+	OwnerID     string                 `json:"owner_id" bson:"owner_id"`
+	Members     []ServerMemberResponse `json:"members" bson:"members"`
+	Channels    []ChannelResponse      `json:"channels" bson:"channels"`
+}
+
 type ChannelResponse struct {
 	ID          primitive.ObjectID `json:"id" bson:"_id"`
 	ServerID    primitive.ObjectID `json:"server_id" bson:"server_id"`
@@ -39,6 +64,7 @@ type DMRoomResponse struct {
 	Nickname  string             `json:"nickname" bson:"nickname"`
 	Picture   string             `json:"picture" bson:"picture"`
 	Timestamp int64              `json:"timestamp" bson:"timestamp"`
+	IsOnline  bool               `json:"is_online" bson:"is_online"` // 聊天對象的在線狀態
 }
 
 type MessageResponse struct {
@@ -55,13 +81,36 @@ type APIFriend struct {
 	Name     string `json:"name" bson:"name"`
 	Nickname string `json:"nickname" bson:"nickname"`
 	Picture  string `json:"picture" bson:"picture"`
-	Status   string `json:"status" bson:"status"`
+	Status   string `json:"status" bson:"status"`       // 好友關係狀態：pending, accepted, blocked
+	IsOnline bool   `json:"is_online" bson:"is_online"` // 在線狀態
 }
 
-func (d *DMRoom) GetID() primitive.ObjectID {
-	return d.ID
+// ServerSearchRequest 伺服器搜尋請求
+type ServerSearchRequest struct {
+	Query     string `json:"q" form:"q"`                   // 搜尋關鍵字
+	Page      int    `json:"page" form:"page"`             // 頁數（從1開始）
+	Limit     int    `json:"limit" form:"limit"`           // 每頁數量
+	SortBy    string `json:"sort_by" form:"sort_by"`       // 排序方式：name, members, created_at
+	SortOrder string `json:"sort_order" form:"sort_order"` // 排序順序：asc, desc
 }
 
-func (d *DMRoom) SetID(id primitive.ObjectID) {
-	d.ID = id
+// ServerSearchResponse 伺服器搜尋回應
+type ServerSearchResponse struct {
+	ID          primitive.ObjectID `json:"id" bson:"_id"`
+	Name        string             `json:"name" bson:"name"`
+	PictureURL  string             `json:"picture_url" bson:"picture_url"`
+	Description string             `json:"description" bson:"description"`
+	MemberCount int                `json:"member_count" bson:"member_count"` // 成員數量
+	IsJoined    bool               `json:"is_joined" bson:"is_joined"`       // 用戶是否已加入
+	OwnerName   string             `json:"owner_name" bson:"owner_name"`     // 伺服器擁有者名稱
+	CreatedAt   int64              `json:"created_at" bson:"created_at"`     // 創建時間戳
+}
+
+// ServerSearchResults 搜尋結果包裝
+type ServerSearchResults struct {
+	Servers    []ServerSearchResponse `json:"servers"`
+	TotalCount int64                  `json:"total_count"` // 總數量
+	Page       int                    `json:"page"`        // 當前頁數
+	Limit      int                    `json:"limit"`       // 每頁數量
+	TotalPages int                    `json:"total_pages"` // 總頁數
 }

@@ -3,6 +3,7 @@ package services
 import (
 	"chat_app_backend/models"
 	"chat_app_backend/providers"
+	"chat_app_backend/repositories"
 	"context"
 	"encoding/json"
 	"log"
@@ -16,21 +17,23 @@ import (
 
 // RoomManager 管理房間的創建、加入、離開等操作
 type RoomManager struct {
-	odm         *providers.ODM
-	rooms       map[string]*Room
-	roomPubSubs map[string]*redis.PubSub
-	redisClient *redis.Client
-	mutex       sync.RWMutex
-	pubSubMutex sync.RWMutex
+	odm              *providers.ODM
+	rooms            map[string]*Room
+	roomPubSubs      map[string]*redis.PubSub
+	redisClient      *redis.Client
+	serverMemberRepo repositories.ServerMemberRepositoryInterface
+	mutex            sync.RWMutex
+	pubSubMutex      sync.RWMutex
 }
 
 // NewRoomManager 創建新的房間管理器
-func NewRoomManager(odm *providers.ODM, redisClient *redis.Client) *RoomManager {
+func NewRoomManager(odm *providers.ODM, redisClient *redis.Client, serverMemberRepo repositories.ServerMemberRepositoryInterface) *RoomManager {
 	return &RoomManager{
-		odm:         odm,
-		rooms:       make(map[string]*Room, 1000),
-		roomPubSubs: make(map[string]*redis.PubSub),
-		redisClient: redisClient,
+		odm:              odm,
+		rooms:            make(map[string]*Room, 1000),
+		roomPubSubs:      make(map[string]*redis.PubSub),
+		redisClient:      redisClient,
+		serverMemberRepo: serverMemberRepo,
 	}
 }
 
@@ -242,12 +245,14 @@ func (rm *RoomManager) checkUserAllowedJoinRoom(userID string, roomID string, ro
 			return false, err
 		}
 
-		for _, member := range server.Members {
-			if member.UserID.Hex() == userID {
-				return true, nil
-			}
+		// 使用 ServerMemberRepository 檢查用戶是否為伺服器成員
+		isMember, err := rm.serverMemberRepo.IsMemberOfServer(channel.ServerID.Hex(), userID)
+		if err != nil {
+			log.Printf("Error checking server membership: %v", err)
+			return false, err
 		}
-		return false, nil
+
+		return isMember, nil
 	}
 	return false, nil
 }
@@ -265,7 +270,10 @@ func (rm *RoomManager) broadcastWorker(room *Room) {
 
 // safelyBroadcastToClient 安全發送消息
 func (rm *RoomManager) safelyBroadcastToClient(client *Client, message *WsMessage[MessageResponse]) {
+	client.WriteMutex.Lock()
 	err := client.Conn.WriteJSON(message)
+	client.WriteMutex.Unlock()
+
 	if err != nil {
 		log.Printf("Failed to send to user %s: %v", client.UserID, err)
 		// 這裡應該通知 ClientManager 註銷客戶端，但為了避免循環依賴，我們先記錄錯誤

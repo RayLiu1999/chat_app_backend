@@ -104,7 +104,11 @@ func (cm *ClientManager) unregisterClient(client *Client) {
 
 	// 清理用戶相關的 Redis 數據
 	cm.redisClient.Del(context.Background(), "user:"+client.UserID+":rooms")
+
+	// 使用互斥鎖保護 WebSocket 連接的關閉操作
+	client.WriteMutex.Lock()
 	client.Conn.Close()
+	client.WriteMutex.Unlock()
 }
 
 // updateClientStatus 更新客戶端狀態

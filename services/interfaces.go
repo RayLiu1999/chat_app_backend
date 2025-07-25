@@ -3,6 +3,7 @@ package services
 import (
 	"chat_app_backend/models"
 	"chat_app_backend/utils"
+	"mime/multipart"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -25,6 +26,21 @@ type UserServiceInterface interface {
 
 	// RefreshToken 刷新令牌
 	RefreshToken(refreshToken string) (string, *utils.AppError)
+
+	// SetUserOnline 設置用戶為在線狀態
+	SetUserOnline(userID string) error
+
+	// SetUserOffline 設置用戶為離線狀態
+	SetUserOffline(userID string) error
+
+	// UpdateUserActivity 更新用戶活動時間
+	UpdateUserActivity(userID string) error
+
+	// CheckAndSetOfflineUsers 檢查並設置離線用戶
+	CheckAndSetOfflineUsers(offlineThresholdMinutes int) error
+
+	// IsUserOnlineByWebSocket 基於 WebSocket 連線檢查用戶是否在線
+	IsUserOnlineByWebSocket(userID string) bool
 
 	// 未來可能添加的其他方法
 	// CreateUser(user *models.User) (primitive.ObjectID, error)
@@ -52,6 +68,9 @@ type ChatServiceInterface interface {
 	// GetDMMessages 獲取私聊訊息
 	GetDMMessages(userID string, roomID string, before string, after string, limit string) ([]models.MessageResponse, error)
 
+	// GetChannelMessages 獲取頻道訊息
+	GetChannelMessages(userID string, channelID string, before string, after string, limit string) ([]models.MessageResponse, error)
+
 	// 其他已實現的方法應該添加到這裡
 	// ... 其他方法 ...
 }
@@ -59,11 +78,35 @@ type ChatServiceInterface interface {
 // ServerServiceInterface 定義了伺服器服務的接口
 // 所有與伺服器相關的業務邏輯方法都應該在這裡声明
 type ServerServiceInterface interface {
-	// GetServerListByUserId 獲取用戶的伺服器列表
-	GetServerListByUserId(userID string) ([]models.Server, error)
+	// CreateServer 新建伺服器
+	CreateServer(userID string, name string, file multipart.File, header *multipart.FileHeader) (*models.ServerResponse, error)
 
-	// CreateServer 新建測試用戶伺服器關聯
-	CreateServer(server *models.Server) (models.Server, error)
+	// GetServerListResponse 獲取用戶的伺服器列表回應格式
+	GetServerListResponse(userID string) ([]models.ServerResponse, error)
+
+	// GetServerChannels 獲取伺服器的頻道列表
+	GetServerChannels(serverID string) ([]models.Channel, error)
+
+	// SearchPublicServers 搜尋公開伺服器
+	SearchPublicServers(userID string, request models.ServerSearchRequest) (*models.ServerSearchResults, error)
+
+	// UpdateServer 更新伺服器信息
+	UpdateServer(userID string, serverID string, updates map[string]interface{}) (*models.ServerResponse, error)
+
+	// DeleteServer 刪除伺服器
+	DeleteServer(userID string, serverID string) error
+
+	// GetServerByID 根據ID獲取伺服器信息
+	GetServerByID(userID string, serverID string) (*models.ServerResponse, error)
+
+	// GetServerDetailByID 獲取伺服器詳細信息（包含成員和頻道列表）
+	GetServerDetailByID(userID string, serverID string) (*models.ServerDetailResponse, error)
+
+	// JoinServer 請求加入伺服器
+	JoinServer(userID string, serverID string) error
+
+	// LeaveServer 離開伺服器
+	LeaveServer(userID string, serverID string) error
 
 	// 其他已實現的方法應該添加到這裡
 	// ... 其他方法 ...
@@ -81,4 +124,48 @@ type FriendServiceInterface interface {
 
 	// UpdateFriendStatus 更新好友狀態
 	UpdateFriendStatus(userID string, friendID string, status string) error
+}
+
+type ChannelServiceInterface interface {
+	// GetChannelsByServerID 根據伺服器ID獲取頻道列表
+	GetChannelsByServerID(userID string, serverID string) ([]models.ChannelResponse, error)
+
+	// GetChannelByID 根據頻道ID獲取頻道詳細信息
+	GetChannelByID(userID string, channelID string) (*models.ChannelResponse, error)
+
+	// CreateChannel 創建新頻道
+	CreateChannel(userID string, channel *models.Channel) (*models.ChannelResponse, error)
+
+	// UpdateChannel 更新頻道信息
+	UpdateChannel(userID string, channelID string, updates map[string]interface{}) (*models.ChannelResponse, error)
+
+	// DeleteChannel 刪除頻道
+	DeleteChannel(userID string, channelID string) error
+}
+
+// FileUploadService - 負責業務邏輯和安全驗證
+type FileUploadServiceInterface interface {
+	// 業務方法
+	UploadFile(file multipart.File, header *multipart.FileHeader, userID string) (*FileResult, error)
+	UploadAvatar(file multipart.File, header *multipart.FileHeader, userID string) (*FileResult, error)
+	UploadDocument(file multipart.File, header *multipart.FileHeader, userID string) (*FileResult, error)
+	UploadFileWithConfig(file multipart.File, header *multipart.FileHeader, userID string, config *models.FileUploadConfig) (*FileResult, error)
+
+	// 驗證方法
+	ValidateFile(header *multipart.FileHeader) error
+	ValidateImage(header *multipart.FileHeader) error
+	ValidateDocument(header *multipart.FileHeader) error
+
+	// 安全檢查方法
+	ScanFileForMalware(filePath string) error
+	CheckFileContent(file multipart.File, header *multipart.FileHeader) error
+
+	// 檔案管理方法
+	DeleteFile(filePath string) error
+	DeleteFileByID(fileID string, userID string) error
+	GetFileInfo(filePath string) (*FileInfo, error)
+	GetFileURLByID(fileID string) (string, error)
+	GetFileInfoByID(fileID string) (*models.UploadedFile, error)
+	GetUserFiles(userID string) ([]*models.UploadedFile, error)
+	CleanupExpiredFiles() error
 }

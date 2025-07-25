@@ -49,6 +49,32 @@ func (m *BaseModel) GetBaseModel() *BaseModel {
 	return m
 }
 
+// setTimestamps 設定模型的時間戳
+func setTimestamps(model Model, isCreate bool) {
+	// 嘗試通過 BaseModel 欄位設定時間
+	if modelValue := reflect.ValueOf(model).Elem(); modelValue.IsValid() {
+		if baseField := modelValue.FieldByName("BaseModel"); baseField.IsValid() && baseField.CanAddr() {
+			now := time.Now()
+			baseModel := baseField.Addr().Interface().(*BaseModel)
+			if isCreate && baseModel.CreatedAt.IsZero() {
+				baseModel.CreatedAt = now
+			}
+			baseModel.UpdatedAt = now
+			return
+		}
+	}
+
+	// 嘗試通過 GetBaseModel 方法設定時間
+	if baseModel, ok := model.(interface{ GetBaseModel() *BaseModel }); ok {
+		now := time.Now()
+		base := baseModel.GetBaseModel()
+		if isCreate && base.CreatedAt.IsZero() {
+			base.CreatedAt = now
+		}
+		base.UpdatedAt = now
+	}
+}
+
 // ODM 提供對模型的資料庫操作
 type ODM struct {
 	db *mongo.Database
@@ -61,6 +87,8 @@ func NewODM(db *mongo.Database) *ODM {
 	}
 }
 
+// ===== 基礎工具方法 =====
+
 // GetDatabase 返回數據庫連接
 func (o *ODM) GetDatabase() *mongo.Database {
 	return o.db
@@ -71,6 +99,8 @@ func (o *ODM) Collection(model Model) *mongo.Collection {
 	return o.db.Collection(model.GetCollectionName())
 }
 
+// ===== 創建操作 =====
+
 // Create 創建新文檔
 func (o *ODM) Create(ctx context.Context, model Model) error {
 	if reflect.ValueOf(model).Kind() != reflect.Ptr {
@@ -78,13 +108,7 @@ func (o *ODM) Create(ctx context.Context, model Model) error {
 	}
 
 	// 設置創建和更新時間
-	v := reflect.ValueOf(model).Elem()
-	if baseField := v.FieldByName("BaseModel"); baseField.IsValid() {
-		now := time.Now()
-		baseModel := baseField.Addr().Interface().(*BaseModel)
-		baseModel.CreatedAt = now
-		baseModel.UpdatedAt = now
-	}
+	setTimestamps(model, true)
 
 	// 如果ID為空，則生成新ID
 	if model.GetID().IsZero() {
@@ -94,6 +118,32 @@ func (o *ODM) Create(ctx context.Context, model Model) error {
 	_, err := o.Collection(model).InsertOne(ctx, model)
 	return err
 }
+
+// InsertMany 插入多個文檔
+func (o *ODM) InsertMany(ctx context.Context, models []Model) error {
+	if len(models) == 0 {
+		return nil
+	}
+
+	// 將 []Model 轉換為 []interface{}
+	interfaces := make([]interface{}, len(models))
+	for i, model := range models {
+		// 設定創建和更新時間
+		setTimestamps(model, true)
+
+		// 如果ID為空，則生成新ID
+		if model.GetID().IsZero() {
+			model.SetID(primitive.NewObjectID())
+		}
+
+		interfaces[i] = model
+	}
+
+	_, err := o.Collection(models[0]).InsertMany(ctx, interfaces)
+	return err
+}
+
+// ===== 查詢操作 =====
 
 // FindByID 通過ID查找文檔
 func (o *ODM) FindByID(ctx context.Context, ID string, model Model) error {
@@ -163,6 +213,8 @@ func (o *ODM) Find(ctx context.Context, filter bson.M, models interface{}) error
 	return cursor.All(ctx, models)
 }
 
+// ===== 更新操作 =====
+
 // Update 更新文檔
 func (o *ODM) Update(ctx context.Context, model Model) error {
 	if reflect.ValueOf(model).Kind() != reflect.Ptr {
@@ -175,11 +227,7 @@ func (o *ODM) Update(ctx context.Context, model Model) error {
 	}
 
 	// 更新更新時間
-	v := reflect.ValueOf(model).Elem()
-	if baseField := v.FieldByName("BaseModel"); baseField.IsValid() {
-		baseModel := baseField.Addr().Interface().(*BaseModel)
-		baseModel.UpdatedAt = time.Now()
-	}
+	setTimestamps(model, false)
 
 	filter := bson.M{"_id": id}
 	_, err := o.Collection(model).ReplaceOne(ctx, filter, model)
@@ -205,6 +253,23 @@ func (o *ODM) UpdateFields(ctx context.Context, model Model, fields bson.M) erro
 	_, err := o.Collection(model).UpdateOne(ctx, filter, update)
 	return err
 }
+
+// UpdateMany 更新多個文檔
+func (o *ODM) UpdateMany(ctx context.Context, model Model, filter bson.M, update bson.M) error {
+	// 添加更新時間
+	if updateSet, ok := update["$set"]; ok {
+		if updateSetMap, ok := updateSet.(bson.M); ok {
+			updateSetMap["updated_at"] = time.Now()
+		}
+	} else {
+		update["$set"] = bson.M{"updated_at": time.Now()}
+	}
+
+	_, err := o.Collection(model).UpdateMany(ctx, filter, update)
+	return err
+}
+
+// ===== 刪除操作 =====
 
 // Delete 刪除文檔
 func (o *ODM) Delete(ctx context.Context, model Model) error {
@@ -239,73 +304,14 @@ func (o *ODM) DeleteByID(ctx context.Context, ID string, model Model) error {
 	return err
 }
 
-// InsertOne 插入單個文檔
-func (o *ODM) InsertOne(ctx context.Context, model Model) error {
-	if reflect.ValueOf(model).Kind() != reflect.Ptr {
-		return ErrInvalidModel
-	}
-
-	// 如果模型包含 BaseModel，則設定創建和更新時間
-	if baseModel, ok := model.(interface{ GetBaseModel() *BaseModel }); ok {
-		now := time.Now()
-		base := baseModel.GetBaseModel()
-		// 只有在創建時間為零值時才設定
-		if base.CreatedAt.IsZero() {
-			base.CreatedAt = now
-		}
-		base.UpdatedAt = now
-	}
-
-	_, err := o.Collection(model).InsertOne(ctx, model)
-	return err
-}
-
-// InsertMany 插入多個文檔
-func (o *ODM) InsertMany(ctx context.Context, models []Model) error {
-	if len(models) == 0 {
-		return nil
-	}
-
-	// 將 []Model 轉換為 []interface{}
-	interfaces := make([]interface{}, len(models))
-	for i, model := range models {
-
-		// 如果模型包含 BaseModel，則設定創建和更新時間
-		if baseModel, ok := model.(interface{ GetBaseModel() *BaseModel }); ok {
-			now := time.Now()
-			base := baseModel.GetBaseModel()
-			// 只有在創建時間為零值時才設定
-			if base.CreatedAt.IsZero() {
-				base.CreatedAt = now
-			}
-			base.UpdatedAt = now
-		}
-		interfaces[i] = model
-	}
-
-	_, err := o.Collection(models[0]).InsertMany(ctx, interfaces)
-	return err
-}
+// ===== 統計和工具方法 =====
 
 // Count 計算符合條件的文檔數量
 func (o *ODM) Count(ctx context.Context, filter bson.M, model Model) (int64, error) {
 	return o.Collection(model).CountDocuments(ctx, filter)
 }
 
-// UpdateMany 更新多個文檔
-func (o *ODM) UpdateMany(ctx context.Context, model Model, filter bson.M, update bson.M) error {
-	// 添加更新時間
-	if updateSet, ok := update["$set"]; ok {
-		if updateSetMap, ok := updateSet.(bson.M); ok {
-			updateSetMap["updated_at"] = time.Now()
-		}
-	} else {
-		update["$set"] = bson.M{"updated_at": time.Now()}
-	}
-
-	_, err := o.Collection(model).UpdateMany(ctx, filter, update)
-	return err
-}
+// ===== 存在性檢查 =====
 
 // Exists 檢查文檔是否存在
 func (o *ODM) Exists(ctx context.Context, filter bson.M, model Model) (bool, error) {
@@ -325,6 +331,8 @@ func (o *ODM) ExistsByID(ctx context.Context, ID string, model Model) (bool, err
 	filter := bson.M{"_id": objectID}
 	return o.Exists(ctx, filter, model)
 }
+
+// ===== 高級查詢操作 =====
 
 // FindWithOptions 使用自定義選項查找文檔
 func (o *ODM) FindWithOptions(ctx context.Context, filter bson.M, models interface{}, options *QueryOptions) error {
@@ -368,10 +376,14 @@ func (o *ODM) Aggregate(ctx context.Context, pipeline interface{}, models interf
 	return cursor.All(ctx, models)
 }
 
+// ===== 批量操作 =====
+
 // BulkWrite 執行批量寫入操作
 func (o *ODM) BulkWrite(ctx context.Context, operations []mongo.WriteModel, model Model) (*mongo.BulkWriteResult, error) {
 	return o.Collection(model).BulkWrite(ctx, operations)
 }
+
+// ===== 查詢選項工具 =====
 
 // QueryOptions 定義查詢選項
 type QueryOptions struct {

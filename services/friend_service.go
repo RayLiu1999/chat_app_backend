@@ -13,18 +13,20 @@ import (
 )
 
 type FriendService struct {
-	config     *config.Config
-	friendRepo repositories.FriendRepositoryInterface
-	userRepo   repositories.UserRepositoryInterface
-	odm        *providers.ODM
+	config      *config.Config
+	friendRepo  repositories.FriendRepositoryInterface
+	userRepo    repositories.UserRepositoryInterface
+	userService UserServiceInterface // 添加 UserService 來查詢在線狀態
+	odm         *providers.ODM
 }
 
-func NewFriendService(cfg *config.Config, odm *providers.ODM, friendRepo repositories.FriendRepositoryInterface, userRepo repositories.UserRepositoryInterface) *FriendService {
+func NewFriendService(cfg *config.Config, odm *providers.ODM, friendRepo repositories.FriendRepositoryInterface, userRepo repositories.UserRepositoryInterface, userService UserServiceInterface) *FriendService {
 	return &FriendService{
-		config:     cfg,
-		friendRepo: friendRepo,
-		userRepo:   userRepo,
-		odm:        odm,
+		config:      cfg,
+		friendRepo:  friendRepo,
+		userRepo:    userRepo,
+		userService: userService,
+		odm:         odm,
 	}
 }
 
@@ -100,12 +102,19 @@ func (fs *FriendService) GetFriendList(userID string) ([]models.APIFriend, error
 	var apiFriend []models.APIFriend
 	for _, user := range users {
 		status := friendsStatusMap[user.ID.Hex()]
+		// 查詢好友的在線狀態
+		isOnline := false
+		if fs.userService != nil {
+			isOnline = fs.userService.IsUserOnlineByWebSocket(user.ID.Hex())
+		}
+
 		apiFriend = append(apiFriend, models.APIFriend{
 			ID:       user.ID.Hex(),
 			Name:     user.Username,
 			Nickname: user.Nickname,
 			Picture:  user.Picture,
 			Status:   status,
+			IsOnline: isOnline, // 添加在線狀態
 		})
 	}
 

@@ -19,15 +19,17 @@ type WebSocketHandler struct {
 	clientManager  *ClientManager
 	roomManager    *RoomManager
 	messageHandler *MessageHandler
+	userService    UserServiceInterface
 }
 
 // NewWebSocketHandler 創建新的 WebSocket 處理器
-func NewWebSocketHandler(odm *providers.ODM, clientManager *ClientManager, roomManager *RoomManager, messageHandler *MessageHandler) *WebSocketHandler {
+func NewWebSocketHandler(odm *providers.ODM, clientManager *ClientManager, roomManager *RoomManager, messageHandler *MessageHandler, userService UserServiceInterface) *WebSocketHandler {
 	return &WebSocketHandler{
 		odm:            odm,
 		clientManager:  clientManager,
 		roomManager:    roomManager,
 		messageHandler: messageHandler,
+		userService:    userService,
 	}
 }
 
@@ -51,6 +53,11 @@ func (wsh *WebSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) 
 	}
 	wsh.clientManager.Register(client)
 
+	// 設置用戶為在線狀態
+	if err := wsh.userService.SetUserOnline(userID); err != nil {
+		utils.PrettyPrintf("Failed to set user %s online: %v", userID, err)
+	}
+
 	// 啟動心跳檢測
 	go wsh.pingHandler(ws, client)
 
@@ -60,7 +67,16 @@ func (wsh *WebSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) 
 			utils.PrettyPrintf("WebSocket handler panic recovered: %v", r)
 		}
 		wsh.clientManager.Unregister(client)
+
+		// 設置用戶為離線狀態
+		if err := wsh.userService.SetUserOffline(userID); err != nil {
+			utils.PrettyPrintf("Failed to set user %s offline: %v", userID, err)
+		}
+
+		// 使用互斥鎖保護 WebSocket 連接的關閉操作
+		client.WriteMutex.Lock()
 		ws.Close()
+		client.WriteMutex.Unlock()
 	}()
 
 	for {
@@ -84,6 +100,11 @@ func (wsh *WebSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) 
 		// 重置讀取截止時間
 		ws.SetReadDeadline(time.Now().Add(60 * time.Second))
 
+		// 更新用戶活動時間
+		if err := wsh.userService.UpdateUserActivity(userID); err != nil {
+			utils.PrettyPrintf("Failed to update user activity for %s: %v", userID, err)
+		}
+
 		switch msg.Action {
 		case "join_room":
 			utils.PrettyPrintf("User %s is joining room: %s", userID, msg.Data)
@@ -95,7 +116,7 @@ func (wsh *WebSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) 
 			wsh.handleSendMessage(ws, client, msg.Data, userID)
 		case "ping":
 			// 處理客戶端ping
-			wsh.handlePing(ws)
+			wsh.handlePing(ws, client)
 		default:
 			utils.PrettyPrintf("Unknown action: %s", msg.Action)
 		}
@@ -108,20 +129,26 @@ func (wsh *WebSocketHandler) pingHandler(ws *websocket.Conn, client *Client) {
 	defer ticker.Stop()
 
 	for range ticker.C {
+		client.WriteMutex.Lock()
 		ws.SetWriteDeadline(time.Now().Add(10 * time.Second))
 		if err := ws.WriteMessage(websocket.PingMessage, nil); err != nil {
 			utils.PrettyPrintf("Ping failed for user %s: %v", client.UserID, err)
+			client.WriteMutex.Unlock()
 			return
 		}
+		client.WriteMutex.Unlock()
 	}
 }
 
 // handlePing 處理ping請求
-func (wsh *WebSocketHandler) handlePing(ws *websocket.Conn) {
+func (wsh *WebSocketHandler) handlePing(ws *websocket.Conn, client *Client) {
 	pongMsg := &WsMessage[map[string]string]{
 		Action: "pong",
 		Data:   map[string]string{"message": "pong"},
 	}
+
+	client.WriteMutex.Lock()
+	defer client.WriteMutex.Unlock()
 
 	ws.SetWriteDeadline(time.Now().Add(10 * time.Second))
 	if err := ws.WriteJSON(pongMsg); err != nil {
@@ -155,7 +182,9 @@ func (wsh *WebSocketHandler) handleJoinRoom(ws *websocket.Conn, client *Client, 
 				Message: "Failed to check user allowed join room",
 			},
 		}
+		client.WriteMutex.Lock()
 		ws.WriteJSON(message)
+		client.WriteMutex.Unlock()
 		return
 	}
 	if !allowed {
@@ -166,7 +195,9 @@ func (wsh *WebSocketHandler) handleJoinRoom(ws *websocket.Conn, client *Client, 
 				Message: "User not allowed to join room",
 			},
 		}
+		client.WriteMutex.Lock()
 		ws.WriteJSON(message)
+		client.WriteMutex.Unlock()
 		return
 	}
 
@@ -184,7 +215,9 @@ func (wsh *WebSocketHandler) handleJoinRoom(ws *websocket.Conn, client *Client, 
 		},
 	}
 
+	client.WriteMutex.Lock()
 	ws.WriteJSON(message)
+	client.WriteMutex.Unlock()
 }
 
 // handleLeaveRoom 處理離開房間請求
@@ -213,7 +246,9 @@ func (wsh *WebSocketHandler) handleLeaveRoom(ws *websocket.Conn, client *Client,
 			Message: "Left " + string(requestData.RoomType) + " room " + requestData.RoomID,
 		},
 	}
+	client.WriteMutex.Lock()
 	ws.WriteJSON(message)
+	client.WriteMutex.Unlock()
 }
 
 // handleSendMessage 處理發送消息請求
@@ -293,7 +328,7 @@ func (wsh *WebSocketHandler) handleDMRoomCreation(roomID, userID string) {
 			ChatWithUserID: partnerUserRoom.UserID,
 			IsHidden:       false,
 		}
-		err := wsh.odm.InsertOne(ctx, newRoom)
+		err := wsh.odm.Create(ctx, newRoom)
 		if err != nil {
 			utils.PrettyPrintf("Failed to create dm room for user %s: %v", userID, err)
 			return
@@ -308,7 +343,7 @@ func (wsh *WebSocketHandler) handleDMRoomCreation(roomID, userID string) {
 			ChatWithUserID: userObjectID,
 			IsHidden:       false,
 		}
-		err := wsh.odm.InsertOne(ctx, newRoom)
+		err := wsh.odm.Create(ctx, newRoom)
 		if err != nil {
 			utils.PrettyPrintf("Failed to create dm room for partner: %v", err)
 			return
