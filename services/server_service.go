@@ -408,8 +408,12 @@ func (ss *ServerService) DeleteServer(userID string, serverID string) error {
 		}
 	}
 
-	// TODO: 刪除所有相關的頻道和類別
-	// 可以在未來版本中添加
+	// 刪除所有相關的頻道和類別
+	err = ss.deleteServerChannelsAndCategories(serverID)
+	if err != nil {
+		fmt.Printf("刪除伺服器頻道和類別失敗: %v\n", err)
+		// 不阻止伺服器刪除，只記錄錯誤
+	}
 
 	// 刪除伺服器圖片
 	if !server.ImageID.IsZero() {
@@ -679,6 +683,41 @@ func (ss *ServerService) LeaveServer(userID string, serverID string) error {
 		err = ss.serverRepo.UpdateMemberCount(serverID, int(memberCount))
 		if err != nil {
 			fmt.Printf("更新成員數量快取失敗: %v\n", err)
+		}
+	}
+
+	return nil
+}
+
+// deleteServerChannelsAndCategories 刪除伺服器的所有頻道和類別
+func (ss *ServerService) deleteServerChannelsAndCategories(serverID string) error {
+	// 獲取伺服器的所有頻道
+	channels, err := ss.channelRepo.GetChannelsByServerID(serverID)
+	if err != nil {
+		return fmt.Errorf("獲取伺服器頻道失敗: %v", err)
+	}
+
+	// 刪除所有頻道
+	for _, channel := range channels {
+		err = ss.channelRepo.DeleteChannel(channel.BaseModel.GetID().Hex())
+		if err != nil {
+			// 記錄錯誤但繼續刪除其他頻道
+			fmt.Printf("刪除頻道 %s 失敗: %v\n", channel.Name, err)
+		}
+	}
+
+	// 獲取伺服器的所有類別
+	categories, err := ss.channelCategoryRepo.GetChannelCategoriesByServerID(serverID)
+	if err != nil {
+		return fmt.Errorf("獲取伺服器類別失敗: %v", err)
+	}
+
+	// 刪除所有類別
+	for _, category := range categories {
+		err = ss.channelCategoryRepo.DeleteChannelCategory(category.BaseModel.GetID().Hex())
+		if err != nil {
+			// 記錄錯誤但繼續刪除其他類別
+			fmt.Printf("刪除類別 %s 失敗: %v\n", category.Name, err)
 		}
 	}
 

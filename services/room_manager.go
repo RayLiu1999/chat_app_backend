@@ -67,15 +67,6 @@ func (rm *RoomManager) InitRoom(roomType models.RoomType, roomID string) *Room {
 		return room
 	}
 
-	// 再次檢查（可能在獲取寫鎖的過程中，其他 goroutine 已經創建了房間）
-	rm.mutex.RLock()
-	if room, exists := rm.rooms[key.String()]; exists {
-		log.Printf("Room %s was created by another goroutine", key.String())
-		rm.mutex.RUnlock()
-		return room
-	}
-	rm.mutex.RUnlock()
-
 	room = &Room{
 		Key:       key,
 		ID:        roomID,
@@ -270,13 +261,11 @@ func (rm *RoomManager) broadcastWorker(room *Room) {
 
 // safelyBroadcastToClient 安全發送消息
 func (rm *RoomManager) safelyBroadcastToClient(client *Client, message *WsMessage[MessageResponse]) {
-	client.WriteMutex.Lock()
-	err := client.Conn.WriteJSON(message)
-	client.WriteMutex.Unlock()
-
-	if err != nil {
+	// 使用統一的發送機制，而不是直接寫入 WebSocket
+	if err := client.SendMessage(message); err != nil {
 		log.Printf("Failed to send to user %s: %v", client.UserID, err)
-		// 這裡應該通知 ClientManager 註銷客戶端，但為了避免循環依賴，我們先記錄錯誤
+		// 標記客戶端為非活躍，讓健康檢查清理
+		client.IsActive = false
 		return
 	}
 

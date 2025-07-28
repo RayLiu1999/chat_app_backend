@@ -6,7 +6,6 @@ import (
 	"chat_app_backend/utils"
 	"context"
 	"encoding/json"
-	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -36,21 +35,21 @@ func NewWebSocketHandler(odm *providers.ODM, clientManager *ClientManager, roomM
 // HandleWebSocket 處理 WebSocket 連線
 func (wsh *WebSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) {
 	// 設置連接參數
-	ws.SetReadLimit(512)
-	ws.SetReadDeadline(time.Now().Add(60 * time.Second))
+	ws.SetReadLimit(MaxMessageSize)
+	ws.SetReadDeadline(time.Now().Add(PongWait))
+
+	// 創建客戶端
+	client := wsh.clientManager.NewClient(userID, ws)
+
+	// 設置 pong 處理器
 	ws.SetPongHandler(func(string) error {
-		ws.SetReadDeadline(time.Now().Add(60 * time.Second))
+		utils.PrettyPrintf("收到來自客戶端 %s 的 pong", userID)
+		ws.SetReadDeadline(time.Now().Add(PongWait))
+		client.UpdateLastSeen()
 		return nil
 	})
 
-	// 初始化用戶
-	client := &Client{
-		UserID:        userID,
-		Conn:          ws,
-		Subscribed:    make(map[string]bool),
-		RoomActivity:  make(map[string]time.Time),
-		ActivityMutex: sync.RWMutex{},
-	}
+	// 註冊客戶端
 	wsh.clientManager.Register(client)
 
 	// 設置用戶為在線狀態
@@ -58,233 +57,18 @@ func (wsh *WebSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) 
 		utils.PrettyPrintf("Failed to set user %s online: %v", userID, err)
 	}
 
-	// 啟動心跳檢測
-	go wsh.pingHandler(ws, client)
+	// 啟動讀寫協程
+	go wsh.clientWritePump(client)
+	go wsh.clientReadPump(client)
 
-	// 處理消息循環
-	defer func() {
-		if r := recover(); r != nil {
-			utils.PrettyPrintf("WebSocket handler panic recovered: %v", r)
-		}
-		wsh.clientManager.Unregister(client)
+	// 等待客戶端 context 結束
+	<-client.Context.Done()
 
-		// 設置用戶為離線狀態
-		if err := wsh.userService.SetUserOffline(userID); err != nil {
-			utils.PrettyPrintf("Failed to set user %s offline: %v", userID, err)
-		}
-
-		// 使用互斥鎖保護 WebSocket 連接的關閉操作
-		client.WriteMutex.Lock()
-		ws.Close()
-		client.WriteMutex.Unlock()
-	}()
-
-	for {
-		var msg WsMessage[json.RawMessage]
-
-		// 設置讀取截止時間
-		ws.SetReadDeadline(time.Now().Add(60 * time.Second))
-
-		err := ws.ReadJSON(&msg)
-		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				utils.PrettyPrintf("WebSocket unexpected close error: %v", err)
-			} else {
-				utils.PrettyPrintf("Read message failed: %v", err)
-			}
-			break
-		}
-
-		utils.PrettyPrint("Received message:", msg)
-
-		// 重置讀取截止時間
-		ws.SetReadDeadline(time.Now().Add(60 * time.Second))
-
-		// 更新用戶活動時間
-		if err := wsh.userService.UpdateUserActivity(userID); err != nil {
-			utils.PrettyPrintf("Failed to update user activity for %s: %v", userID, err)
-		}
-
-		switch msg.Action {
-		case "join_room":
-			utils.PrettyPrintf("User %s is joining room: %s", userID, msg.Data)
-			wsh.handleJoinRoom(ws, client, msg.Data)
-		case "leave_room":
-			wsh.handleLeaveRoom(ws, client, msg.Data)
-		case "send_message":
-			utils.PrettyPrintf("User %s is sending message in room: %s", userID, msg.Data)
-			wsh.handleSendMessage(ws, client, msg.Data, userID)
-		case "ping":
-			// 處理客戶端ping
-			wsh.handlePing(ws, client)
-		default:
-			utils.PrettyPrintf("Unknown action: %s", msg.Action)
-		}
+	// 清理工作
+	wsh.clientManager.Unregister(client)
+	if err := wsh.userService.SetUserOffline(userID); err != nil {
+		utils.PrettyPrintf("Failed to set user %s offline: %v", userID, err)
 	}
-}
-
-// pingHandler 處理心跳檢測
-func (wsh *WebSocketHandler) pingHandler(ws *websocket.Conn, client *Client) {
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		client.WriteMutex.Lock()
-		ws.SetWriteDeadline(time.Now().Add(10 * time.Second))
-		if err := ws.WriteMessage(websocket.PingMessage, nil); err != nil {
-			utils.PrettyPrintf("Ping failed for user %s: %v", client.UserID, err)
-			client.WriteMutex.Unlock()
-			return
-		}
-		client.WriteMutex.Unlock()
-	}
-}
-
-// handlePing 處理ping請求
-func (wsh *WebSocketHandler) handlePing(ws *websocket.Conn, client *Client) {
-	pongMsg := &WsMessage[map[string]string]{
-		Action: "pong",
-		Data:   map[string]string{"message": "pong"},
-	}
-
-	client.WriteMutex.Lock()
-	defer client.WriteMutex.Unlock()
-
-	ws.SetWriteDeadline(time.Now().Add(10 * time.Second))
-	if err := ws.WriteJSON(pongMsg); err != nil {
-		utils.PrettyPrintf("Failed to send pong: %v", err)
-	}
-}
-
-// handleJoinRoom 處理加入房間請求
-func (wsh *WebSocketHandler) handleJoinRoom(ws *websocket.Conn, client *Client, data json.RawMessage) {
-	var requestData struct {
-		RoomID   string          `json:"room_id"`
-		RoomType models.RoomType `json:"room_type"`
-	}
-	err := json.Unmarshal(data, &requestData)
-	if err != nil {
-		utils.PrettyPrintf("Failed to parse join_room data: %v", err)
-		return
-	}
-
-	type joinRoomResponse struct {
-		Status  string `json:"status"`
-		Message string `json:"message"`
-	}
-
-	allowed, err := wsh.roomManager.checkUserAllowedJoinRoom(client.UserID, requestData.RoomID, requestData.RoomType)
-	if err != nil {
-		message := &WsMessage[joinRoomResponse]{
-			Action: "join_room",
-			Data: joinRoomResponse{
-				Status:  "error",
-				Message: "Failed to check user allowed join room",
-			},
-		}
-		client.WriteMutex.Lock()
-		ws.WriteJSON(message)
-		client.WriteMutex.Unlock()
-		return
-	}
-	if !allowed {
-		message := &WsMessage[joinRoomResponse]{
-			Action: "join_room",
-			Data: joinRoomResponse{
-				Status:  "error",
-				Message: "User not allowed to join room",
-			},
-		}
-		client.WriteMutex.Lock()
-		ws.WriteJSON(message)
-		client.WriteMutex.Unlock()
-		return
-	}
-
-	// 初始化房間
-	wsh.roomManager.InitRoom(requestData.RoomType, requestData.RoomID)
-
-	// 加入房間
-	wsh.roomManager.JoinRoom(client, requestData.RoomType, requestData.RoomID)
-
-	message := &WsMessage[joinRoomResponse]{
-		Action: "join_room",
-		Data: joinRoomResponse{
-			Status:  "success",
-			Message: "Joined " + string(requestData.RoomType) + " room " + requestData.RoomID,
-		},
-	}
-
-	client.WriteMutex.Lock()
-	ws.WriteJSON(message)
-	client.WriteMutex.Unlock()
-}
-
-// handleLeaveRoom 處理離開房間請求
-func (wsh *WebSocketHandler) handleLeaveRoom(ws *websocket.Conn, client *Client, data json.RawMessage) {
-	var requestData struct {
-		RoomID   string          `json:"room_id"`
-		RoomType models.RoomType `json:"room_type"`
-	}
-	err := json.Unmarshal(data, &requestData)
-	if err != nil {
-		utils.PrettyPrintf("Failed to parse leave_room data: %v", err)
-		return
-	}
-
-	type leaveRoomResponse struct {
-		Action  string `json:"action"`
-		Status  string `json:"status"`
-		Message string `json:"message"`
-	}
-
-	wsh.roomManager.LeaveRoom(client, requestData.RoomType, requestData.RoomID)
-	message := &WsMessage[leaveRoomResponse]{
-		Action: "leave_room",
-		Data: leaveRoomResponse{
-			Status:  "success",
-			Message: "Left " + string(requestData.RoomType) + " room " + requestData.RoomID,
-		},
-	}
-	client.WriteMutex.Lock()
-	ws.WriteJSON(message)
-	client.WriteMutex.Unlock()
-}
-
-// handleSendMessage 處理發送消息請求
-func (wsh *WebSocketHandler) handleSendMessage(ws *websocket.Conn, client *Client, data json.RawMessage, userID string) {
-	var requestData struct {
-		RoomID   string          `json:"room_id"`
-		RoomType models.RoomType `json:"room_type"`
-		Content  string          `json:"content"`
-	}
-	err := json.Unmarshal(data, &requestData)
-	if err != nil {
-		utils.PrettyPrintf("Failed to parse send_message data: %v", err)
-		return
-	}
-
-	// 確保房間存在
-	wsh.roomManager.InitRoom(requestData.RoomType, requestData.RoomID)
-
-	// 處理私聊房間邏輯
-	if requestData.RoomType == models.RoomTypeDM {
-		wsh.handleDMRoomCreation(requestData.RoomID, userID)
-	}
-
-	message := &WsMessage[MessageResponse]{
-		Action: "send_message",
-		Data: MessageResponse{
-			RoomID:    requestData.RoomID,
-			RoomType:  requestData.RoomType,
-			SenderID:  userID,
-			Content:   requestData.Content,
-			Timestamp: time.Now().UnixMilli(),
-		},
-	}
-
-	// 使用MessageHandler處理消息
-	wsh.messageHandler.HandleMessage(message)
 }
 
 // handleDMRoomCreation 處理私聊房間創建邏輯
@@ -349,5 +133,244 @@ func (wsh *WebSocketHandler) handleDMRoomCreation(roomID, userID string) {
 			return
 		}
 		utils.PrettyPrintf("Created DM room record for partner in room %s", roomID)
+	}
+}
+
+// clientReadPump 處理客戶端讀取
+func (wsh *WebSocketHandler) clientReadPump(client *Client) {
+	defer func() {
+		if r := recover(); r != nil {
+			utils.PrettyPrintf("Read pump panic recovered for user %s: %v", client.UserID, r)
+		}
+		client.Cancel() // 取消所有協程
+	}()
+
+	for {
+		select {
+		case <-client.Context.Done():
+			return
+		default:
+			var msg WsMessage[json.RawMessage]
+
+			// 設置讀取超時
+			client.Conn.SetReadDeadline(time.Now().Add(PongWait))
+
+			err := client.Conn.ReadJSON(&msg)
+			if err != nil {
+				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+					utils.PrettyPrintf("WebSocket unexpected close error for user %s: %v", client.UserID, err)
+				} else {
+					utils.PrettyPrintf("Read message failed for user %s: %v", client.UserID, err)
+				}
+				return
+			}
+
+			// 更新最後活動時間
+			client.UpdateLastSeen()
+
+			// 更新用戶活動時間
+			if err := wsh.userService.UpdateUserActivity(client.UserID); err != nil {
+				utils.PrettyPrintf("Failed to update user activity for %s: %v", client.UserID, err)
+			}
+
+			// 處理訊息
+			wsh.handleClientMessage(client, msg)
+		}
+	}
+}
+
+// clientWritePump 處理客戶端寫入
+func (wsh *WebSocketHandler) clientWritePump(client *Client) {
+	ticker := time.NewTicker(PingPeriod)
+	defer func() {
+		ticker.Stop()
+		if r := recover(); r != nil {
+			utils.PrettyPrintf("Write pump panic recovered for user %s: %v", client.UserID, r)
+		}
+		client.Conn.Close()
+	}()
+
+	for {
+		select {
+		case <-client.Context.Done():
+			return
+
+		case message, ok := <-client.Send:
+			client.Conn.SetWriteDeadline(time.Now().Add(WriteWait))
+			if !ok {
+				// 通道已關閉
+				client.Conn.WriteMessage(websocket.CloseMessage, []byte{})
+				return
+			}
+
+			if err := client.Conn.WriteMessage(websocket.TextMessage, message); err != nil {
+				utils.PrettyPrintf("寫入訊息失敗 for user %s: %v", client.UserID, err)
+				return
+			}
+
+		case <-ticker.C:
+			client.Conn.SetWriteDeadline(time.Now().Add(WriteWait))
+			if err := client.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				utils.PrettyPrintf("發送 Ping 失敗 for user %s: %v", client.UserID, err)
+				return
+			}
+			utils.PrettyPrintf("發送 Ping 給客戶端 %s", client.UserID)
+		}
+	}
+}
+
+// handleClientMessage 處理客戶端訊息
+func (wsh *WebSocketHandler) handleClientMessage(client *Client, msg WsMessage[json.RawMessage]) {
+	switch msg.Action {
+	case "join_room":
+		utils.PrettyPrintf("User %s is joining room: %s", client.UserID, msg.Data)
+		wsh.handleJoinRoom(client, msg.Data)
+	case "leave_room":
+		wsh.handleLeaveRoom(client, msg.Data)
+	case "send_message":
+		utils.PrettyPrintf("User %s is sending message in room: %s", client.UserID, msg.Data)
+		wsh.handleSendMessage(client, msg.Data)
+	case "ping":
+		// 處理客戶端ping
+		utils.PrettyPrintf("收到來自客戶端 %s 的 ping，發送 pong...", client.UserID)
+		wsh.handlePing(client)
+	default:
+		utils.PrettyPrintf("Unknown action from user %s: %s", client.UserID, msg.Action)
+		client.SendError("unknown_action", "未知的動作類型")
+	}
+}
+
+// handleJoinRoom 處理加入房間請求
+func (wsh *WebSocketHandler) handleJoinRoom(client *Client, data json.RawMessage) {
+	var requestData struct {
+		RoomID   string          `json:"room_id"`
+		RoomType models.RoomType `json:"room_type"`
+	}
+	err := json.Unmarshal(data, &requestData)
+	if err != nil {
+		utils.PrettyPrintf("Failed to parse join_room data: %v", err)
+		client.SendError("invalid_data", "無法解析加入房間數據")
+		return
+	}
+
+	type joinRoomResponse struct {
+		Status  string `json:"status"`
+		Message string `json:"message"`
+	}
+
+	allowed, err := wsh.roomManager.checkUserAllowedJoinRoom(client.UserID, requestData.RoomID, requestData.RoomType)
+	if err != nil {
+		client.SendMessage(&WsMessage[joinRoomResponse]{
+			Action: "join_room",
+			Data: joinRoomResponse{
+				Status:  "error",
+				Message: "檢查用戶權限失敗",
+			},
+		})
+		return
+	}
+	if !allowed {
+		client.SendMessage(&WsMessage[joinRoomResponse]{
+			Action: "join_room",
+			Data: joinRoomResponse{
+				Status:  "error",
+				Message: "用戶沒有權限加入此房間",
+			},
+		})
+		return
+	}
+
+	// 初始化房間
+	wsh.roomManager.InitRoom(requestData.RoomType, requestData.RoomID)
+
+	// 加入房間
+	wsh.roomManager.JoinRoom(client, requestData.RoomType, requestData.RoomID)
+
+	client.SendMessage(&WsMessage[joinRoomResponse]{
+		Action: "join_room",
+		Data: joinRoomResponse{
+			Status:  "success",
+			Message: "成功加入 " + string(requestData.RoomType) + " 房間 " + requestData.RoomID,
+		},
+	})
+}
+
+// handleLeaveRoom 處理離開房間請求
+func (wsh *WebSocketHandler) handleLeaveRoom(client *Client, data json.RawMessage) {
+	var requestData struct {
+		RoomID   string          `json:"room_id"`
+		RoomType models.RoomType `json:"room_type"`
+	}
+	err := json.Unmarshal(data, &requestData)
+	if err != nil {
+		utils.PrettyPrintf("Failed to parse leave_room data: %v", err)
+		client.SendError("invalid_data", "無法解析離開房間數據")
+		return
+	}
+
+	type leaveRoomResponse struct {
+		Status  string `json:"status"`
+		Message string `json:"message"`
+	}
+
+	wsh.roomManager.LeaveRoom(client, requestData.RoomType, requestData.RoomID)
+	client.SendMessage(&WsMessage[leaveRoomResponse]{
+		Action: "leave_room",
+		Data: leaveRoomResponse{
+			Status:  "success",
+			Message: "成功離開 " + string(requestData.RoomType) + " 房間 " + requestData.RoomID,
+		},
+	})
+}
+
+// handleSendMessage 處理發送消息請求
+func (wsh *WebSocketHandler) handleSendMessage(client *Client, data json.RawMessage) {
+	var requestData struct {
+		RoomID   string          `json:"room_id"`
+		RoomType models.RoomType `json:"room_type"`
+		Content  string          `json:"content"`
+	}
+	err := json.Unmarshal(data, &requestData)
+	if err != nil {
+		utils.PrettyPrintf("Failed to parse send_message data: %v", err)
+		client.SendError("invalid_data", "無法解析發送訊息數據")
+		return
+	}
+
+	// 確保房間存在
+	wsh.roomManager.InitRoom(requestData.RoomType, requestData.RoomID)
+
+	// 處理私聊房間邏輯
+	if requestData.RoomType == models.RoomTypeDM {
+		wsh.handleDMRoomCreation(requestData.RoomID, client.UserID)
+	}
+
+	message := &WsMessage[MessageResponse]{
+		Action: "send_message",
+		Data: MessageResponse{
+			RoomID:    requestData.RoomID,
+			RoomType:  requestData.RoomType,
+			SenderID:  client.UserID,
+			Content:   requestData.Content,
+			Timestamp: time.Now().UnixMilli(),
+		},
+	}
+
+	// 使用MessageHandler處理消息
+	wsh.messageHandler.HandleMessage(message)
+}
+
+// handlePing 處理ping請求
+func (wsh *WebSocketHandler) handlePing(client *Client) {
+	pongMsg := &WsMessage[map[string]interface{}]{
+		Action: "pong",
+		Data: map[string]interface{}{
+			"message":   "pong",
+			"timestamp": time.Now().Unix(),
+		},
+	}
+
+	if err := client.SendMessage(pongMsg); err != nil {
+		utils.PrettyPrintf("Failed to send pong to client %s: %v", client.UserID, err)
 	}
 }

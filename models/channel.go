@@ -2,6 +2,7 @@ package models
 
 import (
 	"chat_app_backend/providers"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -14,7 +15,8 @@ type Channel struct {
 	Name                string             `json:"name" bson:"name"`
 	ServerID            primitive.ObjectID `json:"server_id" bson:"server_id"` // 所屬伺服器
 	CategoryID          primitive.ObjectID `json:"category_id" bson:"category_id"`
-	Type                string             `json:"type" bson:"type"` // "text" or "voice"
+	Type                string             `json:"type" bson:"type"`                       // "text" or "voice"
+	LastMessageAt       *time.Time         `json:"last_message_at" bson:"last_message_at"` // 最後訊息時間
 }
 
 func (c *Channel) GetCollectionName() string {

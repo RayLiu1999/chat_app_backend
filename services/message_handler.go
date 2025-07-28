@@ -7,7 +7,6 @@ import (
 	"log"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -48,11 +47,15 @@ func (mh *MessageHandler) HandleMessage(message *WsMessage[MessageResponse]) {
 	// 在外部發送消息，避免長時間持有鎖
 	for _, client := range clients {
 		go func(c *Client) {
-			c.WriteMutex.Lock()
-			err := c.Conn.WriteJSON(message)
-			c.WriteMutex.Unlock()
+			// 檢查連線是否仍然有效
+			if !mh.isClientConnectionValid(c) {
+				log.Printf("Client %s connection is invalid, removing from room", c.UserID)
+				go mh.roomManager.LeaveRoom(c, message.Data.RoomType, message.Data.RoomID)
+				return
+			}
 
-			if err != nil {
+			// 使用新的發送機制
+			if err := c.SendMessage(message); err != nil {
 				log.Printf("Failed to send message to client %s: %v", c.UserID, err)
 				// 異步移除有問題的客戶端
 				go mh.roomManager.LeaveRoom(c, message.Data.RoomType, message.Data.RoomID)
@@ -116,10 +119,42 @@ func (mh *MessageHandler) updateRoomLastMessage(roomID string, roomType models.R
 			log.Printf("Failed to update dm room last message time: %v", err)
 		}
 	case models.RoomTypeChannel:
-		channel := &models.Channel{}
-		err = mh.odm.UpdateFields(ctx, channel, bson.M{"last_message_at": time.Now()})
+		// 更新 channels 的 last_message_at
+		now := time.Now()
+		err = mh.odm.UpdateMany(ctx, &models.Channel{},
+			map[string]interface{}{"_id": roomObjectID},
+			map[string]interface{}{"$set": map[string]interface{}{"last_message_at": now}})
 		if err != nil {
 			log.Printf("Failed to update channel last message time: %v", err)
 		}
 	}
+}
+
+// isClientConnectionValid 檢查客戶端連線是否仍然有效
+func (mh *MessageHandler) isClientConnectionValid(client *Client) bool {
+	// 檢查連線是否為 nil
+	if client == nil || client.Conn == nil {
+		return false
+	}
+
+	// 檢查連線是否已標記為非活躍
+	if !client.IsActive {
+		return false
+	}
+
+	// 檢查最後 pong 時間是否過久（超過 2 分鐘）
+	if time.Since(client.LastPongTime) > 2*time.Minute {
+		log.Printf("Client %s last pong time too old: %v", client.UserID, client.LastPongTime)
+		client.IsActive = false
+		return false
+	}
+
+	// 檢查連線時間是否過久（超過 24 小時）
+	if time.Since(client.ConnectedAt) > 24*time.Hour {
+		log.Printf("Client %s connection too old: %v", client.UserID, client.ConnectedAt)
+		client.IsActive = false
+		return false
+	}
+
+	return true
 }

@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -33,6 +34,23 @@ func NewClientManager(redisClient *redis.Client) *ClientManager {
 	go cm.handleUnregister()
 
 	return cm
+}
+
+// NewClient 創建新的客戶端
+func (cm *ClientManager) NewClient(userID string, ws *websocket.Conn) *Client {
+	return &Client{
+		UserID:        userID,
+		Conn:          ws,
+		Subscribed:    make(map[string]bool),
+		RoomActivity:  make(map[string]time.Time),
+		ActivityMutex: sync.RWMutex{},
+		ConnectedAt:   time.Now(),
+		LastPongTime:  time.Now(),
+		IsActive:      true,
+		LastError:     nil,
+		Send:          make(chan []byte, 256), // 創建發送通道
+		Hub:           cm,
+	}
 }
 
 // Register 註冊客戶端
@@ -88,10 +106,14 @@ func (cm *ClientManager) handleUnregister() {
 func (cm *ClientManager) registerClient(client *Client) {
 	cm.mutex.Lock()
 	defer cm.mutex.Unlock()
-	client.Subscribed = make(map[string]bool)
-	client.RoomActivity = make(map[string]time.Time)
+
+	// 創建 context 來管理協程
+	client.Context, client.Cancel = context.WithCancel(context.Background())
+
 	cm.clients[client] = true
 	cm.clientsByUserID[client.UserID] = client
+
+	utils.PrettyPrintf("客戶端 %s 已註冊，當前連線數: %d", client.UserID, len(cm.clients))
 }
 
 // unregisterClient 註銷客戶端
@@ -99,16 +121,29 @@ func (cm *ClientManager) unregisterClient(client *Client) {
 	cm.mutex.Lock()
 	defer cm.mutex.Unlock()
 
+	// 標記為非活躍並取消所有相關協程
+	client.IsActive = false
+	if client.Cancel != nil {
+		client.Cancel()
+	}
+
+	// 關閉發送通道
+	if client.Send != nil {
+		close(client.Send)
+	}
+
 	delete(cm.clients, client)
 	delete(cm.clientsByUserID, client.UserID)
 
 	// 清理用戶相關的 Redis 數據
 	cm.redisClient.Del(context.Background(), "user:"+client.UserID+":rooms")
 
-	// 使用互斥鎖保護 WebSocket 連接的關閉操作
-	client.WriteMutex.Lock()
-	client.Conn.Close()
-	client.WriteMutex.Unlock()
+	// 關閉 WebSocket 連線
+	if client.Conn != nil {
+		client.Conn.Close()
+	}
+
+	utils.PrettyPrintf("客戶端 %s 已註銷，當前連線數: %d", client.UserID, len(cm.clients))
 }
 
 // updateClientStatus 更新客戶端狀態
@@ -116,4 +151,38 @@ func (cm *ClientManager) updateClientStatus(client *Client, status string) {
 	ctx := context.Background()
 	cm.redisClient.Set(ctx, "user:"+client.UserID+":status", status, 24*time.Hour)
 	utils.PrettyPrintf("Update status for user %s: %s", client.UserID, status)
+}
+
+// CheckClientsHealth 檢查所有客戶端的健康狀態
+func (cm *ClientManager) CheckClientsHealth() {
+	cm.mutex.RLock()
+	var unhealthyClients []*Client
+
+	for client := range cm.clients {
+		if !client.IsHealthy() {
+			unhealthyClients = append(unhealthyClients, client)
+		}
+	}
+	cm.mutex.RUnlock()
+
+	// 移除不健康的客戶端
+	for _, client := range unhealthyClients {
+		utils.PrettyPrintf("客戶端 %s 健康檢查失敗，強制斷開", client.UserID)
+		cm.Unregister(client)
+	}
+}
+
+// StartHealthChecker 啟動健康檢查器
+func (cm *ClientManager) StartHealthChecker(ctx context.Context) {
+	ticker := time.NewTicker(30 * time.Second) // 每30秒檢查一次
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			cm.CheckClientsHealth()
+		}
+	}
 }
