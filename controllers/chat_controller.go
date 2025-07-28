@@ -178,7 +178,7 @@ func (cc *ChatController) GetChannelMessages(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "頻道ID不能為空",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -193,7 +193,7 @@ func (cc *ChatController) GetChannelMessages(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInternalServer,
 			Message:     err.Error(),
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}

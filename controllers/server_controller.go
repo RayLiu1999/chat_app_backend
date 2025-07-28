@@ -63,7 +63,7 @@ func (sc *ServerController) CreateServer(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "伺服器名稱不能為空",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -74,7 +74,7 @@ func (sc *ServerController) CreateServer(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "無法獲取圖片檔案",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -86,7 +86,7 @@ func (sc *ServerController) CreateServer(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "無法開啟檔案",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -99,7 +99,7 @@ func (sc *ServerController) CreateServer(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{
 			Code:        utils.ErrInternalServer,
 			Message:     "創建伺服器失敗: " + err.Error(),
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -123,7 +123,7 @@ func (sc *ServerController) SearchPublicServers(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "查詢參數格式錯誤",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -149,7 +149,7 @@ func (sc *ServerController) SearchPublicServers(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{
 			Code:        utils.ErrInternalServer,
 			Message:     "搜尋伺服器失敗: " + err.Error(),
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -173,7 +173,7 @@ func (sc *ServerController) UpdateServer(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "伺服器ID不能為空",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -184,7 +184,7 @@ func (sc *ServerController) UpdateServer(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "請求格式錯誤",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -210,7 +210,7 @@ func (sc *ServerController) UpdateServer(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "沒有有效的更新欄位",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -222,7 +222,7 @@ func (sc *ServerController) UpdateServer(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{
 			Code:        utils.ErrInternalServer,
 			Message:     "更新伺服器失敗: " + err.Error(),
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -246,7 +246,7 @@ func (sc *ServerController) DeleteServer(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "伺服器ID不能為空",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -258,7 +258,7 @@ func (sc *ServerController) DeleteServer(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{
 			Code:        utils.ErrInternalServer,
 			Message:     "刪除伺服器失敗: " + err.Error(),
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -282,7 +282,7 @@ func (sc *ServerController) GetServerByID(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "伺服器ID不能為空",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -294,7 +294,7 @@ func (sc *ServerController) GetServerByID(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{
 			Code:        utils.ErrInternalServer,
 			Message:     "獲取伺服器失敗: " + err.Error(),
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -318,7 +318,7 @@ func (sc *ServerController) GetServerDetailByID(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "伺服器ID不能為空",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -330,7 +330,7 @@ func (sc *ServerController) GetServerDetailByID(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{
 			Code:        utils.ErrInternalServer,
 			Message:     "獲取伺服器詳細信息失敗: " + err.Error(),
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -354,7 +354,7 @@ func (sc *ServerController) JoinServer(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "伺服器ID不能為空",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -366,7 +366,7 @@ func (sc *ServerController) JoinServer(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     err.Error(),
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -390,7 +390,7 @@ func (sc *ServerController) LeaveServer(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "伺服器ID不能為空",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -402,7 +402,7 @@ func (sc *ServerController) LeaveServer(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     err.Error(),
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}

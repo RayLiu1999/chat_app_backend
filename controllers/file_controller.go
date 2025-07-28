@@ -32,7 +32,7 @@ func (fc *FileController) UploadFile(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{
 			Code:        utils.ErrUnauthorized,
 			Message:     "未找到用戶ID",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -55,14 +55,14 @@ func (fc *FileController) UploadFile(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "檔案上傳失敗: " + err.Error(),
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
 
 	utils.SuccessResponse(c, result, utils.MessageOptions{
 		Message:     "檔案上傳成功",
-		Displayable: true,
+		Displayable: false,
 	})
 }
 
@@ -74,7 +74,7 @@ func (fc *FileController) UploadAvatar(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{
 			Code:        utils.ErrUnauthorized,
 			Message:     "未找到用戶ID",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -97,14 +97,14 @@ func (fc *FileController) UploadAvatar(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "頭像上傳失敗: " + err.Error(),
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
 
 	utils.SuccessResponse(c, result, utils.MessageOptions{
 		Message:     "頭像上傳成功",
-		Displayable: true,
+		Displayable: false,
 	})
 }
 
@@ -116,7 +116,7 @@ func (fc *FileController) UploadDocument(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{
 			Code:        utils.ErrUnauthorized,
 			Message:     "未找到用戶ID",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -139,14 +139,14 @@ func (fc *FileController) UploadDocument(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "文件上傳失敗: " + err.Error(),
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
 
 	utils.SuccessResponse(c, result, utils.MessageOptions{
 		Message:     "文件上傳成功",
-		Displayable: true,
+		Displayable: false,
 	})
 }
 
@@ -158,7 +158,7 @@ func (fc *FileController) GetUserFiles(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{
 			Code:        utils.ErrUnauthorized,
 			Message:     "未找到用戶ID",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -169,14 +169,14 @@ func (fc *FileController) GetUserFiles(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{
 			Code:        utils.ErrInternalServer,
 			Message:     "獲取檔案列表失敗: " + err.Error(),
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
 
 	utils.SuccessResponse(c, files, utils.MessageOptions{
 		Message:     "獲取檔案列表成功",
-		Displayable: true,
+		Displayable: false,
 	})
 }
 
@@ -188,7 +188,7 @@ func (fc *FileController) DeleteFile(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{
 			Code:        utils.ErrUnauthorized,
 			Message:     "未找到用戶ID",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -199,7 +199,7 @@ func (fc *FileController) DeleteFile(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "檔案ID不能為空",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -210,13 +210,13 @@ func (fc *FileController) DeleteFile(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "檔案刪除失敗: " + err.Error(),
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
 
 	utils.SuccessResponse(c, nil, utils.MessageOptions{
 		Message:     "檔案刪除成功",
-		Displayable: true,
+		Displayable: false,
 	})
 }

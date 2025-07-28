@@ -41,7 +41,7 @@ func (cc *ChannelController) GetChannelsByServerID(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "伺服器ID不能為空",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -78,7 +78,7 @@ func (cc *ChannelController) GetChannelByID(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "頻道ID不能為空",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -89,7 +89,7 @@ func (cc *ChannelController) GetChannelByID(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "無效的頻道ID格式",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -126,7 +126,7 @@ func (cc *ChannelController) CreateChannel(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "伺服器ID不能為空",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -137,7 +137,7 @@ func (cc *ChannelController) CreateChannel(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "無效的伺服器ID格式",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -158,7 +158,7 @@ func (cc *ChannelController) CreateChannel(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "頻道名稱不能為空",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -213,7 +213,7 @@ func (cc *ChannelController) CreateChannel(c *gin.Context) {
 	c.JSON(http.StatusCreated, utils.APIResponse{
 		Status:      "success",
 		Message:     "創建頻道成功",
-		Displayable: true,
+		Displayable: false,
 		Data:        createdChannel,
 	})
 }
@@ -233,7 +233,7 @@ func (cc *ChannelController) UpdateChannel(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "頻道ID不能為空",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -244,7 +244,7 @@ func (cc *ChannelController) UpdateChannel(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "無效的頻道ID格式",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -286,7 +286,7 @@ func (cc *ChannelController) UpdateChannel(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "沒有提供要更新的字段",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -304,7 +304,7 @@ func (cc *ChannelController) UpdateChannel(c *gin.Context) {
 
 	utils.SuccessResponse(c, updatedChannel, utils.MessageOptions{
 		Message:     "更新頻道成功",
-		Displayable: true,
+		Displayable: false,
 	})
 }
 
@@ -323,7 +323,7 @@ func (cc *ChannelController) DeleteChannel(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "頻道ID不能為空",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -334,7 +334,7 @@ func (cc *ChannelController) DeleteChannel(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
 			Code:        utils.ErrInvalidParams,
 			Message:     "無效的頻道ID格式",
-			Displayable: true,
+			Displayable: false,
 		})
 		return
 	}
@@ -352,7 +352,7 @@ func (cc *ChannelController) DeleteChannel(c *gin.Context) {
 
 	utils.SuccessResponse(c, nil, utils.MessageOptions{
 		Message:     "刪除頻道成功",
-		Displayable: true,
+		Displayable: false,
 	})
 }
 
