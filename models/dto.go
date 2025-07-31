@@ -5,11 +5,12 @@ import (
 )
 
 type UserResponse struct {
-	ID       string `json:"id" bson:"_id"`
-	Username string `json:"username" bson:"username"`
-	Email    string `json:"email" bson:"email"`
-	Nickname string `json:"nickname" bson:"nickname"`
-	Picture  string `json:"picture" bson:"picture"`
+	ID         string `json:"id" bson:"_id"`
+	Username   string `json:"username" bson:"username"`
+	Email      string `json:"email" bson:"email"`
+	Nickname   string `json:"nickname" bson:"nickname"`
+	PictureURL string `json:"picture_url"`
+	BannerURL  string `json:"banner_url"`
 }
 
 // LoginResponse 包含登入成功後返回的資訊
@@ -30,7 +31,7 @@ type ServerMemberResponse struct {
 	UserID       string `json:"user_id" bson:"user_id"`
 	Username     string `json:"username" bson:"username"`
 	Nickname     string `json:"nickname" bson:"nickname"` // 伺服器內暱稱
-	Picture      string `json:"picture" bson:"picture"`
+	PictureURL   string `json:"picture_url"`
 	Role         string `json:"role" bson:"role"`                     // "owner", "admin", "member"
 	IsOnline     bool   `json:"is_online" bson:"is_online"`           // 在線狀態
 	LastActiveAt int64  `json:"last_active_at" bson:"last_active_at"` // 最後活動時間
@@ -60,11 +61,11 @@ type ChannelResponse struct {
 }
 
 type DMRoomResponse struct {
-	RoomID    primitive.ObjectID `json:"room_id" bson:"room_id"`
-	Nickname  string             `json:"nickname" bson:"nickname"`
-	Picture   string             `json:"picture" bson:"picture"`
-	Timestamp int64              `json:"timestamp" bson:"timestamp"`
-	IsOnline  bool               `json:"is_online" bson:"is_online"` // 聊天對象的在線狀態
+	RoomID     primitive.ObjectID `json:"room_id" bson:"room_id"`
+	Nickname   string             `json:"nickname" bson:"nickname"`
+	PictureURL string             `json:"picture_url"`
+	Timestamp  int64              `json:"timestamp" bson:"timestamp"`
+	IsOnline   bool               `json:"is_online" bson:"is_online"` // 聊天對象的在線狀態
 }
 
 type MessageResponse struct {
@@ -76,13 +77,14 @@ type MessageResponse struct {
 	Timestamp int64              `json:"timestamp" bson:"timestamp"`
 }
 
-type APIFriend struct {
-	ID       string `json:"id" bson:"_id"`
-	Name     string `json:"name" bson:"name"`
-	Nickname string `json:"nickname" bson:"nickname"`
-	Picture  string `json:"picture" bson:"picture"`
-	Status   string `json:"status" bson:"status"`       // 好友關係狀態：pending, accepted, blocked
-	IsOnline bool   `json:"is_online" bson:"is_online"` // 在線狀態
+// FriendResponse 好友響應模型
+type FriendResponse struct {
+	ID         string `json:"id" bson:"_id"`
+	Name       string `json:"name" bson:"name"`
+	Nickname   string `json:"nickname" bson:"nickname"`
+	PictureURL string `json:"picture_url" bson:"picture_url"`
+	Status     string `json:"status" bson:"status"`       // 好友關係狀態：pending, accepted, blocked
+	IsOnline   bool   `json:"is_online" bson:"is_online"` // 在線狀態
 }
 
 // ServerSearchRequest 伺服器搜尋請求
@@ -113,4 +115,27 @@ type ServerSearchResults struct {
 	Page       int                    `json:"page"`        // 當前頁數
 	Limit      int                    `json:"limit"`       // 每頁數量
 	TotalPages int                    `json:"total_pages"` // 總頁數
+}
+
+// UserProfileResponse 用戶個人資料響應
+type UserProfileResponse struct {
+	ID         string `json:"id" bson:"_id"`
+	Username   string `json:"username" bson:"username"`
+	Email      string `json:"email" bson:"email"`
+	Nickname   string `json:"nickname" bson:"nickname"`
+	PictureURL string `json:"picture_url"` // 圖片 URL（從 PictureID 解析）
+	BannerURL  string `json:"banner_url"`  // 橫幅 URL（從 BannerID 解析）
+	Status     string `json:"status" bson:"status"`
+	Bio        string `json:"bio" bson:"bio"`
+}
+
+// UserImageResponse 用戶圖片上傳響應
+type UserImageResponse struct {
+	ImageURL string `json:"image_url"`
+	Type     string `json:"type"` // "avatar" 或 "banner"
+}
+
+// TwoFactorStatusResponse 兩步驟驗證狀態響應
+type TwoFactorStatusResponse struct {
+	Enabled bool `json:"enabled"`
 }

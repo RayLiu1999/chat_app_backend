@@ -21,14 +21,15 @@ import (
 
 // ChatService 管理所有的聊天功能
 type ChatService struct {
-	config           *config.Config
-	redisClient      *redis.Client
-	chatRepo         repositories.ChatRepositoryInterface
-	serverRepo       repositories.ServerRepositoryInterface
-	serverMemberRepo repositories.ServerMemberRepositoryInterface
-	userRepo         repositories.UserRepositoryInterface
-	odm              *providers.ODM
-	userService      UserServiceInterface
+	config            *config.Config
+	redisClient       *redis.Client
+	chatRepo          repositories.ChatRepositoryInterface
+	serverRepo        repositories.ServerRepositoryInterface
+	serverMemberRepo  repositories.ServerMemberRepositoryInterface
+	userRepo          repositories.UserRepositoryInterface
+	odm               *providers.ODM
+	userService       UserServiceInterface
+	fileUploadService FileUploadServiceInterface // 添加 FileUploadService 依賴
 
 	// 新增的模組化組件
 	clientManager    *ClientManager
@@ -38,7 +39,7 @@ type ChatService struct {
 }
 
 // NewChatService 初始化聊天室服務
-func NewChatService(cfg *config.Config, odm *providers.ODM, chatRepo repositories.ChatRepositoryInterface, serverRepo repositories.ServerRepositoryInterface, serverMemberRepo repositories.ServerMemberRepositoryInterface, userRepo repositories.UserRepositoryInterface, userService UserServiceInterface) *ChatService {
+func NewChatService(cfg *config.Config, odm *providers.ODM, chatRepo repositories.ChatRepositoryInterface, serverRepo repositories.ServerRepositoryInterface, serverMemberRepo repositories.ServerMemberRepositoryInterface, userRepo repositories.UserRepositoryInterface, userService UserServiceInterface, fileUploadService FileUploadServiceInterface) *ChatService {
 	redisClient := redis.NewClient(&redis.Options{Addr: cfg.Redis.Addr})
 	if _, err := redisClient.Ping(context.Background()).Result(); err != nil {
 		log.Printf("Failed to ping Redis: %v", err)
@@ -52,21 +53,35 @@ func NewChatService(cfg *config.Config, odm *providers.ODM, chatRepo repositorie
 	websocketHandler := NewWebSocketHandler(odm, clientManager, roomManager, messageHandler, userService)
 
 	cs := &ChatService{
-		config:           cfg,
-		redisClient:      redisClient,
-		chatRepo:         chatRepo,
-		serverRepo:       serverRepo,
-		serverMemberRepo: serverMemberRepo,
-		userRepo:         userRepo,
-		odm:              odm,
-		userService:      userService,
-		clientManager:    clientManager,
-		roomManager:      roomManager,
-		messageHandler:   messageHandler,
-		websocketHandler: websocketHandler,
+		config:            cfg,
+		redisClient:       redisClient,
+		chatRepo:          chatRepo,
+		serverRepo:        serverRepo,
+		serverMemberRepo:  serverMemberRepo,
+		userRepo:          userRepo,
+		odm:               odm,
+		userService:       userService,
+		fileUploadService: fileUploadService,
+		clientManager:     clientManager,
+		roomManager:       roomManager,
+		messageHandler:    messageHandler,
+		websocketHandler:  websocketHandler,
 	}
 
 	return cs
+}
+
+// getUserPictureURL 獲取用戶頭像 URL（從 ObjectID 解析）
+func (cs *ChatService) getUserPictureURL(user *models.User) string {
+	if user.PictureID.IsZero() || cs.fileUploadService == nil {
+		return ""
+	}
+
+	pictureURL, err := cs.fileUploadService.GetFileURLByID(user.PictureID.Hex())
+	if err != nil {
+		return ""
+	}
+	return pictureURL
 }
 
 // HandleWebSocket 處理 WebSocket 連線
@@ -124,11 +139,11 @@ func (cs *ChatService) GetDMRoomResponseList(userID string, includeHidden bool) 
 		}
 
 		chatResponseList = append(chatResponseList, models.DMRoomResponse{
-			RoomID:    chat.RoomID,
-			Nickname:  user.Nickname,
-			Picture:   user.Picture,
-			Timestamp: chat.UpdatedAt.Unix(),
-			IsOnline:  isOnline,
+			RoomID:     chat.RoomID,
+			Nickname:   user.Nickname,
+			PictureURL: cs.getUserPictureURL(&user),
+			Timestamp:  chat.UpdatedAt.Unix(),
+			IsOnline:   isOnline,
 		})
 	}
 
@@ -214,10 +229,10 @@ func (cs *ChatService) CreateDMRoom(userID string, chatWithUserID string) (*mode
 		for _, room := range roomList {
 			if room.UserID == userObjectID {
 				dmRoomResponse = models.DMRoomResponse{
-					RoomID:    room.RoomID,
-					Nickname:  user.Nickname,
-					Picture:   user.Picture,
-					Timestamp: room.UpdatedAt.Unix(),
+					RoomID:     room.RoomID,
+					Nickname:   user.Nickname,
+					PictureURL: cs.getUserPictureURL(&user),
+					Timestamp:  room.UpdatedAt.Unix(),
 				}
 
 				// 如果isHidden為true，則將isHidden設為false
@@ -251,10 +266,10 @@ func (cs *ChatService) CreateDMRoom(userID string, chatWithUserID string) (*mode
 			}
 
 			dmRoomResponse = models.DMRoomResponse{
-				RoomID:    room.RoomID,
-				Nickname:  user.Nickname,
-				Picture:   user.Picture,
-				Timestamp: dmRoom.UpdatedAt.Unix(),
+				RoomID:     room.RoomID,
+				Nickname:   user.Nickname,
+				PictureURL: cs.getUserPictureURL(&user),
+				Timestamp:  dmRoom.UpdatedAt.Unix(),
 			}
 
 			return &dmRoomResponse, nil
@@ -263,10 +278,10 @@ func (cs *ChatService) CreateDMRoom(userID string, chatWithUserID string) (*mode
 		// 如果自己建立過則直接回傳
 		if room.UserID == userObjectID {
 			dmRoomResponse = models.DMRoomResponse{
-				RoomID:    room.RoomID,
-				Nickname:  user.Nickname,
-				Picture:   user.Picture,
-				Timestamp: room.UpdatedAt.Unix(),
+				RoomID:     room.RoomID,
+				Nickname:   user.Nickname,
+				PictureURL: cs.getUserPictureURL(&user),
+				Timestamp:  room.UpdatedAt.Unix(),
 			}
 
 			return &dmRoomResponse, nil
@@ -289,10 +304,10 @@ func (cs *ChatService) CreateDMRoom(userID string, chatWithUserID string) (*mode
 		}
 
 		dmRoomResponse = models.DMRoomResponse{
-			RoomID:    dmRoom.RoomID,
-			Nickname:  user.Nickname,
-			Picture:   user.Picture,
-			Timestamp: dmRoom.UpdatedAt.Unix(),
+			RoomID:     dmRoom.RoomID,
+			Nickname:   user.Nickname,
+			PictureURL: cs.getUserPictureURL(&user),
+			Timestamp:  dmRoom.UpdatedAt.Unix(),
 		}
 
 		return &dmRoomResponse, nil

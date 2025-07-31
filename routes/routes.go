@@ -48,6 +48,19 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, mongodb *providers.MongoWrap
 
 	// user
 	auth.GET("/user", controllers.UserController.GetUser)
+
+	// User Profile APIs
+	auth.GET("/user/profile", controllers.UserController.GetUserProfile)
+	auth.PUT("/user/profile", controllers.UserController.UpdateUserProfile)
+	auth.POST("/user/upload-image", controllers.UserController.UploadUserImage)
+	auth.DELETE("/user/avatar", controllers.UserController.DeleteUserAvatar)
+	auth.DELETE("/user/banner", controllers.UserController.DeleteUserBanner)
+	auth.PUT("/user/password", controllers.UserController.UpdateUserPassword)
+	// auth.GET("/user/two-factor-status", controllers.UserController.GetTwoFactorStatus)
+	// auth.PUT("/user/two-factor", controllers.UserController.UpdateTwoFactorStatus)
+	auth.PUT("/user/deactivate", controllers.UserController.DeactivateAccount)
+	auth.DELETE("/user/delete", controllers.UserController.DeleteAccount)
+
 	// auth.GET("/users/:id/online-status", controllers.UserController.CheckUserOnlineStatus) // 檢查特定用戶在線狀態
 
 	// friend

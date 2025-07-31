@@ -19,6 +19,9 @@ type ChatRepositoryInterface interface {
 
 	// SaveOrUpdateDMRoom 保存或更新聊天列表
 	SaveOrUpdateDMRoom(chat models.DMRoom) (models.DMRoom, error)
+
+	// DeleteMessagesByRoomID 根據房間ID刪除所有訊息
+	DeleteMessagesByRoomID(roomID string) error
 }
 
 type ServerRepositoryInterface interface {
@@ -91,6 +94,12 @@ type UserRepositoryInterface interface {
 
 	// UpdateUserLastActiveTime 更新用戶最後活動時間
 	UpdateUserLastActiveTime(userID string, timestamp int64) error
+
+	// UpdateUser 更新用戶信息
+	UpdateUser(userID string, updates map[string]interface{}) error
+
+	// DeleteUser 刪除用戶
+	DeleteUser(userID string) error
 }
 
 type FriendRepositoryInterface interface {

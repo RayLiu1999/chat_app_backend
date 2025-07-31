@@ -21,12 +21,13 @@ type ServerService struct {
 	userRepo            repositories.UserRepositoryInterface
 	channelRepo         repositories.ChannelRepositoryInterface
 	channelCategoryRepo repositories.ChannelCategoryRepositoryInterface
+	chatRepo            repositories.ChatRepositoryInterface
 	odm                 *providers.ODM
 	fileUploadService   FileUploadServiceInterface
 	userService         UserServiceInterface
 }
 
-func NewServerService(cfg *config.Config, odm *providers.ODM, serverRepo repositories.ServerRepositoryInterface, serverMemberRepo repositories.ServerMemberRepositoryInterface, userRepo repositories.UserRepositoryInterface, channelRepo repositories.ChannelRepositoryInterface, channelCategoryRepo repositories.ChannelCategoryRepositoryInterface, fileUploadService FileUploadServiceInterface, userService UserServiceInterface) *ServerService {
+func NewServerService(cfg *config.Config, odm *providers.ODM, serverRepo repositories.ServerRepositoryInterface, serverMemberRepo repositories.ServerMemberRepositoryInterface, userRepo repositories.UserRepositoryInterface, channelRepo repositories.ChannelRepositoryInterface, channelCategoryRepo repositories.ChannelCategoryRepositoryInterface, chatRepo repositories.ChatRepositoryInterface, fileUploadService FileUploadServiceInterface, userService UserServiceInterface) *ServerService {
 	return &ServerService{
 		config:              cfg,
 		serverRepo:          serverRepo,
@@ -34,6 +35,7 @@ func NewServerService(cfg *config.Config, odm *providers.ODM, serverRepo reposit
 		userRepo:            userRepo,
 		channelRepo:         channelRepo,
 		channelCategoryRepo: channelCategoryRepo,
+		chatRepo:            chatRepo,
 		odm:                 odm,
 		fileUploadService:   fileUploadService,
 		userService:         userService,
@@ -43,6 +45,19 @@ func NewServerService(cfg *config.Config, odm *providers.ODM, serverRepo reposit
 // UpdateUserService 更新 UserService 引用
 func (ss *ServerService) UpdateUserService(userService UserServiceInterface) {
 	ss.userService = userService
+}
+
+// getUserPictureURL 獲取用戶頭像 URL（從 ObjectID 解析）
+func (ss *ServerService) getUserPictureURL(user *models.User) string {
+	if user.PictureID.IsZero() || ss.fileUploadService == nil {
+		return ""
+	}
+
+	pictureURL, err := ss.fileUploadService.GetFileURLByID(user.PictureID.Hex())
+	if err != nil {
+		return ""
+	}
+	return pictureURL
 }
 
 // GetServerListResponse 獲取用戶的伺服器列表回應格式
@@ -544,7 +559,7 @@ func (ss *ServerService) GetServerDetailByID(userID string, serverID string) (*m
 					UserID:       member.UserID.Hex(),
 					Username:     user.Username,
 					Nickname:     displayNickname,
-					Picture:      user.Picture,
+					PictureURL:   ss.getUserPictureURL(&user),
 					Role:         member.Role,
 					IsOnline:     isOnline,
 					LastActiveAt: member.LastActiveAt.Unix(),
@@ -697,8 +712,15 @@ func (ss *ServerService) deleteServerChannelsAndCategories(serverID string) erro
 		return fmt.Errorf("獲取伺服器頻道失敗: %v", err)
 	}
 
-	// 刪除所有頻道
+	// 刪除所有頻道及其訊息
 	for _, channel := range channels {
+		// 先刪除該頻道的所有訊息
+		err = ss.chatRepo.DeleteMessagesByRoomID(channel.BaseModel.GetID().Hex())
+		if err != nil {
+			fmt.Printf("刪除頻道 %s 的訊息失敗: %v\n", channel.Name, err)
+		}
+
+		// 然後刪除頻道本身
 		err = ss.channelRepo.DeleteChannel(channel.BaseModel.GetID().Hex())
 		if err != nil {
 			// 記錄錯誤但繼續刪除其他頻道

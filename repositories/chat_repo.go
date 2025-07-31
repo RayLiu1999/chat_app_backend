@@ -196,3 +196,25 @@ func (cr *ChatRepository) SaveOrUpdateDMRoom(chat models.DMRoom) (models.DMRoom,
 
 	return chat, nil
 }
+
+// DeleteMessagesByRoomID 根據房間ID刪除所有訊息
+func (cr *ChatRepository) DeleteMessagesByRoomID(roomID string) error {
+	ctx := context.Background()
+
+	// 將 roomID 轉換為 ObjectID
+	roomObjectID, err := primitive.ObjectIDFromHex(roomID)
+	if err != nil {
+		return err
+	}
+
+	// 刪除該房間的所有訊息
+	filter := bson.M{"room_id": roomObjectID}
+	_, err = cr.odm.GetDatabase().Collection("messages").DeleteMany(ctx, filter)
+	if err != nil {
+		log.Printf("刪除房間 %s 的訊息失敗: %v", roomID, err)
+		return err
+	}
+
+	log.Printf("成功刪除房間 %s 的所有訊息", roomID)
+	return nil
+}

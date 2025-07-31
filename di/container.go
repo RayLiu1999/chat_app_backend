@@ -66,27 +66,30 @@ func initServices(cfg *config.Config, providers *ProviderContainer, repos *Repos
 	fileUploadService := services.NewFileUploadService(cfg, providers.FileProvider, providers.ODM, repos.FileRepo)
 
 	// 先創建一個臨時的 UserService（沒有 ClientManager）
-	tempUserService := services.NewUserService(cfg, providers.ODM, repos.UserRepo, nil)
+	tempUserService := services.NewUserService(cfg, providers.ODM, repos.UserRepo, nil, fileUploadService)
 
 	// 創建 ChatService（會初始化 ClientManager）
-	chatService := services.NewChatService(cfg, providers.ODM, repos.ChatRepo, repos.ServerRepo, repos.ServerMemberRepo, repos.UserRepo, tempUserService)
+	chatService := services.NewChatService(cfg, providers.ODM, repos.ChatRepo, repos.ServerRepo, repos.ServerMemberRepo, repos.UserRepo, tempUserService, fileUploadService)
 
 	// 獲取 ClientManager 並創建最終的 UserService
 	clientManager := chatService.GetClientManager()
-	finalUserService := services.NewUserService(cfg, providers.ODM, repos.UserRepo, clientManager)
+	finalUserService := services.NewUserService(cfg, providers.ODM, repos.UserRepo, clientManager, fileUploadService)
 
 	// 更新 ChatService 中的 UserService 引用
 	chatService.UpdateUserService(finalUserService)
 
 	// 創建其他服務並傳入最終的 UserService
-	serverService := services.NewServerService(cfg, providers.ODM, repos.ServerRepo, repos.ServerMemberRepo, repos.UserRepo, repos.ChannelRepo, repos.ChannelCategoryRepo, fileUploadService, finalUserService)
+	serverService := services.NewServerService(cfg, providers.ODM, repos.ServerRepo, repos.ServerMemberRepo, repos.UserRepo, repos.ChannelRepo, repos.ChannelCategoryRepo, repos.ChatRepo, fileUploadService, finalUserService)
+
+	// 更新 ServerService 中的 UserService 引用
+	serverService.UpdateUserService(finalUserService)
 
 	return &ServiceContainer{
 		UserService:       finalUserService,
 		ChatService:       chatService,
 		ServerService:     serverService,
-		FriendService:     services.NewFriendService(cfg, providers.ODM, repos.FriendRepo, repos.UserRepo, finalUserService), // 傳入最終的 UserService
-		ChannelService:    services.NewChannelService(cfg, providers.ODM, repos.ChannelRepo, repos.ServerRepo, repos.ServerMemberRepo, repos.UserRepo),
+		FriendService:     services.NewFriendService(cfg, providers.ODM, repos.FriendRepo, repos.UserRepo, finalUserService, fileUploadService), // 傳入最終的 UserService
+		ChannelService:    services.NewChannelService(cfg, providers.ODM, repos.ChannelRepo, repos.ServerRepo, repos.ServerMemberRepo, repos.UserRepo, repos.ChatRepo),
 		FileUploadService: fileUploadService,
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"chat_app_backend/providers"
 	"chat_app_backend/repositories"
 	"errors"
+	"log"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -17,6 +18,7 @@ type ChannelService struct {
 	serverRepo       repositories.ServerRepositoryInterface
 	serverMemberRepo repositories.ServerMemberRepositoryInterface
 	userRepo         repositories.UserRepositoryInterface
+	chatRepo         repositories.ChatRepositoryInterface
 }
 
 func NewChannelService(cfg *config.Config,
@@ -24,7 +26,8 @@ func NewChannelService(cfg *config.Config,
 	channelRepo repositories.ChannelRepositoryInterface,
 	serverRepo repositories.ServerRepositoryInterface,
 	serverMemberRepo repositories.ServerMemberRepositoryInterface,
-	userRepo repositories.UserRepositoryInterface) ChannelServiceInterface {
+	userRepo repositories.UserRepositoryInterface,
+	chatRepo repositories.ChatRepositoryInterface) ChannelServiceInterface {
 	return &ChannelService{
 		config:           cfg,
 		odm:              odm,
@@ -32,6 +35,7 @@ func NewChannelService(cfg *config.Config,
 		serverRepo:       serverRepo,
 		serverMemberRepo: serverMemberRepo,
 		userRepo:         userRepo,
+		chatRepo:         chatRepo,
 	}
 }
 
@@ -229,6 +233,13 @@ func (cs *ChannelService) DeleteChannel(userID string, channelID string) error {
 		return errors.New("用戶沒有權限刪除該頻道")
 	}
 
-	// 刪除頻道
+	// 先刪除該頻道的所有訊息
+	err = cs.chatRepo.DeleteMessagesByRoomID(channelID)
+	if err != nil {
+		// 記錄錯誤但不阻止頻道刪除
+		log.Printf("刪除頻道 %s 的訊息失敗: %v", channelID, err)
+	}
+
+	// 然後刪除頻道本身
 	return cs.channelRepo.DeleteChannel(channelID)
 }

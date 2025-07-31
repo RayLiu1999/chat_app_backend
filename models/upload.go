@@ -42,7 +42,7 @@ type FileUploadConfig struct {
 func GetServerUploadConfig() *FileUploadConfig {
 	return &FileUploadConfig{
 		FileType:    "server",
-		MaxFileSize: 3 * 1024 * 1024, // 3MB
+		MaxFileSize: 5 * 1024 * 1024, // 3MB
 		AllowedMimeTypes: []string{
 			"image/jpeg",
 			"image/png",
@@ -61,7 +61,7 @@ func GetServerUploadConfig() *FileUploadConfig {
 func GetAvatarUploadConfig() *FileUploadConfig {
 	return &FileUploadConfig{
 		FileType:    "avatar",
-		MaxFileSize: 3 * 1024 * 1024, // 3MB
+		MaxFileSize: 5 * 1024 * 1024, // 3MB
 		AllowedMimeTypes: []string{
 			"image/jpeg",
 			"image/png",

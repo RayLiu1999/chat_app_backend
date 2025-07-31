@@ -116,3 +116,23 @@ func (ur *UserRepository) UpdateUserLastActiveTime(userID string, timestamp int6
 
 	return ur.odm.UpdateMany(context.Background(), &models.User{}, filter, update)
 }
+
+// UpdateUser 更新用戶信息
+func (ur *UserRepository) UpdateUser(userID string, updates map[string]interface{}) error {
+	ctx := context.Background()
+
+	userObjectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return err
+	}
+
+	filter := bson.M{"_id": userObjectID}
+	update := bson.M{"$set": updates}
+
+	return ur.odm.UpdateMany(ctx, &models.User{}, filter, update)
+}
+
+// DeleteUser 刪除用戶
+func (ur *UserRepository) DeleteUser(userID string) error {
+	return ur.odm.DeleteByID(context.Background(), userID, &models.User{})
+}

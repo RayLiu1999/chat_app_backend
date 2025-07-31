@@ -13,21 +13,36 @@ import (
 )
 
 type FriendService struct {
-	config      *config.Config
-	friendRepo  repositories.FriendRepositoryInterface
-	userRepo    repositories.UserRepositoryInterface
-	userService UserServiceInterface // 添加 UserService 來查詢在線狀態
-	odm         *providers.ODM
+	config            *config.Config
+	friendRepo        repositories.FriendRepositoryInterface
+	userRepo          repositories.UserRepositoryInterface
+	userService       UserServiceInterface       // 添加 UserService 來查詢在線狀態
+	fileUploadService FileUploadServiceInterface // 添加 FileUploadService 依賴
+	odm               *providers.ODM
 }
 
-func NewFriendService(cfg *config.Config, odm *providers.ODM, friendRepo repositories.FriendRepositoryInterface, userRepo repositories.UserRepositoryInterface, userService UserServiceInterface) *FriendService {
+func NewFriendService(cfg *config.Config, odm *providers.ODM, friendRepo repositories.FriendRepositoryInterface, userRepo repositories.UserRepositoryInterface, userService UserServiceInterface, fileUploadService FileUploadServiceInterface) *FriendService {
 	return &FriendService{
-		config:      cfg,
-		friendRepo:  friendRepo,
-		userRepo:    userRepo,
-		userService: userService,
-		odm:         odm,
+		config:            cfg,
+		friendRepo:        friendRepo,
+		userRepo:          userRepo,
+		userService:       userService,
+		fileUploadService: fileUploadService,
+		odm:               odm,
 	}
+}
+
+// getUserPictureURL 獲取用戶頭像 URL（從 ObjectID 解析）
+func (fs *FriendService) getUserPictureURL(user *models.User) string {
+	if user.PictureID.IsZero() || fs.fileUploadService == nil {
+		return ""
+	}
+
+	pictureURL, err := fs.fileUploadService.GetFileURLByID(user.PictureID.Hex())
+	if err != nil {
+		return ""
+	}
+	return pictureURL
 }
 
 func (fs *FriendService) GetFriendById(userID string) (*models.Friend, error) {
@@ -47,7 +62,7 @@ const (
 )
 
 // GetFriendList 獲取好友列表
-func (fs *FriendService) GetFriendList(userID string) ([]models.APIFriend, error) {
+func (fs *FriendService) GetFriendList(userID string) ([]models.FriendResponse, error) {
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return nil, err
@@ -68,7 +83,7 @@ func (fs *FriendService) GetFriendList(userID string) ([]models.APIFriend, error
 	}
 
 	if len(friends) == 0 {
-		return []models.APIFriend{}, nil
+		return []models.FriendResponse{}, nil
 	}
 
 	// 處理好友ID和狀態
@@ -99,7 +114,7 @@ func (fs *FriendService) GetFriendList(userID string) ([]models.APIFriend, error
 		return nil, err
 	}
 
-	var apiFriend []models.APIFriend
+	var apiFriend []models.FriendResponse
 	for _, user := range users {
 		status := friendsStatusMap[user.ID.Hex()]
 		// 查詢好友的在線狀態
@@ -108,13 +123,13 @@ func (fs *FriendService) GetFriendList(userID string) ([]models.APIFriend, error
 			isOnline = fs.userService.IsUserOnlineByWebSocket(user.ID.Hex())
 		}
 
-		apiFriend = append(apiFriend, models.APIFriend{
-			ID:       user.ID.Hex(),
-			Name:     user.Username,
-			Nickname: user.Nickname,
-			Picture:  user.Picture,
-			Status:   status,
-			IsOnline: isOnline, // 添加在線狀態
+		apiFriend = append(apiFriend, models.FriendResponse{
+			ID:         user.ID.Hex(),
+			Name:       user.Username,
+			Nickname:   user.Nickname,
+			PictureURL: fs.getUserPictureURL(&user),
+			Status:     status,
+			IsOnline:   isOnline, // 添加在線狀態
 		})
 	}
 

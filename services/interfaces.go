@@ -42,6 +42,36 @@ type UserServiceInterface interface {
 	// IsUserOnlineByWebSocket 基於 WebSocket 連線檢查用戶是否在線
 	IsUserOnlineByWebSocket(userID string) bool
 
+	// GetUserProfile 獲取用戶個人資料
+	GetUserProfile(userID string) (*models.UserProfileResponse, error)
+
+	// UpdateUserProfile 更新用戶基本資料
+	UpdateUserProfile(userID string, updates map[string]interface{}) error
+
+	// UploadUserImage 上傳用戶頭像或橫幅
+	UploadUserImage(userID string, file multipart.File, header *multipart.FileHeader, imageType string) (*models.UserImageResponse, error)
+
+	// DeleteUserAvatar 刪除用戶頭像
+	DeleteUserAvatar(userID string) error
+
+	// DeleteUserBanner 刪除用戶橫幅
+	DeleteUserBanner(userID string) error
+
+	// UpdateUserPassword 更新用戶密碼
+	UpdateUserPassword(userID string, newPassword string) error
+
+	// GetTwoFactorStatus 獲取兩步驟驗證狀態
+	GetTwoFactorStatus(userID string) (*models.TwoFactorStatusResponse, error)
+
+	// UpdateTwoFactorStatus 啟用/停用兩步驟驗證
+	UpdateTwoFactorStatus(userID string, enabled bool) error
+
+	// DeactivateAccount 停用帳號
+	DeactivateAccount(userID string) error
+
+	// DeleteAccount 刪除帳號
+	DeleteAccount(userID string) error
+
 	// 未來可能添加的其他方法
 	// CreateUser(user *models.User) (primitive.ObjectID, error)
 	// UpdateUser(userID primitive.ObjectID, updates map[string]interface{}) error
@@ -117,7 +147,7 @@ type FriendServiceInterface interface {
 	GetFriendById(userID string) (*models.Friend, error)
 
 	// GetFriendList 獲取好友列表
-	GetFriendList(userID string) ([]models.APIFriend, error)
+	GetFriendList(userID string) ([]models.FriendResponse, error)
 
 	// AddFriendRequest 發送好友請求
 	AddFriendRequest(userID string, username string) error

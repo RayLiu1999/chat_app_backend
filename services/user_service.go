@@ -7,6 +7,8 @@ import (
 	"chat_app_backend/repositories"
 	"chat_app_backend/utils"
 	"context"
+	"fmt"
+	"mime/multipart"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -15,19 +17,47 @@ import (
 )
 
 type UserService struct {
-	config        *config.Config
-	userRepo      repositories.UserRepositoryInterface
-	odm           *providers.ODM
-	clientManager *ClientManager // 添加 ClientManager 依賴
+	config            *config.Config
+	userRepo          repositories.UserRepositoryInterface
+	odm               *providers.ODM
+	clientManager     *ClientManager             // 添加 ClientManager 依賴
+	fileUploadService FileUploadServiceInterface // 添加 FileUploadService 依賴
 }
 
-func NewUserService(cfg *config.Config, odm *providers.ODM, userRepo repositories.UserRepositoryInterface, clientManager *ClientManager) *UserService {
+func NewUserService(cfg *config.Config, odm *providers.ODM, userRepo repositories.UserRepositoryInterface, clientManager *ClientManager, fileUploadService FileUploadServiceInterface) *UserService {
 	return &UserService{
-		config:        cfg,
-		userRepo:      userRepo,
-		odm:           odm,
-		clientManager: clientManager,
+		config:            cfg,
+		userRepo:          userRepo,
+		odm:               odm,
+		clientManager:     clientManager,
+		fileUploadService: fileUploadService,
 	}
+}
+
+// getUserPictureURL 獲取用戶頭像 URL（從 ObjectID 解析）
+func (us *UserService) getUserPictureURL(user *models.User) string {
+	if user.PictureID.IsZero() || us.fileUploadService == nil {
+		return ""
+	}
+
+	pictureURL, err := us.fileUploadService.GetFileURLByID(user.PictureID.Hex())
+	if err != nil {
+		return ""
+	}
+	return pictureURL
+}
+
+// getUserBannerURL 獲取用戶橫幅 URL（從 ObjectID 解析）
+func (us *UserService) getUserBannerURL(user *models.User) string {
+	if user.BannerID.IsZero() || us.fileUploadService == nil {
+		return ""
+	}
+
+	bannerURL, err := us.fileUploadService.GetFileURLByID(user.BannerID.Hex())
+	if err != nil {
+		return ""
+	}
+	return bannerURL
 }
 
 // 註冊新用戶
@@ -96,11 +126,12 @@ func (us *UserService) GetUserResponseById(userID string) (*models.UserResponse,
 
 	// 轉換為 UserResponse
 	response := &models.UserResponse{
-		ID:       userID,
-		Username: user.Username,
-		Email:    user.Email,
-		Nickname: user.Nickname,
-		Picture:  user.Picture,
+		ID:         userID,
+		Username:   user.Username,
+		Email:      user.Email,
+		Nickname:   user.Nickname,
+		PictureURL: us.getUserPictureURL(user),
+		BannerURL:  us.getUserBannerURL(user),
 	}
 
 	return response, nil
@@ -132,7 +163,7 @@ func (us *UserService) Login(loginUser models.User) (*models.LoginResponse, *uti
 	if err != nil {
 		return nil, &utils.AppError{
 			Code:        utils.ErrLoginFailed,
-			Displayable: true,
+			Displayable: false,
 		}
 	}
 
@@ -211,7 +242,7 @@ func (us *UserService) RefreshToken(refreshToken string) (string, *utils.AppErro
 	if err != nil {
 		return "", &utils.AppError{
 			Code:        utils.ErrInvalidToken,
-			Displayable: true,
+			Displayable: false,
 		}
 	}
 
@@ -228,7 +259,7 @@ func (us *UserService) RefreshToken(refreshToken string) (string, *utils.AppErro
 
 		return "", &utils.AppError{
 			Code:        utils.ErrInvalidToken,
-			Displayable: true,
+			Displayable: false,
 		}
 	}
 
@@ -306,4 +337,226 @@ func (us *UserService) CheckAndSetOfflineUsers(offlineThresholdMinutes int) erro
 	}
 
 	return us.odm.UpdateMany(context.Background(), &models.User{}, filter, update)
+}
+
+// GetUserProfile 獲取用戶個人資料
+func (us *UserService) GetUserProfile(userID string) (*models.UserProfileResponse, error) {
+	user, err := us.userRepo.GetUserById(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	profile := &models.UserProfileResponse{
+		ID:         user.ID.Hex(),
+		Username:   user.Username,
+		Email:      user.Email,
+		Nickname:   user.Nickname,
+		PictureURL: us.getUserPictureURL(user),
+		BannerURL:  us.getUserBannerURL(user),
+		Status:     user.Status,
+		Bio:        user.Bio,
+	}
+
+	// 解析圖片 URL
+	if !user.PictureID.IsZero() {
+		if pictureURL, err := us.fileUploadService.GetFileURLByID(user.PictureID.Hex()); err == nil && pictureURL != "" {
+			profile.PictureURL = pictureURL
+		}
+	}
+
+	if !user.BannerID.IsZero() {
+		if bannerURL, err := us.fileUploadService.GetFileURLByID(user.BannerID.Hex()); err == nil && bannerURL != "" {
+			profile.BannerURL = bannerURL
+		}
+	}
+
+	return profile, nil
+}
+
+// UpdateUserProfile 更新用戶基本資料
+func (us *UserService) UpdateUserProfile(userID string, updates map[string]interface{}) error {
+	// 過濾允許更新的欄位
+	allowedFields := map[string]bool{
+		"username": true,
+		"nickname": true,
+		"status":   true,
+		"bio":      true,
+	}
+
+	filteredUpdates := make(map[string]interface{})
+	for field, value := range updates {
+		if allowedFields[field] {
+			filteredUpdates[field] = value
+		}
+	}
+
+	if len(filteredUpdates) == 0 {
+		return nil // 沒有需要更新的欄位
+	}
+
+	// 添加更新時間
+	filteredUpdates["updated_at"] = time.Now()
+
+	return us.userRepo.UpdateUser(userID, filteredUpdates)
+}
+
+// UploadUserImage 上傳用戶頭像或橫幅
+func (us *UserService) UploadUserImage(userID string, file multipart.File, header *multipart.FileHeader, imageType string) (*models.UserImageResponse, error) {
+	if us.fileUploadService == nil {
+		return nil, fmt.Errorf("檔案上傳服務未初始化")
+	}
+
+	var config *models.FileUploadConfig
+	var fieldName string
+
+	// 根據圖片類型選擇配置
+	switch imageType {
+	case "avatar":
+		config = models.GetAvatarUploadConfig()
+		fieldName = "picture_id"
+	case "banner":
+		config = models.GetBannerUploadConfig()
+		fieldName = "banner_id"
+	default:
+		return nil, fmt.Errorf("不支援的圖片類型: %s", imageType)
+	}
+
+	// 上傳檔案
+	uploadResult, err := us.fileUploadService.UploadFileWithConfig(file, header, userID, config)
+	if err != nil {
+		return nil, fmt.Errorf("圖片上傳失敗: %v", err)
+	}
+
+	// 獲取圖片URL
+	imageURL, err := us.fileUploadService.GetFileURLByID(uploadResult.ID.Hex())
+	if err != nil {
+		// 如果獲取URL失敗，嘗試刪除已上傳的檔案
+		if deleteErr := us.fileUploadService.DeleteFileByID(uploadResult.ID.Hex(), userID); deleteErr != nil {
+			fmt.Printf("清理上傳檔案失敗: %v\n", deleteErr)
+		}
+		return nil, fmt.Errorf("獲取圖片URL失敗: %v", err)
+	}
+
+	// 更新用戶資料庫記錄（儲存檔案ID）
+	updates := map[string]interface{}{
+		fieldName:    uploadResult.ID,
+		"updated_at": time.Now(),
+	}
+
+	err = us.userRepo.UpdateUser(userID, updates)
+	if err != nil {
+		// 如果更新資料庫失敗，嘗試刪除已上傳的檔案
+		if deleteErr := us.fileUploadService.DeleteFileByID(uploadResult.ID.Hex(), userID); deleteErr != nil {
+			fmt.Printf("清理上傳檔案失敗: %v\n", deleteErr)
+		}
+		return nil, fmt.Errorf("更新用戶資料失敗: %v", err)
+	}
+
+	return &models.UserImageResponse{
+		ImageURL: imageURL,
+		Type:     imageType,
+	}, nil
+}
+
+// DeleteUserAvatar 刪除用戶頭像
+func (us *UserService) DeleteUserAvatar(userID string) error {
+	// 獲取用戶當前資料，以便刪除舊的頭像檔案
+	user, err := us.userRepo.GetUserById(userID)
+	if err != nil {
+		return err
+	}
+
+	// 如果有舊的頭像，嘗試刪除檔案
+	if !user.PictureID.IsZero() && us.fileUploadService != nil {
+		if err := us.fileUploadService.DeleteFileByID(user.PictureID.Hex(), userID); err != nil {
+			// 記錄錯誤但不阻止更新資料庫
+			fmt.Printf("刪除頭像檔案失敗: %v\n", err)
+		}
+	}
+
+	// 更新資料庫記錄，清空圖片ID
+	updates := map[string]interface{}{
+		"picture_id": nil,
+		"updated_at": time.Now(),
+	}
+	return us.userRepo.UpdateUser(userID, updates)
+}
+
+// DeleteUserBanner 刪除用戶橫幅
+func (us *UserService) DeleteUserBanner(userID string) error {
+	// 獲取用戶當前資料，以便刪除舊的橫幅檔案
+	user, err := us.userRepo.GetUserById(userID)
+	if err != nil {
+		return err
+	}
+
+	// 如果有舊的橫幅，嘗試刪除檔案
+	if !user.BannerID.IsZero() && us.fileUploadService != nil {
+		if err := us.fileUploadService.DeleteFileByID(user.BannerID.Hex(), userID); err != nil {
+			// 記錄錯誤但不阻止更新資料庫
+			fmt.Printf("刪除橫幅檔案失敗: %v\n", err)
+		}
+	}
+
+	// 更新資料庫記錄，清空圖片ID
+	updates := map[string]interface{}{
+		"banner_id":  nil,
+		"updated_at": time.Now(),
+	}
+	return us.userRepo.UpdateUser(userID, updates)
+}
+
+// UpdateUserPassword 更新用戶密碼
+func (us *UserService) UpdateUserPassword(userID string, newPassword string) error {
+	// 對新密碼進行雜湊
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	updates := map[string]interface{}{
+		"password":   string(hashedPassword),
+		"updated_at": time.Now(),
+	}
+
+	return us.userRepo.UpdateUser(userID, updates)
+}
+
+// GetTwoFactorStatus 獲取兩步驟驗證狀態
+func (us *UserService) GetTwoFactorStatus(userID string) (*models.TwoFactorStatusResponse, error) {
+	user, err := us.userRepo.GetUserById(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.TwoFactorStatusResponse{
+		Enabled: user.TwoFactorEnabled,
+	}, nil
+}
+
+// UpdateTwoFactorStatus 啟用/停用兩步驟驗證
+func (us *UserService) UpdateTwoFactorStatus(userID string, enabled bool) error {
+	updates := map[string]interface{}{
+		"two_factor_enabled": enabled,
+		"updated_at":         time.Now(),
+	}
+
+	return us.userRepo.UpdateUser(userID, updates)
+}
+
+// DeactivateAccount 停用帳號
+func (us *UserService) DeactivateAccount(userID string) error {
+	updates := map[string]interface{}{
+		"is_active":  false,
+		"updated_at": time.Now(),
+	}
+
+	return us.userRepo.UpdateUser(userID, updates)
+}
+
+// DeleteAccount 刪除帳號
+func (us *UserService) DeleteAccount(userID string) error {
+	// 這裡應該包含更複雜的邏輯，如刪除相關的伺服器、訊息等
+	// 暫時只刪除用戶記錄
+	return us.userRepo.DeleteUser(userID)
 }
