@@ -13,14 +13,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-var cfg *config.Config
-
 func init() {
-	// 取得全局配置
-	cfg = config.GetConfig()
+	// 載入環境變數配置
+	config.LoadConfig()
 
 	// 設置時區
-	location, err := time.LoadLocation(cfg.Timezone)
+	location, err := time.LoadLocation(config.AppConfig.Server.Timezone)
 	if err != nil {
 		log.Fatalf("Failed to load location: %v", err)
 	}
@@ -31,24 +29,27 @@ func main() {
 	// 初始化資料庫連接
 	mongodb, err := providers.DBConnect[*providers.MongoWrapper]("mongodb")
 	if err != nil {
-		mongodb.Close()
 		log.Fatalf("Failed to connect to MongoDB: %v", err)
 	}
+	defer mongodb.Close()
 
-	gin.SetMode(cfg.Server.Mode)
+	gin.SetMode(config.AppConfig.Server.Mode)
 
 	// 初始化 Gin
 	r := gin.Default()
 
 	// 構建依賴
-	deps := di.BuildDependencies(cfg, mongodb)
+	deps := di.BuildDependencies(config.AppConfig, mongodb)
 
 	// // 使用依賴容器中的 UserService 來啟動後台任務
 	// backgroundTasks := services.NewBackgroundTasks(deps.Services.UserService)
 	// go backgroundTasks.StartAllBackgroundTasks()
 
+	// 註冊 pprof
+	// pprof.Register(r)
+
 	// 設置路由
-	routes.SetupRoutes(r, cfg, mongodb, deps.Controllers)
+	routes.SetupRoutes(r, config.AppConfig, mongodb, deps.Controllers)
 
 	// 確保上傳目錄存在
 	err = os.MkdirAll("uploads", 0755)
@@ -57,6 +58,6 @@ func main() {
 	}
 
 	// 啟動服務器
-	log.Println("Server starting on :" + cfg.Server.Port)
-	r.Run(":" + cfg.Server.Port)
+	log.Println("Server starting on :" + config.AppConfig.Server.Port)
+	r.Run(":" + config.AppConfig.Server.Port)
 }

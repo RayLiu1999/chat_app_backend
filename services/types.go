@@ -26,6 +26,12 @@ type WsMessage[T any] struct {
 	Data   T      `json:"data"`
 }
 
+// WsStatusResponse 定義狀態回應結構
+type WsStatusResponse struct {
+	Status  string `json:"status"`
+	Message string `json:"message"`
+}
+
 // MessageResponse 定義聊天室消息
 type MessageResponse struct {
 	RoomType  models.RoomType `json:"room_type"`

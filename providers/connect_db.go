@@ -14,14 +14,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var (
-	cfg = config.GetConfig()
-	// mongoDatabase *mongo.Database
-	// mongoOnce     sync.Once
-	// postgresPool  *pgxpool.Pool
-	// pgOnce        sync.Once
-)
-
 // DBConnection 介面定義了不同資料庫連接的通用行為
 // 這裡我們假設所有連接都應該有 Close 和 Ping 方法
 type DBConnection interface {
@@ -39,12 +31,14 @@ type MongoWrapper struct {
 }
 
 func (mw *MongoWrapper) Close() {
-	if mw.Client != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := mw.Client.Disconnect(ctx); err != nil {
-			log.Printf("Error disconnecting from MongoDB: %v", err)
-		}
+	if mw == nil || mw.Client == nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := mw.Client.Disconnect(ctx); err != nil {
+		log.Printf("Error disconnecting from MongoDB: %v", err)
 	}
 }
 
@@ -105,25 +99,15 @@ func connectMongoDB() (*mongo.Client, *mongo.Database, error) {
 	var mongoErr error
 
 	mongoOnce.Do(func() {
-		DBcfg := cfg.Database.MongoDB
-		isDebug := cfg.Server.Mode
-
-		var mongoURI string
-		if isDebug == "debug" {
-			mongoURI = fmt.Sprintf("mongodb://%s:%s",
-				DBcfg.Host,
-				DBcfg.Port,
-			)
-		} else {
-			mongoURI = fmt.Sprintf("mongodb://%s:%s@%s:%s/%s?authSource=%s",
-				DBcfg.Username,
-				DBcfg.Password,
-				DBcfg.Host,
-				DBcfg.Port,
-				DBcfg.DBName,
-				DBcfg.AuthSource,
-			)
+		// 使用全域配置
+		if config.AppConfig == nil {
+			mongoErr = fmt.Errorf("config not loaded, please call config.LoadConfig() first")
+			return
 		}
+
+		// 優先使用環境變數中的完整 MONGO_URI
+		mongoURI := config.AppConfig.Database.MongoURI
+		dbName := config.AppConfig.Database.MongoDBName
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
@@ -140,7 +124,9 @@ func connectMongoDB() (*mongo.Client, *mongo.Database, error) {
 			return
 		}
 
-		mongoDatabase = client.Database(DBcfg.DBName)
+		// 將全局 client 與 database 都設置好
+		mongoClient = client
+		mongoDatabase = client.Database(dbName)
 		fmt.Println("Connected to MongoDB!")
 	})
 	return mongoClient, mongoDatabase, mongoErr
@@ -157,41 +143,48 @@ func connectPostgreSQL() (*pgxpool.Pool, error) {
 	var err error
 
 	pgOnce.Do(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
+		// 由於目前專案不使用 PostgreSQL，暫時返回錯誤
+		// 如果需要使用，請在配置中添加 PostgreSQL 相關設定
+		err = fmt.Errorf("PostgreSQL 支援暫未實作，請使用 MongoDB")
+		return
 
-		pgCfg := cfg.Database.PostgreSQL
-		connectURI := fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s",
-			pgCfg.Username,
-			pgCfg.Password,
-			pgCfg.Host,
-			pgCfg.Port,
-			pgCfg.DBName,
-			pgCfg.SSLMode)
+		// 以下是 PostgreSQL 連接的範例代碼，需要時可以啟用
+		/*
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
 
-		config, err := pgxpool.ParseConfig(connectURI)
-		if err != nil {
-			return
-		}
+			if config.AppConfig == nil {
+				err = fmt.Errorf("config not loaded, please call config.LoadConfig() first")
+				return
+			}
 
-		// 設置連接池參數
-		config.MaxConns = 10                      // 最大連接數
-		config.MaxConnLifetime = 1 * time.Hour    // 連接最大存活時間
-		config.MaxConnIdleTime = 30 * time.Minute // 最大閒置時間
-		config.MinConns = 2                       // 最小連接數
+			// 這裡需要在 config 中添加 PostgreSQL 設定
+			connectURI := "postgresql://user:password@localhost:5432/dbname?sslmode=disable"
 
-		pool, err = pgxpool.ConnectConfig(ctx, config)
-		if err != nil {
-			return
-		}
+			config, err := pgxpool.ParseConfig(connectURI)
+			if err != nil {
+				return
+			}
 
-		// 測試連接
-		err = pool.Ping(ctx)
-		if err != nil {
-			return
-		}
+			// 設置連接池參數
+			config.MaxConns = 10                      // 最大連接數
+			config.MaxConnLifetime = 1 * time.Hour    // 連接最大存活時間
+			config.MaxConnIdleTime = 30 * time.Minute // 最大閒置時間
+			config.MinConns = 2                       // 最小連接數
 
-		log.Println("成功連接到 PostgreSQL!")
+			pool, err = pgxpool.ConnectConfig(ctx, config)
+			if err != nil {
+				return
+			}
+
+			// 測試連接
+			err = pool.Ping(ctx)
+			if err != nil {
+				return
+			}
+
+			log.Println("成功連接到 PostgreSQL!")
+		*/
 	})
 
 	return pool, err

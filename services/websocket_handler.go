@@ -253,42 +253,25 @@ func (wsh *WebSocketHandler) handleJoinRoom(client *Client, data json.RawMessage
 		return
 	}
 
-	type joinRoomResponse struct {
-		Status  string `json:"status"`
-		Message string `json:"message"`
-	}
-
 	allowed, err := wsh.roomManager.checkUserAllowedJoinRoom(client.UserID, requestData.RoomID, requestData.RoomType)
 	if err != nil {
-		client.SendMessage(&WsMessage[joinRoomResponse]{
-			Action: "join_room",
-			Data: joinRoomResponse{
-				Status:  "error",
-				Message: "檢查用戶權限失敗",
-			},
-		})
+		// 使用統一的 error action
+		client.SendError("permission_check_failed", "檢查用戶權限失敗")
 		return
 	}
 	if !allowed {
-		client.SendMessage(&WsMessage[joinRoomResponse]{
-			Action: "join_room",
-			Data: joinRoomResponse{
-				Status:  "error",
-				Message: "用戶沒有權限加入此房間",
-			},
-		})
+		// 使用統一的 error action
+		client.SendError("permission_denied", "用戶沒有權限加入此房間")
 		return
 	}
 
-	// 初始化房間
+	// 成功時使用 "join_room" action
 	wsh.roomManager.InitRoom(requestData.RoomType, requestData.RoomID)
-
-	// 加入房間
 	wsh.roomManager.JoinRoom(client, requestData.RoomType, requestData.RoomID)
 
-	client.SendMessage(&WsMessage[joinRoomResponse]{
-		Action: "join_room",
-		Data: joinRoomResponse{
+	client.SendMessage(&WsMessage[WsStatusResponse]{
+		Action: "room_joined",
+		Data: WsStatusResponse{
 			Status:  "success",
 			Message: "成功加入 " + string(requestData.RoomType) + " 房間 " + requestData.RoomID,
 		},
@@ -308,15 +291,10 @@ func (wsh *WebSocketHandler) handleLeaveRoom(client *Client, data json.RawMessag
 		return
 	}
 
-	type leaveRoomResponse struct {
-		Status  string `json:"status"`
-		Message string `json:"message"`
-	}
-
 	wsh.roomManager.LeaveRoom(client, requestData.RoomType, requestData.RoomID)
-	client.SendMessage(&WsMessage[leaveRoomResponse]{
-		Action: "leave_room",
-		Data: leaveRoomResponse{
+	client.SendMessage(&WsMessage[WsStatusResponse]{
+		Action: "room_left",
+		Data: WsStatusResponse{
 			Status:  "success",
 			Message: "成功離開 " + string(requestData.RoomType) + " 房間 " + requestData.RoomID,
 		},
@@ -346,7 +324,6 @@ func (wsh *WebSocketHandler) handleSendMessage(client *Client, data json.RawMess
 	}
 
 	message := &WsMessage[MessageResponse]{
-		Action: "send_message",
 		Data: MessageResponse{
 			RoomID:    requestData.RoomID,
 			RoomType:  requestData.RoomType,

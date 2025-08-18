@@ -54,8 +54,20 @@ func (mh *MessageHandler) HandleMessage(message *WsMessage[MessageResponse]) {
 				return
 			}
 
-			// 使用新的發送機制
-			if err := c.SendMessage(message); err != nil {
+			// 根據用戶是否為發送者決定 action
+			var action string
+			if c.UserID == message.Data.SenderID {
+				action = "message_sent"
+			} else {
+				action = "new_message"
+			}
+
+			outMsg := &WsMessage[MessageResponse]{
+				Action: action,
+				Data:   message.Data,
+			}
+
+			if err := c.SendMessage(outMsg); err != nil {
 				log.Printf("Failed to send message to client %s: %v", c.UserID, err)
 				// 異步移除有問題的客戶端
 				go mh.roomManager.LeaveRoom(c, message.Data.RoomType, message.Data.RoomID)

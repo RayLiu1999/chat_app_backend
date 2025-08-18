@@ -1,6 +1,7 @@
 # 編譯產生的二進位檔案
 /main
 /main.exe
+/chat_app_backend
 *.exe
 *.test
 *.out
@@ -17,12 +18,15 @@
 .DS_Store
 Thumbs.db
 
-# 設定檔
-/config.yaml
+# 環境變數設定檔 (敏感資訊)
+.env
+.env.local
+.env.production
 
 # 暫存與上傳資料夾
 /tmp/
 /uploads/
+/logs/
 
 # IDE/編輯器相關
 .idea/
@@ -32,3 +36,6 @@ Thumbs.db
 
 # 測試覆蓋率報告
 coverage.out
+
+# 備份檔案
+*.bak

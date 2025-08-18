@@ -96,6 +96,16 @@ func (fp *FileProvider) GetFileInfo(filepath string) (os.FileInfo, error) {
 // GetFileURL 生成檔案的URL
 func (fp *FileProvider) GetFileURL(filePath string) string {
 	baseURL := fp.cfg.Server.BaseURL
+	if (baseURL == "" || baseURL == "http://localhost") && fp.cfg.Server.Port != "" {
+		baseURL = fmt.Sprintf("http://localhost:%s", fp.cfg.Server.Port)
+	}
+
+	// 確保路徑格式正確
+	if !strings.HasPrefix(filePath, BaseUploadPath) {
+		filePath = filepath.Join(BaseUploadPath, filePath)
+	}
+
+	// 返回完整的檔案URL
 	return fmt.Sprintf("%s/%s", baseURL, filePath)
 }
 

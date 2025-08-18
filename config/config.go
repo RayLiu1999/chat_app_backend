@@ -1,79 +1,132 @@
+// config/config.go
 package config
 
 import (
 	"log"
 	"os"
-	"sync"
+	"strconv"
+	"strings"
 
-	"github.com/spf13/viper"
-)
-
-var (
-	instance *Config
-	once     sync.Once
+	"github.com/joho/godotenv"
 )
 
 type Config struct {
-	Timezone string `mapstructure:"timezone"`
-	Server   struct {
-		BaseURL string `mapstructure:"base_url"`
-		Port    string `mapstructure:"port"`
-		Mode    string `mapstructure:"mode"`
-	} `mapstructure:"server"`
-	Redis struct {
-		Addr string `mapstructure:"addr"`
-	} `mapstructure:"redis"`
-	AllowedOrigins []string `mapstructure:"allowed_origins"`
-	Database       struct {
-		Type    string `mapstructure:"type"` // 資料庫類型
-		MongoDB struct {
-			Host       string `mapstructure:"host"`
-			Port       string `mapstructure:"port"`
-			Username   string `mapstructure:"username"`
-			Password   string `mapstructure:"password"`
-			DBName     string `mapstructure:"dbname"`
-			AuthSource string `mapstructure:"authSource"`
-		} `mapstructure:"mongodb"`
-		PostgreSQL struct {
-			Host     string `mapstructure:"host"`
-			Port     string `mapstructure:"port"`
-			Username string `mapstructure:"username"`
-			Password string `mapstructure:"password"`
-			DBName   string `mapstructure:"dbname"`
-			SSLMode  string `mapstructure:"sslmode"`
-		} `mapstructure:"postgresql"`
-	} `mapstructure:"database"`
-	JWT struct {
-		AccessToken struct {
-			Secret      string  `mapstructure:"secret"`
-			ExpireHours float32 `mapstructure:"expire_hours"`
-		} `mapstructure:"access_token"`
-
-		RefreshToken struct {
-			Secret      string  `mapstructure:"secret"`
-			ExpireHours float32 `mapstructure:"expire_hours"`
-		} `mapstructure:"refresh_token"`
-	} `mapstructure:"jwt"`
+	Server   ServerConfig
+	Database DatabaseConfig
+	Redis    RedisConfig
+	JWT      JWTConfig
+	Upload   UploadConfig
 }
 
-// GetConfig 使用單例模式載入配置
-func GetConfig() *Config {
-	once.Do(func() {
-		// 獲取當前工作目錄
-		workingDir, err := os.Getwd()
-		if err != nil {
-			log.Fatalf("Error getting working directory: %v", err)
-		}
+type ServerConfig struct {
+	Port           string
+	BaseURL        string
+	Mode           string
+	Timezone       string
+	AllowedOrigins []string
+}
 
-		viper.SetConfigFile(workingDir + "/config.yaml")
-		if err := viper.ReadInConfig(); err != nil {
-			log.Fatalf("Error loading config file: %v", err)
-		}
+type DatabaseConfig struct {
+	MongoURI        string
+	MongoUsername   string
+	MongoPassword   string
+	MongoDBName     string
+	MongoAuthSource string
+}
 
-		instance = &Config{}
-		if err := viper.Unmarshal(instance); err != nil {
-			log.Fatalf("Error unmarshalling config: %v", err)
+type RedisConfig struct {
+	Addr     string
+	Password string
+}
+
+type JWTConfig struct {
+	AccessSecret       string
+	RefreshSecret      string
+	AccessExpireHours  int
+	RefreshExpireHours int
+}
+
+type UploadConfig struct {
+	MaxSize      int64
+	AllowedTypes []string
+}
+
+var AppConfig *Config
+
+func LoadConfig() {
+	// 載入 .env 檔案
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, using system environment variables")
+	}
+
+	AppConfig = &Config{
+		Server: ServerConfig{
+			Port:           getEnv("SERVER_PORT", "8080"),
+			BaseURL:        getEnv("SERVER_BASE_URL", "http://localhost"),
+			Mode:           getEnv("GIN_MODE", "debug"),
+			Timezone:       getEnv("TIMEZONE", "Asia/Taipei"),
+			AllowedOrigins: strings.Split(getEnv("ALLOWED_ORIGINS", "http://localhost:3000"), ","),
+		},
+		Database: DatabaseConfig{
+			MongoURI:        getEnv("MONGO_URI", "mongodb://localhost:27017/chat_app"),
+			MongoUsername:   getEnv("MONGO_USERNAME", ""),
+			MongoPassword:   getEnv("MONGO_PASSWORD", ""),
+			MongoDBName:     getEnv("MONGO_DB_NAME", "chat_app"),
+			MongoAuthSource: getEnv("MONGO_AUTH_SOURCE", "admin"),
+		},
+		Redis: RedisConfig{
+			Addr:     getEnv("REDIS_ADDR", "localhost:6379"),
+			Password: getEnv("REDIS_PASSWORD", ""),
+		},
+		JWT: JWTConfig{
+			AccessSecret:       getEnv("JWT_ACCESS_SECRET", ""),
+			RefreshSecret:      getEnv("JWT_REFRESH_SECRET", ""),
+			AccessExpireHours:  getEnvAsInt("JWT_ACCESS_EXPIRE_HOURS", 24),
+			RefreshExpireHours: getEnvAsInt("JWT_REFRESH_EXPIRE_HOURS", 168),
+		},
+		Upload: UploadConfig{
+			MaxSize:      getEnvAsInt64("UPLOAD_MAX_SIZE", 10485760),
+			AllowedTypes: strings.Split(getEnv("UPLOAD_ALLOWED_TYPES", "image/jpeg,image/png"), ","),
+		},
+	}
+
+	// 驗證必要的配置
+	validateConfig()
+}
+
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+func getEnvAsInt(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if intValue, err := strconv.Atoi(value); err == nil {
+			return intValue
 		}
-	})
-	return instance
+	}
+	return defaultValue
+}
+
+func getEnvAsInt64(key string, defaultValue int64) int64 {
+	if value := os.Getenv(key); value != "" {
+		if intValue, err := strconv.ParseInt(value, 10, 64); err == nil {
+			return intValue
+		}
+	}
+	return defaultValue
+}
+
+func validateConfig() {
+	if AppConfig.JWT.AccessSecret == "" {
+		log.Fatal("JWT_ACCESS_SECRET is required")
+	}
+	if AppConfig.JWT.RefreshSecret == "" {
+		log.Fatal("JWT_REFRESH_SECRET is required")
+	}
+	if AppConfig.Database.MongoURI == "" {
+		log.Fatal("MONGO_URI is required")
+	}
 }

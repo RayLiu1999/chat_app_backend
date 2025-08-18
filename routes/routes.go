@@ -5,6 +5,8 @@ import (
 	"chat_app_backend/di"
 	"chat_app_backend/middlewares"
 	"chat_app_backend/providers"
+	"context"
+	"net/http"
 	"path/filepath"
 	"time"
 
@@ -20,13 +22,47 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, mongodb *providers.MongoWrap
 
 	// 設定 CORS 中介軟體
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     cfg.AllowedOrigins,                                                                 // 允許的來源
+		AllowOrigins:     cfg.Server.AllowedOrigins,                                                          // 允許的來源
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},                                           // 允許的方法
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-CSRF-NAME", "X-CSRF-TOKEN"}, // 允許的標頭
 		ExposeHeaders:    []string{"Content-Length"},                                                         // 允許暴露的標頭
 		AllowCredentials: true,                                                                               // 是否允許憑證
 		MaxAge:           12 * time.Hour,                                                                     // 預檢請求的緩存時間
 	}))
+
+	// 健康檢查
+	r.GET("/health", func(c *gin.Context) {
+		status := "ok"
+
+		// 預設 mongo 狀態
+		mongoStatus := "ok"
+		mongoError := ""
+
+		if mongodb == nil {
+			mongoStatus = "not_initialized"
+		} else {
+			ctx, cancel := context.WithTimeout(context.Background(), 800*time.Millisecond)
+			defer cancel()
+			if err := mongodb.Ping(ctx); err != nil {
+				mongoStatus = "error"
+				mongoError = err.Error()
+				// 只有資料庫異常時將整體狀態標記為 degraded
+				status = "degraded"
+			}
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"status":  status, // ok | degraded
+			"services": gin.H{
+				"mongo": gin.H{
+					"status": mongoStatus,
+					"error":  mongoError,
+				},
+			},
+			"timestamp": time.Now().UTC(),
+		})
+	})
 
 	// 未認證的路由，只需要 CSRF 驗證
 	public := r.Group("/")
@@ -65,7 +101,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, mongodb *providers.MongoWrap
 
 	// friend
 	auth.GET("/friends", controllers.FriendController.GetFriendList)                 // 取得好友清單
-	auth.POST("/friends", controllers.FriendController.AddFriendRequest)             // 建立好友請求
+	auth.POST("/friends/:username", controllers.FriendController.AddFriendRequest)   // 建立好友請求
 	auth.PUT("/friends/:friend_id", controllers.FriendController.UpdateFriendStatus) // 更新好友狀態
 	// auth.DELETE("/friends/:friend_id", controllers.FriendController.RemoveFriend)     // 刪除好友
 

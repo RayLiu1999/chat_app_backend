@@ -192,8 +192,11 @@ func ParseURLParams(urlStr string) (map[string]string, error) {
 // 返回：
 //   - URL 字串
 func GetUploadURL(path string, params map[string]string) string {
-	cfg := config.GetConfig()
-	baseURL := cfg.Server.BaseURL
+	if config.AppConfig == nil {
+		return "/uploads/" + path // fallback
+	}
+
+	baseURL := config.AppConfig.Server.BaseURL
 	uploadPath := "/uploads/"
 	url := baseURL + uploadPath + path
 

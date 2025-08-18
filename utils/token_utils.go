@@ -27,13 +27,14 @@ type TokenResponse struct {
 	ExpiresAt int64
 }
 
-var jwtSecret = []byte(config.GetConfig().JWT.AccessToken.Secret)
-
 // 生成 access token
 func GenAccessToken(userID string) (TokenResponse, error) {
-	cfg := config.GetConfig()
-	accessTokenJwtSecret := []byte(cfg.JWT.AccessToken.Secret)
-	accessTokenExpireHours := cfg.JWT.AccessToken.ExpireHours
+	if config.AppConfig == nil {
+		return TokenResponse{}, errors.New("config not loaded")
+	}
+
+	accessTokenJwtSecret := []byte(config.AppConfig.JWT.AccessSecret)
+	accessTokenExpireHours := config.AppConfig.JWT.AccessExpireHours
 
 	// 將小時轉換為分鐘
 	accessTokenExpireDuration := time.Duration(accessTokenExpireHours*60) * time.Minute
@@ -63,9 +64,12 @@ func GenAccessToken(userID string) (TokenResponse, error) {
 
 // 生成 refresh token
 func GenRefreshToken(userID string) (TokenResponse, error) {
-	cfg := config.GetConfig()
-	refreshTokenJwtSecret := []byte(cfg.JWT.RefreshToken.Secret)
-	refreshTokenExpireHours := cfg.JWT.RefreshToken.ExpireHours
+	if config.AppConfig == nil {
+		return TokenResponse{}, errors.New("config not loaded")
+	}
+
+	refreshTokenJwtSecret := []byte(config.AppConfig.JWT.RefreshSecret)
+	refreshTokenExpireHours := config.AppConfig.JWT.RefreshExpireHours
 
 	// 將小時轉換為分鐘
 	refreshTokenExpireDuration := time.Duration(refreshTokenExpireHours*60) * time.Minute
@@ -95,6 +99,12 @@ func GenRefreshToken(userID string) (TokenResponse, error) {
 
 // 驗證 JWT access token
 func ValidateAccessToken(tokenString string) (bool, error) {
+	if config.AppConfig == nil {
+		return false, errors.New("config not loaded")
+	}
+
+	jwtSecret := []byte(config.AppConfig.JWT.AccessSecret)
+
 	// 解析和驗證 JWT 簽章
 	token, err := jwt.ParseWithClaims(tokenString, &AccessTokenClaims{}, func(token *jwt.Token) (interface{}, error) {
 		// 檢查簽名方法是否為預期的 HMAC 方法
@@ -122,6 +132,12 @@ func ValidateAccessToken(tokenString string) (bool, error) {
 
 // 從 token 中獲取用戶 ID
 func GetUserFromToken(tokenString string) (string, primitive.ObjectID, error) {
+	if config.AppConfig == nil {
+		return "", primitive.NilObjectID, errors.New("config not loaded")
+	}
+
+	jwtSecret := []byte(config.AppConfig.JWT.AccessSecret)
+
 	// 解析和驗證 JWT token
 	token, err := jwt.ParseWithClaims(tokenString, &AccessTokenClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return jwtSecret, nil
