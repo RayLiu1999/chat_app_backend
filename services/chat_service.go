@@ -7,8 +7,6 @@ import (
 	"chat_app_backend/repositories"
 	"chat_app_backend/utils"
 	"context"
-	"errors"
-	"fmt"
 	"log"
 	"strconv"
 	"time"
@@ -40,7 +38,10 @@ type ChatService struct {
 
 // NewChatService 初始化聊天室服務
 func NewChatService(cfg *config.Config, odm *providers.ODM, chatRepo repositories.ChatRepositoryInterface, serverRepo repositories.ServerRepositoryInterface, serverMemberRepo repositories.ServerMemberRepositoryInterface, userRepo repositories.UserRepositoryInterface, userService UserServiceInterface, fileUploadService FileUploadServiceInterface) *ChatService {
-	redisClient := redis.NewClient(&redis.Options{Addr: cfg.Redis.Addr})
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:     cfg.Redis.Addr,
+		Password: cfg.Redis.Password,
+	})
 	if _, err := redisClient.Ping(context.Background()).Result(); err != nil {
 		log.Printf("Failed to ping Redis: %v", err)
 		utils.PrettyPrint("Failed to ping Redis:", err)
@@ -102,10 +103,14 @@ func (cs *ChatService) UpdateUserService(userService UserServiceInterface) {
 }
 
 // 取得聊天記錄response
-func (cs *ChatService) GetDMRoomResponseList(userID string, includeHidden bool) ([]models.DMRoomResponse, error) {
+func (cs *ChatService) GetDMRoomResponseList(userID string, includeHidden bool) ([]models.DMRoomResponse, *models.MessageOptions) {
 	chatList, err := cs.chatRepo.GetDMRoomListByUserID(userID, includeHidden)
 	if err != nil {
-		return nil, err
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
+			Message: "獲取聊天列表失敗",
+		}
 	}
 
 	var userIds []string
@@ -116,7 +121,11 @@ func (cs *ChatService) GetDMRoomResponseList(userID string, includeHidden bool) 
 	// 取得用戶id陣列
 	userList, err := cs.userRepo.GetUserListByIds(userIds)
 	if err != nil {
-		return nil, err
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
+			Message: "獲取用戶資訊失敗",
+		}
 	}
 
 	userListById := make(map[string]models.User)
@@ -151,18 +160,26 @@ func (cs *ChatService) GetDMRoomResponseList(userID string, includeHidden bool) 
 }
 
 // UpdateDMRoom 更新聊天房間狀態
-func (cs *ChatService) UpdateDMRoom(userID string, roomID string, isHidden bool) error {
+func (cs *ChatService) UpdateDMRoom(userID string, roomID string, isHidden bool) *models.MessageOptions {
 	// 使用ODM直接操作
 	ctx := context.Background()
 
 	userObjID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return err
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Details: err,
+			Message: "無效的用戶ID格式",
+		}
 	}
 
 	roomObjID, err := primitive.ObjectIDFromHex(roomID)
 	if err != nil {
-		return err
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Details: err,
+			Message: "無效的房間ID格式",
+		}
 	}
 
 	var dmRoom models.DMRoom
@@ -173,32 +190,57 @@ func (cs *ChatService) UpdateDMRoom(userID string, roomID string, isHidden bool)
 
 	err = cs.odm.FindOne(ctx, filter, &dmRoom)
 	if err != nil {
-		return err
+		return &models.MessageOptions{
+			Code:    models.ErrRoomNotFound,
+			Details: err,
+			Message: "聊天房間不存在",
+		}
 	}
 
 	dmRoom.IsHidden = isHidden
 	dmRoom.UpdatedAt = time.Now()
 
-	return cs.odm.Update(ctx, &dmRoom)
+	err = cs.odm.Update(ctx, &dmRoom)
+	if err != nil {
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
+			Message: "更新聊天房間狀態失敗",
+		}
+	}
+
+	return nil
 }
 
 // CreateDMRoom 創建私聊房間
-func (cs *ChatService) CreateDMRoom(userID string, chatWithUserID string) (*models.DMRoomResponse, error) {
+func (cs *ChatService) CreateDMRoom(userID string, chatWithUserID string) (*models.DMRoomResponse, *models.MessageOptions) {
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return nil, err
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Details: err,
+			Message: "無效的用戶ID格式",
+		}
 	}
 
 	chatWithUserObjectID, err := primitive.ObjectIDFromHex(chatWithUserID)
 	if err != nil {
-		return nil, err
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Details: err,
+			Message: "無效的聊天對象ID格式",
+		}
 	}
 
 	// 檢查chat_with_user_id是否存在
 	var user models.User
 	err = cs.odm.FindByID(context.Background(), chatWithUserID, &user)
 	if err != nil {
-		return nil, err
+		return nil, &models.MessageOptions{
+			Code:    models.ErrUserNotFound,
+			Details: err,
+			Message: "聊天對象不存在",
+		}
 	}
 
 	// 檢查房間是否存在
@@ -218,7 +260,11 @@ func (cs *ChatService) CreateDMRoom(userID string, chatWithUserID string) (*mode
 	var roomList []models.DMRoom
 	err = cs.odm.Find(context.Background(), qb.GetFilter(), &roomList)
 	if err != nil {
-		return nil, err
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
+			Message: "查詢聊天房間失敗",
+		}
 	}
 
 	// 定義回傳格式
@@ -262,7 +308,11 @@ func (cs *ChatService) CreateDMRoom(userID string, chatWithUserID string) (*mode
 
 			err := cs.odm.Create(context.Background(), &dmRoom)
 			if err != nil {
-				return nil, err
+				return nil, &models.MessageOptions{
+					Code:    models.ErrInternalServer,
+					Details: err,
+					Message: "創建聊天房間失敗",
+				}
 			}
 
 			dmRoomResponse = models.DMRoomResponse{
@@ -300,7 +350,11 @@ func (cs *ChatService) CreateDMRoom(userID string, chatWithUserID string) (*mode
 
 		err := cs.odm.Create(context.Background(), &dmRoom)
 		if err != nil {
-			return nil, err
+			return nil, &models.MessageOptions{
+				Code:    models.ErrInternalServer,
+				Details: err,
+				Message: "創建聊天房間失敗",
+			}
 		}
 
 		dmRoomResponse = models.DMRoomResponse{
@@ -313,19 +367,30 @@ func (cs *ChatService) CreateDMRoom(userID string, chatWithUserID string) (*mode
 		return &dmRoomResponse, nil
 	}
 
-	return nil, errors.New("unknown error occurred")
+	return nil, &models.MessageOptions{
+		Code:    models.ErrInternalServer,
+		Message: "未知錯誤",
+	}
 }
 
 // GetDMMessages 獲取私聊訊息
-func (cs *ChatService) GetDMMessages(userID string, roomID string, before string, after string, limit string) ([]models.MessageResponse, error) {
+func (cs *ChatService) GetDMMessages(userID string, roomID string, before string, after string, limit string) ([]models.MessageResponse, *models.MessageOptions) {
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return nil, err
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Details: err,
+			Message: "無效的用戶ID格式",
+		}
 	}
 
 	roomObjectID, err := primitive.ObjectIDFromHex(roomID)
 	if err != nil {
-		return nil, err
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Details: err,
+			Message: "無效的房間ID格式",
+		}
 	}
 
 	// 檢查room_id是否存在
@@ -335,7 +400,11 @@ func (cs *ChatService) GetDMMessages(userID string, roomID string, before string
 	var room models.DMRoom
 	err = cs.odm.FindOne(context.Background(), qb.GetFilter(), &room)
 	if err != nil {
-		return nil, err
+		return nil, &models.MessageOptions{
+			Code:    models.ErrRoomNotFound,
+			Details: err,
+			Message: "聊天房間不存在",
+		}
 	}
 
 	// 構建訊息查詢
@@ -345,7 +414,11 @@ func (cs *ChatService) GetDMMessages(userID string, roomID string, before string
 	if before != "" {
 		beforeObjectID, err := primitive.ObjectIDFromHex(before)
 		if err != nil {
-			return nil, err
+			return nil, &models.MessageOptions{
+				Code:    models.ErrInvalidParams,
+				Details: err,
+				Message: "無效的before參數格式",
+			}
 		}
 		messageQb.WhereLt("_id", beforeObjectID)
 	}
@@ -353,7 +426,11 @@ func (cs *ChatService) GetDMMessages(userID string, roomID string, before string
 	if after != "" {
 		afterObjectID, err := primitive.ObjectIDFromHex(after)
 		if err != nil {
-			return nil, err
+			return nil, &models.MessageOptions{
+				Code:    models.ErrInvalidParams,
+				Details: err,
+				Message: "無效的after參數格式",
+			}
 		}
 		messageQb.WhereGt("_id", afterObjectID)
 	}
@@ -370,7 +447,11 @@ func (cs *ChatService) GetDMMessages(userID string, roomID string, before string
 	var messageList []models.Message
 	err = cs.odm.FindWithOptions(context.Background(), messageQb.GetFilter(), &messageList, messageQb.GetQueryOptions())
 	if err != nil {
-		return nil, err
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
+			Message: "獲取訊息失敗",
+		}
 	}
 
 	var messageResponse []models.MessageResponse
@@ -389,27 +470,42 @@ func (cs *ChatService) GetDMMessages(userID string, roomID string, before string
 }
 
 // GetChannelMessages 獲取頻道訊息
-func (cs *ChatService) GetChannelMessages(userID string, channelID string, before string, after string, limit string) ([]models.MessageResponse, error) {
+func (cs *ChatService) GetChannelMessages(userID string, channelID string, before string, after string, limit string) ([]models.MessageResponse, *models.MessageOptions) {
 	channelObjectID, err := primitive.ObjectIDFromHex(channelID)
 	if err != nil {
-		return nil, fmt.Errorf("無效的頻道ID: %v", err)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Details: err,
+			Message: "無效的頻道ID格式",
+		}
 	}
 
 	// 首先檢查頻道是否存在
 	var channel models.Channel
 	err = cs.odm.FindByID(context.Background(), channelID, &channel)
 	if err != nil {
-		return nil, fmt.Errorf("頻道不存在: %v", err)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrChannelNotFound,
+			Details: err,
+			Message: "頻道不存在",
+		}
 	}
 
 	// 檢查用戶是否有權限訪問此頻道（檢查是否為伺服器成員）
 	// 這裡我們需要檢查用戶是否是該伺服器的成員
 	isMember, err := cs.checkUserServerMembership(userID, channel.ServerID.Hex())
 	if err != nil {
-		return nil, fmt.Errorf("檢查伺服器成員身份失敗: %v", err)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
+			Message: "檢查伺服器成員身份失敗",
+		}
 	}
 	if !isMember {
-		return nil, fmt.Errorf("您沒有權限訪問此頻道")
+		return nil, &models.MessageOptions{
+			Code:    models.ErrUnauthorized,
+			Message: "您沒有權限訪問此頻道",
+		}
 	}
 
 	// 構建訊息查詢
@@ -419,7 +515,11 @@ func (cs *ChatService) GetChannelMessages(userID string, channelID string, befor
 	if before != "" {
 		beforeObjectID, err := primitive.ObjectIDFromHex(before)
 		if err != nil {
-			return nil, fmt.Errorf("無效的 before 參數: %v", err)
+			return nil, &models.MessageOptions{
+				Code:    models.ErrInvalidParams,
+				Details: err,
+				Message: "無效的before參數格式",
+			}
 		}
 		messageQb.WhereLt("_id", beforeObjectID)
 	}
@@ -427,7 +527,11 @@ func (cs *ChatService) GetChannelMessages(userID string, channelID string, befor
 	if after != "" {
 		afterObjectID, err := primitive.ObjectIDFromHex(after)
 		if err != nil {
-			return nil, fmt.Errorf("無效的 after 參數: %v", err)
+			return nil, &models.MessageOptions{
+				Code:    models.ErrInvalidParams,
+				Details: err,
+				Message: "無效的after參數格式",
+			}
 		}
 		messageQb.WhereGt("_id", afterObjectID)
 	}
@@ -451,7 +555,11 @@ func (cs *ChatService) GetChannelMessages(userID string, channelID string, befor
 	var messageList []models.Message
 	err = cs.odm.FindWithOptions(context.Background(), messageQb.GetFilter(), &messageList, messageQb.GetQueryOptions())
 	if err != nil {
-		return nil, fmt.Errorf("獲取頻道訊息失敗: %v", err)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
+			Message: "獲取頻道訊息失敗",
+		}
 	}
 
 	// 轉換為響應格式

@@ -5,8 +5,6 @@ import (
 	"chat_app_backend/di"
 	"chat_app_backend/middlewares"
 	"chat_app_backend/providers"
-	"context"
-	"net/http"
 	"path/filepath"
 	"time"
 
@@ -20,6 +18,14 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, mongodb *providers.MongoWrap
 	uploadsAbsPath := filepath.Join(".", "uploads")
 	r.Static("/uploads", uploadsAbsPath)
 
+	// 健康檢查
+	r.GET("/health", controllers.HealthController.HealthCheck)
+
+	// 驗證前端來源
+	if cfg.Server.Mode == config.ProductionMode {
+		r.Use(middlewares.VerifyOrigin(cfg.Server.AllowedOrigins))
+	}
+
 	// 設定 CORS 中介軟體
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     cfg.Server.AllowedOrigins,                                                          // 允許的來源
@@ -30,43 +36,8 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, mongodb *providers.MongoWrap
 		MaxAge:           12 * time.Hour,                                                                     // 預檢請求的緩存時間
 	}))
 
-	// 健康檢查
-	r.GET("/health", func(c *gin.Context) {
-		status := "ok"
-
-		// 預設 mongo 狀態
-		mongoStatus := "ok"
-		mongoError := ""
-
-		if mongodb == nil {
-			mongoStatus = "not_initialized"
-		} else {
-			ctx, cancel := context.WithTimeout(context.Background(), 800*time.Millisecond)
-			defer cancel()
-			if err := mongodb.Ping(ctx); err != nil {
-				mongoStatus = "error"
-				mongoError = err.Error()
-				// 只有資料庫異常時將整體狀態標記為 degraded
-				status = "degraded"
-			}
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"success": true,
-			"status":  status, // ok | degraded
-			"services": gin.H{
-				"mongo": gin.H{
-					"status": mongoStatus,
-					"error":  mongoError,
-				},
-			},
-			"timestamp": time.Now().UTC(),
-		})
-	})
-
 	// 未認證的路由，只需要 CSRF 驗證
 	public := r.Group("/")
-	public.Use(middlewares.VerifyCsrfToken())
 	public.POST("/register", controllers.UserController.Register)
 	public.POST("/login", controllers.UserController.Login)
 	public.POST("/logout", controllers.UserController.Logout)
@@ -75,9 +46,6 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, mongodb *providers.MongoWrap
 	// 需要認證的路由
 	auth := r.Group("/")
 	auth.Use(middlewares.Auth())
-
-	// CSRF 驗證
-	auth.Use(middlewares.VerifyCsrfToken())
 
 	// WebSocket
 	auth.GET("/ws", controllers.ChatController.HandleConnections)
@@ -101,7 +69,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, mongodb *providers.MongoWrap
 
 	// friend
 	auth.GET("/friends", controllers.FriendController.GetFriendList)                 // 取得好友清單
-	auth.POST("/friends/:username", controllers.FriendController.AddFriendRequest)   // 建立好友請求
+	auth.POST("/friends", controllers.FriendController.AddFriendRequest)             // 建立好友請求
 	auth.PUT("/friends/:friend_id", controllers.FriendController.UpdateFriendStatus) // 更新好友狀態
 	// auth.DELETE("/friends/:friend_id", controllers.FriendController.RemoveFriend)     // 刪除好友
 

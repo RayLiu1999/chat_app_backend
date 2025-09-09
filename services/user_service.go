@@ -61,41 +61,44 @@ func (us *UserService) getUserBannerURL(user *models.User) string {
 }
 
 // 註冊新用戶
-func (us *UserService) RegisterUser(user models.User) *utils.AppError {
+func (us *UserService) RegisterUser(user models.User) *models.MessageOptions {
 	// 檢查用戶名是否已存在
 	exists, err := us.userRepo.CheckUsernameExists(user.Username)
 	if err != nil {
-		return &utils.AppError{
-			Code: utils.ErrInternalServer,
-			Err:  err,
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
+			Message: "檢查用戶名是否存在失敗",
 		}
 	}
 	if exists {
-		return &utils.AppError{
-			Code: utils.ErrUsernameExists,
+		return &models.MessageOptions{
+			Code: models.ErrUsernameExists,
 		}
 	}
 
 	// 檢查電子郵件是否已存在
 	exists, err = us.userRepo.CheckEmailExists(user.Email)
 	if err != nil {
-		return &utils.AppError{
-			Code: utils.ErrInternalServer,
-			Err:  err,
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
+			Message: "檢查電子郵件是否存在失敗",
 		}
 	}
 	if exists {
-		return &utils.AppError{
-			Code: utils.ErrEmailExists,
+		return &models.MessageOptions{
+			Code: models.ErrEmailExists,
 		}
 	}
 
 	// 加密密碼
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return &utils.AppError{
-			Code: utils.ErrInternalServer,
-			Err:  err,
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
+			Message: "密碼雜湊失敗",
 		}
 	}
 	user.Password = string(hashedPassword)
@@ -108,9 +111,10 @@ func (us *UserService) RegisterUser(user models.User) *utils.AppError {
 	// 創建用戶
 	err = us.userRepo.CreateUser(user)
 	if err != nil {
-		return &utils.AppError{
-			Code: utils.ErrInternalServer,
-			Err:  err,
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
+			Message: "創建用戶失敗",
 		}
 	}
 
@@ -138,13 +142,14 @@ func (us *UserService) GetUserResponseById(userID string) (*models.UserResponse,
 }
 
 // Login 處理用戶登入邏輯
-func (us *UserService) Login(loginUser models.User) (*models.LoginResponse, *utils.AppError) {
+func (us *UserService) Login(loginUser models.User) (*models.LoginResponse, *models.MessageOptions) {
 	// 刪除過期或被註銷的 refresh token
 	err := us.ClearExpiredRefreshTokens()
 	if err != nil {
-		return nil, &utils.AppError{
-			Code: utils.ErrInternalServer,
-			Err:  err,
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
+			Message: "清除過期刷新令牌失敗",
 		}
 	}
 
@@ -152,27 +157,29 @@ func (us *UserService) Login(loginUser models.User) (*models.LoginResponse, *uti
 	var user models.User
 	err = us.odm.FindOne(context.Background(), bson.M{"email": loginUser.Email}, &user)
 	if err != nil {
-		return nil, &utils.AppError{
-			Code: utils.ErrInternalServer,
-			Err:  err,
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
+			Message: "查找用戶失敗",
 		}
 	}
 
 	// 驗證密碼
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginUser.Password))
 	if err != nil {
-		return nil, &utils.AppError{
-			Code:        utils.ErrLoginFailed,
-			Displayable: false,
+		return nil, &models.MessageOptions{
+			Code:    models.ErrLoginFailed,
+			Message: "電子郵件或密碼無效",
 		}
 	}
 
 	// 生成 Refresh Token
 	refreshTokenResponse, err := utils.GenRefreshToken(user.BaseModel.GetID().Hex())
 	if err != nil {
-		return nil, &utils.AppError{
-			Code: utils.ErrInternalServer,
-			Err:  err,
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
+			Message: "生成刷新令牌失敗",
 		}
 	}
 
@@ -186,18 +193,20 @@ func (us *UserService) Login(loginUser models.User) (*models.LoginResponse, *uti
 
 	err = us.odm.Create(context.Background(), &refreshTokenDoc)
 	if err != nil {
-		return nil, &utils.AppError{
-			Code: utils.ErrInternalServer,
-			Err:  err,
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
+			Message: "創建刷新令牌失敗",
 		}
 	}
 
 	// 生成 Access Token
 	accessTokenResponse, err := utils.GenAccessToken(user.BaseModel.GetID().Hex())
 	if err != nil {
-		return nil, &utils.AppError{
-			Code: utils.ErrInternalServer,
-			Err:  err,
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
+			Message: "生成訪問令牌失敗",
 		}
 	}
 
@@ -209,12 +218,12 @@ func (us *UserService) Login(loginUser models.User) (*models.LoginResponse, *uti
 }
 
 // 登出
-func (us *UserService) Logout(c *gin.Context) *utils.AppError {
+func (us *UserService) Logout(c *gin.Context) *models.MessageOptions {
 	// 註銷 refresh token
 	_, userObjectID, err := utils.GetUserIDFromHeader(c)
 	if err != nil {
-		return &utils.AppError{
-			Code: utils.ErrUnauthorized,
+		return &models.MessageOptions{
+			Code: models.ErrUnauthorized,
 		}
 	}
 
@@ -223,26 +232,25 @@ func (us *UserService) Logout(c *gin.Context) *utils.AppError {
 	update := bson.M{"$set": bson.M{"revoked": true}}
 	err = us.odm.UpdateMany(context.Background(), &models.RefreshToken{}, filter, update)
 	if err != nil {
-		return &utils.AppError{
-			Code: utils.ErrInternalServer,
-			Err:  err,
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
 		}
 	}
 
 	// 清除 cookie
-	c.SetCookie("refresh_token", "", -1, "/", "localhost", false, true)
+	utils.ClearCookie(c, us.config, "refresh_token")
 	return nil
 }
 
 // RefreshToken 刷新令牌
-func (us *UserService) RefreshToken(refreshToken string) (string, *utils.AppError) {
+func (us *UserService) RefreshToken(refreshToken string) (string, *models.MessageOptions) {
 	// 查詢 refresh token
 	var refreshTokenDoc models.RefreshToken
 	err := us.odm.FindOne(context.Background(), bson.M{"token": refreshToken}, &refreshTokenDoc)
 	if err != nil {
-		return "", &utils.AppError{
-			Code:        utils.ErrInvalidToken,
-			Displayable: false,
+		return "", &models.MessageOptions{
+			Code: models.ErrInvalidToken,
 		}
 	}
 
@@ -251,24 +259,23 @@ func (us *UserService) RefreshToken(refreshToken string) (string, *utils.AppErro
 		// 移除 refresh token
 		err = us.odm.Delete(context.Background(), &refreshTokenDoc)
 		if err != nil {
-			return "", &utils.AppError{
-				Code: utils.ErrInternalServer,
-				Err:  err,
+			return "", &models.MessageOptions{
+				Code:    models.ErrInternalServer,
+				Details: err,
 			}
 		}
 
-		return "", &utils.AppError{
-			Code:        utils.ErrInvalidToken,
-			Displayable: false,
+		return "", &models.MessageOptions{
+			Code: models.ErrInvalidToken,
 		}
 	}
 
 	// 生成新的 access token
 	accessTokenResponse, err := utils.GenAccessToken(refreshTokenDoc.UserID.Hex())
 	if err != nil {
-		return "", &utils.AppError{
-			Code: utils.ErrInternalServer,
-			Err:  err,
+		return "", &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
 		}
 	}
 
@@ -276,9 +283,9 @@ func (us *UserService) RefreshToken(refreshToken string) (string, *utils.AppErro
 	refreshTokenDoc.ExpiresAt = time.Now().Add(time.Hour * 24 * 7).Unix()
 	err = us.odm.Update(context.Background(), &refreshTokenDoc)
 	if err != nil {
-		return "", &utils.AppError{
-			Code: utils.ErrInternalServer,
-			Err:  err,
+		return "", &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
 		}
 	}
 
@@ -431,8 +438,8 @@ func (us *UserService) UploadUserImage(userID string, file multipart.File, heade
 	imageURL, err := us.fileUploadService.GetFileURLByID(uploadResult.ID.Hex())
 	if err != nil {
 		// 如果獲取URL失敗，嘗試刪除已上傳的檔案
-		if deleteErr := us.fileUploadService.DeleteFileByID(uploadResult.ID.Hex(), userID); deleteErr != nil {
-			fmt.Printf("清理上傳檔案失敗: %v\n", deleteErr)
+		if msgOpt := us.fileUploadService.DeleteFileByID(uploadResult.ID.Hex(), userID); msgOpt != nil {
+			fmt.Printf("清理上傳檔案失敗: %v\n", msgOpt.Details)
 		}
 		return nil, fmt.Errorf("獲取圖片URL失敗: %v", err)
 	}
@@ -443,13 +450,13 @@ func (us *UserService) UploadUserImage(userID string, file multipart.File, heade
 		"updated_at": time.Now(),
 	}
 
-	err = us.userRepo.UpdateUser(userID, updates)
-	if err != nil {
+	updateErr := us.userRepo.UpdateUser(userID, updates)
+	if updateErr != nil {
 		// 如果更新資料庫失敗，嘗試刪除已上傳的檔案
-		if deleteErr := us.fileUploadService.DeleteFileByID(uploadResult.ID.Hex(), userID); deleteErr != nil {
-			fmt.Printf("清理上傳檔案失敗: %v\n", deleteErr)
+		if msgOpt := us.fileUploadService.DeleteFileByID(uploadResult.ID.Hex(), userID); msgOpt != nil {
+			fmt.Printf("清理上傳檔案失敗: %v\n", msgOpt.Details)
 		}
-		return nil, fmt.Errorf("更新用戶資料失敗: %v", err)
+		return nil, fmt.Errorf("更新用戶資料失敗: %v", updateErr)
 	}
 
 	return &models.UserImageResponse{
@@ -468,9 +475,9 @@ func (us *UserService) DeleteUserAvatar(userID string) error {
 
 	// 如果有舊的頭像，嘗試刪除檔案
 	if !user.PictureID.IsZero() && us.fileUploadService != nil {
-		if err := us.fileUploadService.DeleteFileByID(user.PictureID.Hex(), userID); err != nil {
+		if msgOpt := us.fileUploadService.DeleteFileByID(user.PictureID.Hex(), userID); msgOpt != nil {
 			// 記錄錯誤但不阻止更新資料庫
-			fmt.Printf("刪除頭像檔案失敗: %v\n", err)
+			fmt.Printf("刪除頭像檔案失敗: %v\n", msgOpt.Details)
 		}
 	}
 
@@ -492,9 +499,9 @@ func (us *UserService) DeleteUserBanner(userID string) error {
 
 	// 如果有舊的橫幅，嘗試刪除檔案
 	if !user.BannerID.IsZero() && us.fileUploadService != nil {
-		if err := us.fileUploadService.DeleteFileByID(user.BannerID.Hex(), userID); err != nil {
+		if msgOpt := us.fileUploadService.DeleteFileByID(user.BannerID.Hex(), userID); msgOpt != nil {
 			// 記錄錯誤但不阻止更新資料庫
-			fmt.Printf("刪除橫幅檔案失敗: %v\n", err)
+			fmt.Printf("刪除橫幅檔案失敗: %v\n", msgOpt.Details)
 		}
 	}
 

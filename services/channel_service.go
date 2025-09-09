@@ -5,7 +5,6 @@ import (
 	"chat_app_backend/models"
 	"chat_app_backend/providers"
 	"chat_app_backend/repositories"
-	"errors"
 	"log"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -40,11 +39,15 @@ func NewChannelService(cfg *config.Config,
 }
 
 // GetChannelsByServerID 根據伺服器ID獲取頻道列表
-func (cs *ChannelService) GetChannelsByServerID(userID string, serverID string) ([]models.ChannelResponse, error) {
+func (cs *ChannelService) GetChannelsByServerID(userID string, serverID string) ([]models.ChannelResponse, *models.MessageOptions) {
 	// 檢查用戶是否有權限訪問該伺服器
 	serverMembers, err := cs.serverMemberRepo.GetUserServers(userID)
 	if err != nil {
-		return nil, err
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "獲取用戶伺服器列表失敗",
+			Details: err.Error(),
+		}
 	}
 
 	hasAccess := false
@@ -56,13 +59,20 @@ func (cs *ChannelService) GetChannelsByServerID(userID string, serverID string) 
 	}
 
 	if !hasAccess {
-		return nil, errors.New("用戶沒有權限訪問該伺服器")
+		return nil, &models.MessageOptions{
+			Code:    models.ErrUnauthorized,
+			Message: "用戶沒有權限訪問該伺服器",
+		}
 	}
 
 	// 獲取頻道列表
 	channels, err := cs.channelRepo.GetChannelsByServerID(serverID)
 	if err != nil {
-		return nil, err
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "獲取頻道列表失敗",
+			Details: err.Error(),
+		}
 	}
 
 	// 轉換為響應格式
@@ -80,17 +90,25 @@ func (cs *ChannelService) GetChannelsByServerID(userID string, serverID string) 
 }
 
 // GetChannelByID 根據頻道ID獲取頻道詳細信息
-func (cs *ChannelService) GetChannelByID(userID string, channelID string) (*models.ChannelResponse, error) {
+func (cs *ChannelService) GetChannelByID(userID string, channelID string) (*models.ChannelResponse, *models.MessageOptions) {
 	// 獲取頻道信息
 	channel, err := cs.channelRepo.GetChannelByID(channelID)
 	if err != nil {
-		return nil, err
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "獲取頻道信息失敗",
+			Details: err.Error(),
+		}
 	}
 
 	// 檢查用戶是否有權限訪問該頻道所屬的伺服器
 	serverMembers, err := cs.serverMemberRepo.GetUserServers(userID)
 	if err != nil {
-		return nil, err
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "獲取用戶伺服器列表失敗",
+			Details: err.Error(),
+		}
 	}
 
 	hasAccess := false
@@ -102,7 +120,10 @@ func (cs *ChannelService) GetChannelByID(userID string, channelID string) (*mode
 	}
 
 	if !hasAccess {
-		return nil, errors.New("用戶沒有權限訪問該頻道")
+		return nil, &models.MessageOptions{
+			Code:    models.ErrUnauthorized,
+			Message: "用戶沒有權限訪問該頻道",
+		}
 	}
 
 	// 轉換為響應格式
@@ -117,11 +138,15 @@ func (cs *ChannelService) GetChannelByID(userID string, channelID string) (*mode
 }
 
 // CreateChannel 創建新頻道
-func (cs *ChannelService) CreateChannel(userID string, channel *models.Channel) (*models.ChannelResponse, error) {
+func (cs *ChannelService) CreateChannel(userID string, channel *models.Channel) (*models.ChannelResponse, *models.MessageOptions) {
 	// 檢查用戶是否有權限創建頻道（需要是伺服器成員）
 	serverMembers, err := cs.serverMemberRepo.GetUserServers(userID)
 	if err != nil {
-		return nil, err
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "獲取用戶伺服器列表失敗",
+			Details: err.Error(),
+		}
 	}
 
 	hasAccess := false
@@ -133,7 +158,10 @@ func (cs *ChannelService) CreateChannel(userID string, channel *models.Channel) 
 	}
 
 	if !hasAccess {
-		return nil, errors.New("用戶沒有權限在該伺服器創建頻道")
+		return nil, &models.MessageOptions{
+			Code:    models.ErrUnauthorized,
+			Message: "用戶沒有權限在該伺服器創建頻道",
+		}
 	}
 
 	// 設置頻道ID
@@ -144,7 +172,11 @@ func (cs *ChannelService) CreateChannel(userID string, channel *models.Channel) 
 	// 創建頻道
 	err = cs.channelRepo.CreateChannel(channel)
 	if err != nil {
-		return nil, err
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "創建頻道失敗",
+			Details: err.Error(),
+		}
 	}
 
 	// 返回創建的頻道響應
@@ -159,17 +191,25 @@ func (cs *ChannelService) CreateChannel(userID string, channel *models.Channel) 
 }
 
 // UpdateChannel 更新頻道信息
-func (cs *ChannelService) UpdateChannel(userID string, channelID string, updates map[string]interface{}) (*models.ChannelResponse, error) {
+func (cs *ChannelService) UpdateChannel(userID string, channelID string, updates map[string]interface{}) (*models.ChannelResponse, *models.MessageOptions) {
 	// 獲取頻道信息以檢查權限
 	channel, err := cs.channelRepo.GetChannelByID(channelID)
 	if err != nil {
-		return nil, err
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "獲取頻道信息失敗",
+			Details: err.Error(),
+		}
 	}
 
 	// 檢查用戶是否有權限更新該頻道
 	serverMembers, err := cs.serverMemberRepo.GetUserServers(userID)
 	if err != nil {
-		return nil, err
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "獲取用戶伺服器列表失敗",
+			Details: err.Error(),
+		}
 	}
 
 	hasAccess := false
@@ -181,19 +221,30 @@ func (cs *ChannelService) UpdateChannel(userID string, channelID string, updates
 	}
 
 	if !hasAccess {
-		return nil, errors.New("用戶沒有權限更新該頻道")
+		return nil, &models.MessageOptions{
+			Code:    models.ErrUnauthorized,
+			Message: "用戶沒有權限更新該頻道",
+		}
 	}
 
 	// 更新頻道
 	err = cs.channelRepo.UpdateChannel(channelID, updates)
 	if err != nil {
-		return nil, err
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "更新頻道失敗",
+			Details: err.Error(),
+		}
 	}
 
 	// 重新獲取更新後的頻道信息
 	updatedChannel, err := cs.channelRepo.GetChannelByID(channelID)
 	if err != nil {
-		return nil, err
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "獲取更新後的頻道信息失敗",
+			Details: err.Error(),
+		}
 	}
 
 	// 返回更新後的頻道響應
@@ -208,17 +259,25 @@ func (cs *ChannelService) UpdateChannel(userID string, channelID string, updates
 }
 
 // DeleteChannel 刪除頻道
-func (cs *ChannelService) DeleteChannel(userID string, channelID string) error {
+func (cs *ChannelService) DeleteChannel(userID string, channelID string) *models.MessageOptions {
 	// 獲取頻道信息以檢查權限
 	channel, err := cs.channelRepo.GetChannelByID(channelID)
 	if err != nil {
-		return err
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "獲取頻道信息失敗",
+			Details: err.Error(),
+		}
 	}
 
 	// 檢查用戶是否有權限刪除該頻道
 	serverMembers, err := cs.serverMemberRepo.GetUserServers(userID)
 	if err != nil {
-		return err
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "獲取用戶伺服器列表失敗",
+			Details: err.Error(),
+		}
 	}
 
 	hasAccess := false
@@ -230,7 +289,10 @@ func (cs *ChannelService) DeleteChannel(userID string, channelID string) error {
 	}
 
 	if !hasAccess {
-		return errors.New("用戶沒有權限刪除該頻道")
+		return &models.MessageOptions{
+			Code:    models.ErrUnauthorized,
+			Message: "用戶沒有權限刪除該頻道",
+		}
 	}
 
 	// 先刪除該頻道的所有訊息
@@ -241,5 +303,14 @@ func (cs *ChannelService) DeleteChannel(userID string, channelID string) error {
 	}
 
 	// 然後刪除頻道本身
-	return cs.channelRepo.DeleteChannel(channelID)
+	err = cs.channelRepo.DeleteChannel(channelID)
+	if err != nil {
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "刪除頻道失敗",
+			Details: err.Error(),
+		}
+	}
+
+	return nil
 }

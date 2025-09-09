@@ -77,6 +77,10 @@ type MessageResponse struct {
 	Timestamp int64              `json:"timestamp" bson:"timestamp"`
 }
 
+type FriendRequest struct {
+	Username string `json:"username" bson:"username"`
+}
+
 // FriendResponse 好友響應模型
 type FriendResponse struct {
 	ID         string `json:"id" bson:"_id"`

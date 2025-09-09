@@ -17,11 +17,19 @@ type Config struct {
 	JWT      JWTConfig
 	Upload   UploadConfig
 }
+type ModeConfig string
+
+const (
+	DevelopmentMode ModeConfig = "development"
+	ProductionMode  ModeConfig = "production"
+	TestMode        ModeConfig = "test"
+)
 
 type ServerConfig struct {
+	MainDomain     string
 	Port           string
 	BaseURL        string
-	Mode           string
+	Mode           ModeConfig
 	Timezone       string
 	AllowedOrigins []string
 }
@@ -61,14 +69,15 @@ func LoadConfig() {
 
 	AppConfig = &Config{
 		Server: ServerConfig{
+			MainDomain:     getEnv("SERVER_MAIN_DOMAIN", "localhost"),
 			Port:           getEnv("SERVER_PORT", "8080"),
 			BaseURL:        getEnv("SERVER_BASE_URL", "http://localhost"),
-			Mode:           getEnv("GIN_MODE", "debug"),
+			Mode:           ModeConfig(getEnv("SERVER_MODE", "development")),
 			Timezone:       getEnv("TIMEZONE", "Asia/Taipei"),
 			AllowedOrigins: strings.Split(getEnv("ALLOWED_ORIGINS", "http://localhost:3000"), ","),
 		},
 		Database: DatabaseConfig{
-			MongoURI:        getEnv("MONGO_URI", "mongodb://localhost:27017/chat_app"),
+			MongoURI:        getEnv("MONGO_URI", "localhost:27017"),
 			MongoUsername:   getEnv("MONGO_USERNAME", ""),
 			MongoPassword:   getEnv("MONGO_PASSWORD", ""),
 			MongoDBName:     getEnv("MONGO_DB_NAME", "chat_app"),
@@ -129,4 +138,9 @@ func validateConfig() {
 	if AppConfig.Database.MongoURI == "" {
 		log.Fatal("MONGO_URI is required")
 	}
+}
+
+// IsProduction 是一個輔助函數，方便判斷是否為生產環境
+func IsProduction() bool {
+	return AppConfig.Server.Mode == ProductionMode
 }

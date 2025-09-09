@@ -31,36 +31,28 @@ func (cc *ChannelController) GetChannelsByServerID(c *gin.Context) {
 	// 取得使用者ID
 	userID, _, err := utils.GetUserIDFromHeader(c)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{Code: utils.ErrUnauthorized})
+		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{Code: models.ErrUnauthorized, Message: "需要認證"})
 		return
 	}
 
 	// 獲取伺服器ID
 	serverID := c.Param("server_id")
 	if serverID == "" {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
-			Code:        utils.ErrInvalidParams,
-			Message:     "伺服器ID不能為空",
-			Displayable: false,
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "伺服器ID不能為空",
 		})
 		return
 	}
 
 	// 獲取頻道列表
-	channels, err := cc.channelService.GetChannelsByServerID(userID, serverID)
-	if err != nil {
-		utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{
-			Code:        utils.ErrInternalServer,
-			Message:     "獲取頻道列表失敗: " + err.Error(),
-			Displayable: false,
-		})
+	channels, msgOpt := cc.channelService.GetChannelsByServerID(userID, serverID)
+	if msgOpt != nil {
+		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
 		return
 	}
 
-	utils.SuccessResponse(c, channels, utils.MessageOptions{
-		Message:     "獲取頻道列表成功",
-		Displayable: false,
-	})
+	SuccessResponse(c, channels, "獲取頻道列表成功")
 }
 
 // GetChannelByID 獲取單個頻道信息
@@ -68,17 +60,16 @@ func (cc *ChannelController) GetChannelByID(c *gin.Context) {
 	// 從 JWT 中獲取用戶ID
 	userID, _, err := utils.GetUserIDFromHeader(c)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{Code: utils.ErrUnauthorized})
+		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{Code: models.ErrUnauthorized, Message: "需要認證"})
 		return
 	}
 
 	// 獲取頻道ID
 	channelID := c.Param("channel_id")
 	if channelID == "" {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
-			Code:        utils.ErrInvalidParams,
-			Message:     "頻道ID不能為空",
-			Displayable: false,
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "頻道ID不能為空",
 		})
 		return
 	}
@@ -86,29 +77,21 @@ func (cc *ChannelController) GetChannelByID(c *gin.Context) {
 	// 驗證頻道ID格式
 	_, err = primitive.ObjectIDFromHex(channelID)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
-			Code:        utils.ErrInvalidParams,
-			Message:     "無效的頻道ID格式",
-			Displayable: false,
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "無效的頻道ID格式",
 		})
 		return
 	}
 
 	// 獲取頻道信息
-	channel, err := cc.channelService.GetChannelByID(userID, channelID)
-	if err != nil {
-		utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{
-			Code:        utils.ErrInternalServer,
-			Message:     "獲取頻道信息失敗: " + err.Error(),
-			Displayable: false,
-		})
+	channel, msgOpt := cc.channelService.GetChannelByID(userID, channelID)
+	if msgOpt != nil {
+		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
 		return
 	}
 
-	utils.SuccessResponse(c, channel, utils.MessageOptions{
-		Message:     "獲取頻道信息成功",
-		Displayable: false,
-	})
+	SuccessResponse(c, channel, "獲取頻道信息成功")
 }
 
 // CreateChannel 創建新頻道
@@ -116,17 +99,16 @@ func (cc *ChannelController) CreateChannel(c *gin.Context) {
 	// 取得使用者ID
 	userID, _, err := utils.GetUserIDFromHeader(c)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{Code: utils.ErrUnauthorized})
+		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{Code: models.ErrUnauthorized})
 		return
 	}
 
 	// 獲取伺服器ID
 	serverID := c.Param("server_id")
 	if serverID == "" {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
-			Code:        utils.ErrInvalidParams,
-			Message:     "伺服器ID不能為空",
-			Displayable: false,
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "伺服器ID不能為空",
 		})
 		return
 	}
@@ -134,10 +116,9 @@ func (cc *ChannelController) CreateChannel(c *gin.Context) {
 	// 驗證伺服器ID格式
 	_, err = primitive.ObjectIDFromHex(serverID)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
-			Code:        utils.ErrInvalidParams,
-			Message:     "無效的伺服器ID格式",
-			Displayable: false,
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "無效的伺服器ID格式",
 		})
 		return
 	}
@@ -145,20 +126,19 @@ func (cc *ChannelController) CreateChannel(c *gin.Context) {
 	// 解析請求體
 	var req CreateChannelRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
-			Code:        utils.ErrInvalidParams,
-			Message:     "無效的請求格式: " + err.Error(),
-			Displayable: false,
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "無效的請求格式",
+			Details: err.Error(),
 		})
 		return
 	}
 
 	// 驗證請求數據
 	if req.Name == "" {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
-			Code:        utils.ErrInvalidParams,
-			Message:     "頻道名稱不能為空",
-			Displayable: false,
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "頻道名稱不能為空",
 		})
 		return
 	}
@@ -170,10 +150,10 @@ func (cc *ChannelController) CreateChannel(c *gin.Context) {
 	// 轉換伺服器ID
 	serverObjID, err := primitive.ObjectIDFromHex(serverID)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
-			Code:        utils.ErrInvalidParams,
-			Message:     "無效的伺服器ID: " + err.Error(),
-			Displayable: false,
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "無效的伺服器ID",
+			Details: err.Error(),
 		})
 		return
 	}
@@ -189,10 +169,10 @@ func (cc *ChannelController) CreateChannel(c *gin.Context) {
 	if req.CategoryID != "" {
 		categoryObjID, err := primitive.ObjectIDFromHex(req.CategoryID)
 		if err != nil {
-			utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
-				Code:        utils.ErrInvalidParams,
-				Message:     "無效的分類ID: " + err.Error(),
-				Displayable: false,
+			ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
+				Code:    models.ErrInvalidParams,
+				Message: "無效的分類ID",
+				Details: err.Error(),
 			})
 			return
 		}
@@ -200,21 +180,16 @@ func (cc *ChannelController) CreateChannel(c *gin.Context) {
 	}
 
 	// 創建頻道
-	createdChannel, err := cc.channelService.CreateChannel(userID, channel)
-	if err != nil {
-		utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{
-			Code:        utils.ErrInternalServer,
-			Message:     "創建頻道失敗: " + err.Error(),
-			Displayable: false,
-		})
+	createdChannel, msgOpt := cc.channelService.CreateChannel(userID, channel)
+	if msgOpt != nil {
+		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
 		return
 	}
 
 	c.JSON(http.StatusCreated, utils.APIResponse{
-		Status:      "success",
-		Message:     "創建頻道成功",
-		Displayable: false,
-		Data:        createdChannel,
+		Status:  "success",
+		Message: "創建頻道成功",
+		Data:    createdChannel,
 	})
 }
 
@@ -223,17 +198,16 @@ func (cc *ChannelController) UpdateChannel(c *gin.Context) {
 	// 取得使用者ID
 	userID, _, err := utils.GetUserIDFromHeader(c)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{Code: utils.ErrUnauthorized})
+		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{Code: models.ErrUnauthorized})
 		return
 	}
 
 	// 獲取頻道ID
 	channelID := c.Param("channel_id")
 	if channelID == "" {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
-			Code:        utils.ErrInvalidParams,
-			Message:     "頻道ID不能為空",
-			Displayable: false,
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "頻道ID不能為空",
 		})
 		return
 	}
@@ -241,10 +215,10 @@ func (cc *ChannelController) UpdateChannel(c *gin.Context) {
 	// 驗證頻道ID格式
 	_, err = primitive.ObjectIDFromHex(channelID)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
-			Code:        utils.ErrInvalidParams,
-			Message:     "無效的頻道ID格式",
-			Displayable: false,
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "無效的頻道ID格式",
+			Details: err.Error(),
 		})
 		return
 	}
@@ -252,10 +226,10 @@ func (cc *ChannelController) UpdateChannel(c *gin.Context) {
 	// 解析請求體
 	var req UpdateChannelRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
-			Code:        utils.ErrInvalidParams,
-			Message:     "無效的請求格式: " + err.Error(),
-			Displayable: false,
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "無效的請求格式",
+			Details: err.Error(),
 		})
 		return
 	}
@@ -271,10 +245,10 @@ func (cc *ChannelController) UpdateChannel(c *gin.Context) {
 	if req.CategoryID != "" {
 		categoryObjID, err := primitive.ObjectIDFromHex(req.CategoryID)
 		if err != nil {
-			utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
-				Code:        utils.ErrInvalidParams,
-				Message:     "無效的分類ID: " + err.Error(),
-				Displayable: false,
+			ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
+				Code:    models.ErrInvalidParams,
+				Message: "無效的分類ID",
+				Details: err.Error(),
 			})
 			return
 		}
@@ -283,29 +257,21 @@ func (cc *ChannelController) UpdateChannel(c *gin.Context) {
 
 	// 檢查是否有字段需要更新
 	if len(updates) == 0 {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
-			Code:        utils.ErrInvalidParams,
-			Message:     "沒有提供要更新的字段",
-			Displayable: false,
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "沒有提供要更新的字段",
 		})
 		return
 	}
 
 	// 更新頻道
-	updatedChannel, err := cc.channelService.UpdateChannel(userID, channelID, updates)
-	if err != nil {
-		utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{
-			Code:        utils.ErrInternalServer,
-			Message:     "更新頻道失敗: " + err.Error(),
-			Displayable: false,
-		})
+	updatedChannel, msgOpt := cc.channelService.UpdateChannel(userID, channelID, updates)
+	if msgOpt != nil {
+		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
 		return
 	}
 
-	utils.SuccessResponse(c, updatedChannel, utils.MessageOptions{
-		Message:     "更新頻道成功",
-		Displayable: false,
-	})
+	SuccessResponse(c, updatedChannel, "更新頻道成功")
 }
 
 // DeleteChannel 刪除頻道
@@ -313,17 +279,16 @@ func (cc *ChannelController) DeleteChannel(c *gin.Context) {
 	// 取得使用者ID
 	userID, _, err := utils.GetUserIDFromHeader(c)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{Code: utils.ErrUnauthorized})
+		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{Code: models.ErrUnauthorized})
 		return
 	}
 
 	// 獲取頻道ID
 	channelID := c.Param("channel_id")
 	if channelID == "" {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
-			Code:        utils.ErrInvalidParams,
-			Message:     "頻道ID不能為空",
-			Displayable: false,
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "頻道ID不能為空",
 		})
 		return
 	}
@@ -331,29 +296,22 @@ func (cc *ChannelController) DeleteChannel(c *gin.Context) {
 	// 驗證頻道ID格式
 	_, err = primitive.ObjectIDFromHex(channelID)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
-			Code:        utils.ErrInvalidParams,
-			Message:     "無效的頻道ID格式",
-			Displayable: false,
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "無效的頻道ID格式",
+			Details: err.Error(),
 		})
 		return
 	}
 
 	// 刪除頻道
-	err = cc.channelService.DeleteChannel(userID, channelID)
-	if err != nil {
-		utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{
-			Code:        utils.ErrInternalServer,
-			Message:     "刪除頻道失敗: " + err.Error(),
-			Displayable: false,
-		})
+	msgOpt := cc.channelService.DeleteChannel(userID, channelID)
+	if msgOpt != nil {
+		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
 		return
 	}
 
-	utils.SuccessResponse(c, nil, utils.MessageOptions{
-		Message:     "刪除頻道成功",
-		Displayable: false,
-	})
+	SuccessResponse(c, nil, "刪除頻道成功")
 }
 
 // Request DTOs for Channel operations

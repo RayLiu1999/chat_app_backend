@@ -32,6 +32,7 @@ type ServiceContainer struct {
 
 // Controller容器
 type ControllerContainer struct {
+	HealthController  *controllers.HealthController
 	UserController    *controllers.UserController
 	ChatController    *controllers.ChatController
 	ServerController  *controllers.ServerController
@@ -97,6 +98,7 @@ func initServices(cfg *config.Config, providers *ProviderContainer, repos *Repos
 // 初始化Controllers
 func initControllers(cfg *config.Config, mongodb *providers.MongoWrapper, services *ServiceContainer, repos *RepositoryContainer) *ControllerContainer {
 	return &ControllerContainer{
+		HealthController:  controllers.NewHealthController(cfg, mongodb),
 		UserController:    controllers.NewUserController(cfg, mongodb.DB, services.UserService),
 		ChatController:    controllers.NewChatController(cfg, mongodb.DB, services.ChatService, services.UserService),
 		ServerController:  controllers.NewServerController(cfg, mongodb.DB, services.ServerService),

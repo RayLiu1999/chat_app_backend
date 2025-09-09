@@ -108,11 +108,17 @@ func connectMongoDB() (*mongo.Client, *mongo.Database, error) {
 		// 優先使用環境變數中的完整 MONGO_URI
 		mongoURI := config.AppConfig.Database.MongoURI
 		dbName := config.AppConfig.Database.MongoDBName
+		username := config.AppConfig.Database.MongoUsername
+		password := config.AppConfig.Database.MongoPassword
+		dbAuthSource := config.AppConfig.Database.MongoAuthSource
+
+		mongoURL := fmt.Sprintf("mongodb://%s:%s@%s/%s?authSource=%s",
+			username, password, mongoURI, dbName, dbAuthSource)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
+		client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURL))
 		if err != nil {
 			mongoErr = err
 			return

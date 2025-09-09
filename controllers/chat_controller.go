@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"chat_app_backend/config"
+	"chat_app_backend/models"
 	"chat_app_backend/services"
 	"chat_app_backend/utils"
 	"net/http"
@@ -54,14 +55,14 @@ func (cc *ChatController) HandleConnections(c *gin.Context) {
 	// 取得 userID
 	userID, _, err := utils.GetUserFromToken(token)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{Code: utils.ErrInvalidToken})
+		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{Code: models.ErrInvalidToken})
 		return
 	}
 
 	// 升級 HTTP 連接為 WebSocket
 	ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{Code: utils.ErrInternalServer})
+		ErrorResponse(c, http.StatusInternalServerError, models.MessageOptions{Code: models.ErrInternalServer})
 		return
 	}
 
@@ -74,25 +75,25 @@ func (cc *ChatController) HandleConnections(c *gin.Context) {
 func (cc *ChatController) GetDMRoomList(c *gin.Context) {
 	userID, _, err := utils.GetUserIDFromHeader(c)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{Code: utils.ErrUnauthorized})
+		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{Code: models.ErrUnauthorized})
 		return
 	}
 
 	// 獲取聊天列表
-	dmRoomResponseList, err := cc.chatService.GetDMRoomResponseList(userID, false)
-	if err != nil {
-		utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{Code: utils.ErrInternalServer, Message: "獲取聊天列表失敗"})
+	dmRoomResponseList, msgOpt := cc.chatService.GetDMRoomResponseList(userID, false)
+	if msgOpt != nil {
+		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
 		return
 	}
 
-	utils.SuccessResponse(c, dmRoomResponseList, utils.MessageOptions{Message: "獲取聊天列表成功"})
+	SuccessResponse(c, dmRoomResponseList, "獲取聊天列表成功")
 }
 
 // UpdateDMRoom 更新聊天列表的狀態（標記為已刪除或取消刪除）
 func (cc *ChatController) UpdateDMRoom(c *gin.Context) {
 	userID, _, err := utils.GetUserIDFromHeader(c)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{Code: utils.ErrUnauthorized})
+		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{Code: models.ErrUnauthorized})
 		return
 	}
 
@@ -101,25 +102,25 @@ func (cc *ChatController) UpdateDMRoom(c *gin.Context) {
 		IsHidden bool   `json:"is_hidden"`
 	}
 	if err := c.ShouldBindJSON(&requestBody); err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{Code: utils.ErrInvalidParams})
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{Code: models.ErrInvalidParams})
 		return
 	}
 
 	// 使用service層的業務邏輯
-	err = cc.chatService.UpdateDMRoom(userID, requestBody.RoomID, requestBody.IsHidden)
-	if err != nil {
-		utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{Code: utils.ErrInternalServer, Message: err.Error()})
+	msgOpt := cc.chatService.UpdateDMRoom(userID, requestBody.RoomID, requestBody.IsHidden)
+	if msgOpt != nil {
+		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
 		return
 	}
 
-	utils.SuccessResponse(c, nil, utils.MessageOptions{Message: "聊天列表保存成功"})
+	SuccessResponse(c, nil, "聊天列表保存成功")
 }
 
 // 建立私聊房間
 func (cc *ChatController) CreateDMRoom(c *gin.Context) {
 	userID, _, err := utils.GetUserIDFromHeader(c)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{Code: utils.ErrUnauthorized})
+		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{Code: models.ErrUnauthorized})
 		return
 	}
 
@@ -128,25 +129,25 @@ func (cc *ChatController) CreateDMRoom(c *gin.Context) {
 		ChatWithUserID string `json:"chat_with_user_id"`
 	}
 	if err := c.ShouldBindJSON(&requestBody); err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{Code: utils.ErrInvalidParams})
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{Code: models.ErrInvalidParams})
 		return
 	}
 
 	// 使用service層的業務邏輯
-	response, err := cc.chatService.CreateDMRoom(userID, requestBody.ChatWithUserID)
-	if err != nil {
-		utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{Code: utils.ErrInternalServer, Message: err.Error()})
+	response, msgOpt := cc.chatService.CreateDMRoom(userID, requestBody.ChatWithUserID)
+	if msgOpt != nil {
+		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
 		return
 	}
 
-	utils.SuccessResponse(c, response, utils.MessageOptions{Message: "聊天列表已創建"})
+	SuccessResponse(c, response, "聊天列表已創建")
 }
 
 // GetDMMessages 獲取私聊訊息
 func (cc *ChatController) GetDMMessages(c *gin.Context) {
 	userID, _, err := utils.GetUserIDFromHeader(c)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{Code: utils.ErrUnauthorized})
+		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{Code: models.ErrUnauthorized})
 		return
 	}
 
@@ -156,29 +157,28 @@ func (cc *ChatController) GetDMMessages(c *gin.Context) {
 	limit := c.Query("limit")
 
 	// 使用service層的業務邏輯
-	messages, err := cc.chatService.GetDMMessages(userID, roomID, before, after, limit)
-	if err != nil {
-		utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{Code: utils.ErrInternalServer, Message: err.Error()})
+	messages, msgOpt := cc.chatService.GetDMMessages(userID, roomID, before, after, limit)
+	if msgOpt != nil {
+		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
 		return
 	}
 
-	utils.SuccessResponse(c, messages, utils.MessageOptions{Message: "獲取訊息成功"})
+	SuccessResponse(c, messages, "獲取訊息成功")
 }
 
 // GetChannelMessages 獲取頻道訊息
 func (cc *ChatController) GetChannelMessages(c *gin.Context) {
 	userID, _, err := utils.GetUserIDFromHeader(c)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{Code: utils.ErrUnauthorized})
+		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{Code: models.ErrUnauthorized})
 		return
 	}
 
 	channelID := c.Param("channel_id")
 	if channelID == "" {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
-			Code:        utils.ErrInvalidParams,
-			Message:     "頻道ID不能為空",
-			Displayable: false,
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "頻道ID不能為空",
 		})
 		return
 	}
@@ -188,15 +188,11 @@ func (cc *ChatController) GetChannelMessages(c *gin.Context) {
 	limit := c.Query("limit")
 
 	// 使用service層的業務邏輯
-	messages, err := cc.chatService.GetChannelMessages(userID, channelID, before, after, limit)
-	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
-			Code:        utils.ErrInternalServer,
-			Message:     err.Error(),
-			Displayable: false,
-		})
+	messages, msgOpt := cc.chatService.GetChannelMessages(userID, channelID, before, after, limit)
+	if msgOpt != nil {
+		ErrorResponse(c, http.StatusBadRequest, *msgOpt)
 		return
 	}
 
-	utils.SuccessResponse(c, messages, utils.MessageOptions{Message: "獲取頻道訊息成功"})
+	SuccessResponse(c, messages, "獲取頻道訊息成功")
 }

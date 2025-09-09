@@ -3,6 +3,7 @@ package providers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"time"
 
@@ -158,6 +159,7 @@ func (o *ODM) FindByID(ctx context.Context, ID string, model Model) error {
 
 	filter := bson.M{"_id": objectID}
 	err = o.Collection(model).FindOne(ctx, filter).Decode(model)
+	fmt.Printf("Error: %v\n", err)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return ErrDocumentNotFound

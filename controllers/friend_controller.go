@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"chat_app_backend/config"
+	"chat_app_backend/models"
 	"chat_app_backend/services"
 	"chat_app_backend/utils"
 
@@ -41,45 +42,52 @@ const (
 func (uc *FriendController) GetFriendList(c *gin.Context) {
 	userID, _, err := utils.GetUserIDFromHeader(c)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{Code: utils.ErrUnauthorized, Displayable: true})
+		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{Code: models.ErrUnauthorized})
 		return
 	}
 
 	// 使用service層的業務邏輯
-	friends, err := uc.friendService.GetFriendList(userID)
-	if err != nil {
-		utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{Code: utils.ErrInternalServer, Message: err.Error()})
+	friends, msgOpt := uc.friendService.GetFriendList(userID)
+	if msgOpt != nil {
+		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
 		return
 	}
 
-	utils.SuccessResponse(c, friends, utils.MessageOptions{Message: "好友資訊獲取成功"})
+	SuccessResponse(c, friends, "好友列表獲取成功")
 }
 
 // 建立好友請求
 func (uc *FriendController) AddFriendRequest(c *gin.Context) {
 	userID, _, err := utils.GetUserIDFromHeader(c)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{Code: utils.ErrUnauthorized})
+		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{Code: models.ErrUnauthorized})
 		return
 	}
 
-	username := c.Param("username")
+	// 綁定請求參數
+	var friendRequest models.FriendRequest
+	if err := c.ShouldBindJSON(&friendRequest); err != nil {
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{Code: models.ErrInvalidParams})
+		return
+	}
+
+	username := friendRequest.Username
 
 	// 使用service層的業務邏輯
-	err = uc.friendService.AddFriendRequest(userID, username)
-	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{Code: utils.ErrInvalidParams, Message: err.Error()})
+	res := uc.friendService.AddFriendRequest(userID, username)
+	if res.Code != "" {
+		ErrorResponse(c, http.StatusBadRequest, *res)
 		return
 	}
 
-	utils.SuccessResponse(c, nil, utils.MessageOptions{Message: "好友請求已發送"})
+	SuccessResponse(c, nil, "好友請求已發送")
 }
 
 // 更新好友狀態
 func (uc *FriendController) UpdateFriendStatus(c *gin.Context) {
 	userID, _, err := utils.GetUserIDFromHeader(c)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{Code: utils.ErrUnauthorized})
+		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{Code: models.ErrUnauthorized})
 		return
 	}
 
@@ -88,14 +96,14 @@ func (uc *FriendController) UpdateFriendStatus(c *gin.Context) {
 	// 取得put中status資料
 	var requestBody FriendRequestStatus
 	if err := c.ShouldBindJSON(&requestBody); err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{Code: utils.ErrInvalidParams})
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{Code: models.ErrInvalidParams})
 		return
 	}
 
 	// 使用service層的業務邏輯
-	err = uc.friendService.UpdateFriendStatus(userID, friendID, requestBody.Status)
-	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{Code: utils.ErrInvalidParams, Message: err.Error()})
+	msgOpt := uc.friendService.UpdateFriendStatus(userID, friendID, requestBody.Status)
+	if msgOpt != nil {
+		ErrorResponse(c, http.StatusBadRequest, *msgOpt)
 		return
 	}
 
@@ -106,5 +114,5 @@ func (uc *FriendController) UpdateFriendStatus(c *gin.Context) {
 		message = "已拒絕好友請求"
 	}
 
-	utils.SuccessResponse(c, nil, utils.MessageOptions{Message: message})
+	SuccessResponse(c, nil, message)
 }

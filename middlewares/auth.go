@@ -1,6 +1,8 @@
 package middlewares
 
 import (
+	"chat_app_backend/controllers"
+	"chat_app_backend/models"
 	"chat_app_backend/utils"
 	"net/http"
 
@@ -19,7 +21,7 @@ func Auth() gin.HandlerFunc {
 			// 判斷是否帶bearer token
 			accessToken, err = utils.GetAccessTokenByHeader(c)
 			if err != nil {
-				utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{Code: utils.ErrUnauthorized})
+				controllers.ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{Code: models.ErrUnauthorized})
 				c.Abort()
 				return
 			}
@@ -27,7 +29,7 @@ func Auth() gin.HandlerFunc {
 
 		res, err := utils.ValidateAccessToken(accessToken)
 		if err != nil || !res {
-			utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{Code: utils.ErrInvalidToken})
+			controllers.ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{Code: models.ErrInvalidToken})
 			c.Abort()
 			return
 		}

@@ -61,17 +61,25 @@ func (ss *ServerService) getUserPictureURL(user *models.User) string {
 }
 
 // GetServerListResponse 獲取用戶的伺服器列表回應格式
-func (ss *ServerService) GetServerListResponse(userID string) ([]models.ServerResponse, error) {
+func (ss *ServerService) GetServerListResponse(userID string) ([]models.ServerResponse, *models.MessageOptions) {
 	// 驗證用戶是否存在
 	_, err := ss.userRepo.GetUserById(userID)
 	if err != nil {
-		return nil, fmt.Errorf("用戶不存在: %v", err)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrUserNotFound,
+			Details: err,
+			Message: "用戶不存在",
+		}
 	}
 
 	// 獲取用戶的伺服器列表
 	serverMembers, err := ss.serverMemberRepo.GetUserServers(userID)
 	if err != nil {
-		return nil, fmt.Errorf("獲取伺服器列表失敗: %v", err)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
+			Message: "獲取伺服器列表失敗",
+		}
 	}
 
 	serverIDs := make([]primitive.ObjectID, len(serverMembers))
@@ -81,7 +89,14 @@ func (ss *ServerService) GetServerListResponse(userID string) ([]models.ServerRe
 
 	// 獲取伺服器詳細信息
 	var servers []models.Server
-	ss.odm.Find(context.Background(), bson.M{"_id": bson.M{"$in": serverIDs}}, &servers)
+	err = ss.odm.Find(context.Background(), bson.M{"_id": bson.M{"$in": serverIDs}}, &servers)
+	if err != nil {
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
+			Message: "獲取伺服器詳細信息失敗",
+		}
+	}
 
 	// 轉換為響應格式
 	serverResponses := make([]models.ServerResponse, len(servers))
@@ -106,24 +121,40 @@ func (ss *ServerService) GetServerListResponse(userID string) ([]models.ServerRe
 }
 
 // CreateServer 創建伺服器
-func (ss *ServerService) CreateServer(userID string, name string, file multipart.File, header *multipart.FileHeader) (*models.ServerResponse, error) {
+func (ss *ServerService) CreateServer(userID string, name string, file multipart.File, header *multipart.FileHeader) (*models.ServerResponse, *models.MessageOptions) {
 	// 驗證用戶是否存在
 	_, err := ss.userRepo.GetUserById(userID)
 	if err != nil {
-		return nil, fmt.Errorf("用戶不存在: %v", err)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrUserNotFound,
+			Details: err,
+			Message: "用戶不存在",
+		}
 	}
 
 	// 將string userID轉換為ObjectID
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return nil, fmt.Errorf("無效的用戶ID: %v", err)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Details: err,
+			Message: "無效的用戶ID格式",
+		}
 	}
 
 	// 上傳檔案 - 使用伺服器專用配置
-	serverConfig := models.GetServerUploadConfig()
-	uploadResult, err := ss.fileUploadService.UploadFileWithConfig(file, header, userID, serverConfig)
-	if err != nil {
-		return nil, fmt.Errorf("伺服器圖片上傳失敗: %v", err)
+	uploadResult := &models.FileResult{}
+	if file != nil {
+		serverConfig := models.GetServerUploadConfig()
+		result, msgOpt := ss.fileUploadService.UploadFileWithConfig(file, header, userID, serverConfig)
+		if msgOpt != nil {
+			return nil, &models.MessageOptions{
+				Code:    models.ErrInternalServer,
+				Details: msgOpt.Details,
+				Message: "伺服器圖片上傳失敗: " + msgOpt.Message,
+			}
+		}
+		uploadResult = result
 	}
 
 	// 創建伺服器
@@ -146,7 +177,11 @@ func (ss *ServerService) CreateServer(userID string, name string, file multipart
 		if deleteErr := ss.fileUploadService.DeleteFile(uploadResult.FilePath); deleteErr != nil {
 			fmt.Printf("清理上傳檔案失敗: %v\n", deleteErr)
 		}
-		return nil, fmt.Errorf("創建伺服器失敗: %v", err)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
+			Message: "創建伺服器失敗",
+		}
 	}
 
 	utils.PrettyPrint("Created Server", createdServer)
@@ -283,17 +318,25 @@ func (ss *ServerService) getDefaultCategoriesByServerID(serverID string) (*model
 }
 
 // SearchPublicServers 搜尋公開伺服器
-func (ss *ServerService) SearchPublicServers(userID string, request models.ServerSearchRequest) (*models.ServerSearchResults, error) {
+func (ss *ServerService) SearchPublicServers(userID string, request models.ServerSearchRequest) (*models.ServerSearchResults, *models.MessageOptions) {
 	// 驗證用戶是否存在
 	_, err := ss.userRepo.GetUserById(userID)
 	if err != nil {
-		return nil, fmt.Errorf("用戶不存在: %v", err)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrNotFound,
+			Message: "用戶不存在",
+			Details: err.Error(),
+		}
 	}
 
 	// 執行搜尋
 	servers, totalCount, err := ss.serverRepo.SearchPublicServers(request)
 	if err != nil {
-		return nil, fmt.Errorf("搜尋伺服器失敗: %v", err)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "搜尋伺服器失敗",
+			Details: err.Error(),
+		}
 	}
 
 	// 轉換為響應格式
@@ -349,35 +392,54 @@ func (ss *ServerService) SearchPublicServers(userID string, request models.Serve
 }
 
 // UpdateServer 更新伺服器信息
-func (ss *ServerService) UpdateServer(userID string, serverID string, updates map[string]interface{}) (*models.ServerResponse, error) {
+func (ss *ServerService) UpdateServer(userID string, serverID string, updates map[string]interface{}) (*models.ServerResponse, *models.MessageOptions) {
 	// 驗證用戶是否存在
 	_, err := ss.userRepo.GetUserById(userID)
 	if err != nil {
-		return nil, fmt.Errorf("用戶不存在: %v", err)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrNotFound,
+			Message: "用戶不存在",
+			Details: err.Error(),
+		}
 	}
 
 	// 獲取伺服器信息
 	server, err := ss.serverRepo.GetServerByID(serverID)
 	if err != nil {
-		return nil, fmt.Errorf("伺服器不存在: %v", err)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrNotFound,
+			Message: "伺服器不存在",
+			Details: err.Error(),
+		}
 	}
 
 	// 檢查用戶是否有權限更新（擁有者或管理員）
 	if server.OwnerID.Hex() != userID {
 		// 可以在未來添加管理員權限檢查
-		return nil, fmt.Errorf("無權限更新此伺服器")
+		return nil, &models.MessageOptions{
+			Code:    models.ErrUnauthorized,
+			Message: "無權限更新此伺服器",
+		}
 	}
 
 	// 執行更新
 	err = ss.serverRepo.UpdateServer(serverID, updates)
 	if err != nil {
-		return nil, fmt.Errorf("更新伺服器失敗: %v", err)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "更新伺服器失敗",
+			Details: err.Error(),
+		}
 	}
 
 	// 獲取更新後的伺服器信息
 	updatedServer, err := ss.serverRepo.GetServerByID(serverID)
 	if err != nil {
-		return nil, fmt.Errorf("獲取更新後伺服器信息失敗: %v", err)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "獲取更新後伺服器信息失敗",
+			Details: err.Error(),
+		}
 	}
 
 	// 獲取圖片URL
@@ -397,22 +459,33 @@ func (ss *ServerService) UpdateServer(userID string, serverID string, updates ma
 }
 
 // DeleteServer 刪除伺服器
-func (ss *ServerService) DeleteServer(userID string, serverID string) error {
+func (ss *ServerService) DeleteServer(userID string, serverID string) *models.MessageOptions {
 	// 驗證用戶是否存在
 	_, err := ss.userRepo.GetUserById(userID)
 	if err != nil {
-		return fmt.Errorf("用戶不存在: %v", err)
+		return &models.MessageOptions{
+			Code:    models.ErrNotFound,
+			Message: "用戶不存在",
+			Details: err.Error(),
+		}
 	}
 
 	// 獲取伺服器信息
 	server, err := ss.serverRepo.GetServerByID(serverID)
 	if err != nil {
-		return fmt.Errorf("伺服器不存在: %v", err)
+		return &models.MessageOptions{
+			Code:    models.ErrNotFound,
+			Message: "伺服器不存在",
+			Details: err.Error(),
+		}
 	}
 
 	// 檢查用戶是否為擁有者
 	if server.OwnerID.Hex() != userID {
-		return fmt.Errorf("只有伺服器擁有者可以刪除伺服器")
+		return &models.MessageOptions{
+			Code:    models.ErrUnauthorized,
+			Message: "只有伺服器擁有者可以刪除伺服器",
+		}
 	}
 
 	// 刪除所有相關的伺服器成員記錄
@@ -432,38 +505,62 @@ func (ss *ServerService) DeleteServer(userID string, serverID string) error {
 
 	// 刪除伺服器圖片
 	if !server.ImageID.IsZero() {
-		if err := ss.fileUploadService.DeleteFileByID(server.ImageID.Hex(), userID); err != nil {
-			fmt.Printf("刪除伺服器圖片失敗: %v\n", err)
+		if msgOpt := ss.fileUploadService.DeleteFileByID(server.ImageID.Hex(), userID); msgOpt != nil {
+			fmt.Printf("刪除伺服器圖片失敗: %v\n", msgOpt.Details)
 		}
 	}
 
 	// 最後刪除伺服器
-	return ss.serverRepo.DeleteServer(serverID)
+	err = ss.serverRepo.DeleteServer(serverID)
+	if err != nil {
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "刪除伺服器失敗",
+			Details: err.Error(),
+		}
+	}
+
+	return nil
 }
 
 // GetServerByID 根據ID獲取伺服器信息
-func (ss *ServerService) GetServerByID(userID string, serverID string) (*models.ServerResponse, error) {
+func (ss *ServerService) GetServerByID(userID string, serverID string) (*models.ServerResponse, *models.MessageOptions) {
 	// 驗證用戶是否存在
 	_, err := ss.userRepo.GetUserById(userID)
 	if err != nil {
-		return nil, fmt.Errorf("用戶不存在: %v", err)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrNotFound,
+			Message: "用戶不存在",
+			Details: err.Error(),
+		}
 	}
 
 	// 檢查用戶是否有權限查看此伺服器（是成員或伺服器是公開的）
 	isMember, err := ss.serverMemberRepo.IsMemberOfServer(serverID, userID)
 	if err != nil {
-		return nil, fmt.Errorf("檢查成員身份失敗: %v", err)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "檢查成員身份失敗",
+			Details: err.Error(),
+		}
 	}
 
 	// 獲取伺服器信息
 	server, err := ss.serverRepo.GetServerByID(serverID)
 	if err != nil {
-		return nil, fmt.Errorf("伺服器不存在: %v", err)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrNotFound,
+			Message: "伺服器不存在",
+			Details: err.Error(),
+		}
 	}
 
 	// 如果不是成員且伺服器不公開，則無權限查看
 	if !isMember && !server.IsPublic {
-		return nil, fmt.Errorf("無權限查看此伺服器")
+		return nil, &models.MessageOptions{
+			Code:    models.ErrUnauthorized,
+			Message: "無權限查看此伺服器",
+		}
 	}
 
 	// 獲取圖片URL
@@ -483,28 +580,43 @@ func (ss *ServerService) GetServerByID(userID string, serverID string) (*models.
 }
 
 // GetServerDetailByID 獲取伺服器詳細信息（包含成員和頻道列表）
-func (ss *ServerService) GetServerDetailByID(userID string, serverID string) (*models.ServerDetailResponse, error) {
+func (ss *ServerService) GetServerDetailByID(userID string, serverID string) (*models.ServerDetailResponse, *models.MessageOptions) {
 	// 驗證用戶是否存在
 	_, err := ss.userRepo.GetUserById(userID)
 	if err != nil {
-		return nil, fmt.Errorf("用戶不存在: %v", err)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrNotFound,
+			Message: "用戶不存在",
+			Details: err.Error(),
+		}
 	}
 
 	// 檢查用戶是否有權限查看此伺服器（是成員或伺服器是公開的）
 	isMember, err := ss.serverMemberRepo.IsMemberOfServer(serverID, userID)
 	if err != nil {
-		return nil, fmt.Errorf("檢查成員身份失敗: %v", err)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "檢查成員身份失敗",
+			Details: err.Error(),
+		}
 	}
 
 	// 獲取伺服器信息
 	server, err := ss.serverRepo.GetServerByID(serverID)
 	if err != nil {
-		return nil, fmt.Errorf("伺服器不存在: %v", err)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrNotFound,
+			Message: "伺服器不存在",
+			Details: err.Error(),
+		}
 	}
 
 	// 如果不是成員且伺服器不公開，則無權限查看詳細信息
 	if !isMember && !server.IsPublic {
-		return nil, fmt.Errorf("無權限查看此伺服器")
+		return nil, &models.MessageOptions{
+			Code:    models.ErrUnauthorized,
+			Message: "無權限查看此伺服器",
+		}
 	}
 
 	// 獲取圖片URL
@@ -520,7 +632,11 @@ func (ss *ServerService) GetServerDetailByID(userID string, serverID string) (*m
 	if isMember {
 		serverMembers, _, err := ss.serverMemberRepo.GetServerMembers(serverID, 1, 100)
 		if err != nil {
-			return nil, fmt.Errorf("獲取成員列表失敗: %v", err)
+			return nil, &models.MessageOptions{
+				Code:    models.ErrInternalServer,
+				Message: "獲取成員列表失敗",
+				Details: err.Error(),
+			}
 		}
 
 		// 獲取所有成員的用戶信息
@@ -531,7 +647,11 @@ func (ss *ServerService) GetServerDetailByID(userID string, serverID string) (*m
 
 		users, err := ss.userRepo.GetUserListByIds(userIDs)
 		if err != nil {
-			return nil, fmt.Errorf("獲取用戶信息失敗: %v", err)
+			return nil, &models.MessageOptions{
+				Code:    models.ErrInternalServer,
+				Message: "獲取用戶信息失敗",
+				Details: err.Error(),
+			}
 		}
 
 		// 創建用戶信息映射
@@ -574,7 +694,11 @@ func (ss *ServerService) GetServerDetailByID(userID string, serverID string) (*m
 	if isMember {
 		serverChannels, err := ss.channelRepo.GetChannelsByServerID(serverID)
 		if err != nil {
-			return nil, fmt.Errorf("獲取頻道列表失敗: %v", err)
+			return nil, &models.MessageOptions{
+				Code:    models.ErrInternalServer,
+				Message: "獲取頻道列表失敗",
+				Details: err.Error(),
+			}
 		}
 
 		for _, channel := range serverChannels {
@@ -601,51 +725,88 @@ func (ss *ServerService) GetServerDetailByID(userID string, serverID string) (*m
 }
 
 // GetServerChannels 獲取伺服器的頻道列表
-func (ss *ServerService) GetServerChannels(serverID string) ([]models.Channel, error) {
-	return ss.channelRepo.GetChannelsByServerID(serverID)
+func (ss *ServerService) GetServerChannels(serverID string) ([]models.Channel, *models.MessageOptions) {
+	channels, err := ss.channelRepo.GetChannelsByServerID(serverID)
+	if err != nil {
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "獲取頻道列表失敗",
+			Details: err.Error(),
+		}
+	}
+	return channels, nil
 }
 
 // JoinServer 請求加入伺服器
-func (ss *ServerService) JoinServer(userID string, serverID string) error {
+func (ss *ServerService) JoinServer(userID string, serverID string) *models.MessageOptions {
 	// 驗證用戶是否存在
 	_, err := ss.userRepo.GetUserById(userID)
 	if err != nil {
-		return fmt.Errorf("用戶不存在: %v", err)
+		return &models.MessageOptions{
+			Code:    models.ErrNotFound,
+			Message: "用戶不存在",
+			Details: err.Error(),
+		}
 	}
 
 	// 獲取伺服器信息
 	server, err := ss.serverRepo.GetServerByID(serverID)
 	if err != nil {
-		return fmt.Errorf("伺服器不存在: %v", err)
+		return &models.MessageOptions{
+			Code:    models.ErrNotFound,
+			Message: "伺服器不存在",
+			Details: err.Error(),
+		}
 	}
 
 	// 檢查伺服器是否為公開伺服器
 	if !server.IsPublic {
-		return fmt.Errorf("此伺服器不開放加入")
+		return &models.MessageOptions{
+			Code:    models.ErrForbidden,
+			Message: "此伺服器不開放加入",
+		}
 	}
 
 	// 檢查用戶是否已經是成員
 	isMember, err := ss.serverMemberRepo.IsMemberOfServer(serverID, userID)
 	if err != nil {
-		return fmt.Errorf("檢查成員身份失敗: %v", err)
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "檢查成員身份失敗",
+			Details: err.Error(),
+		}
 	}
 	if isMember {
-		return fmt.Errorf("您已經是此伺服器的成員")
+		return &models.MessageOptions{
+			Code:    models.ErrOperationFailed,
+			Message: "您已經是此伺服器的成員",
+		}
 	}
 
 	// 檢查伺服器是否已達到最大成員數限制
 	memberCount, err := ss.serverMemberRepo.GetMemberCount(serverID)
 	if err != nil {
-		return fmt.Errorf("獲取成員數量失敗: %v", err)
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "獲取成員數量失敗",
+			Details: err.Error(),
+		}
 	}
 	if int(memberCount) >= server.MaxMembers {
-		return fmt.Errorf("伺服器已達到最大成員數限制")
+		return &models.MessageOptions{
+			Code:    models.ErrForbidden,
+			Message: "伺服器已達到最大成員數限制",
+		}
 	}
 
 	// 添加用戶到伺服器（默認角色為 member）
 	err = ss.serverMemberRepo.AddMemberToServer(serverID, userID, "member")
 	if err != nil {
-		return fmt.Errorf("加入伺服器失敗: %v", err)
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "加入伺服器失敗",
+			Details: err.Error(),
+		}
 	}
 
 	// 更新伺服器成員數量快取
@@ -659,37 +820,59 @@ func (ss *ServerService) JoinServer(userID string, serverID string) error {
 }
 
 // LeaveServer 離開伺服器
-func (ss *ServerService) LeaveServer(userID string, serverID string) error {
+func (ss *ServerService) LeaveServer(userID string, serverID string) *models.MessageOptions {
 	// 驗證用戶是否存在
 	_, err := ss.userRepo.GetUserById(userID)
 	if err != nil {
-		return fmt.Errorf("用戶不存在: %v", err)
+		return &models.MessageOptions{
+			Code:    models.ErrNotFound,
+			Message: "用戶不存在",
+			Details: err.Error(),
+		}
 	}
 
 	// 獲取伺服器信息
 	server, err := ss.serverRepo.GetServerByID(serverID)
 	if err != nil {
-		return fmt.Errorf("伺服器不存在: %v", err)
+		return &models.MessageOptions{
+			Code:    models.ErrNotFound,
+			Message: "伺服器不存在",
+			Details: err.Error(),
+		}
 	}
 
 	// 檢查用戶是否為伺服器擁有者
 	if server.OwnerID.Hex() == userID {
-		return fmt.Errorf("伺服器擁有者無法離開伺服器，請先轉移擁有權或刪除伺服器")
+		return &models.MessageOptions{
+			Code:    models.ErrForbidden,
+			Message: "伺服器擁有者無法離開伺服器，請先轉移擁有權或刪除伺服器",
+		}
 	}
 
 	// 檢查用戶是否為成員
 	isMember, err := ss.serverMemberRepo.IsMemberOfServer(serverID, userID)
 	if err != nil {
-		return fmt.Errorf("檢查成員身份失敗: %v", err)
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "檢查成員身份失敗",
+			Details: err.Error(),
+		}
 	}
 	if !isMember {
-		return fmt.Errorf("您不是此伺服器的成員")
+		return &models.MessageOptions{
+			Code:    models.ErrOperationFailed,
+			Message: "您不是此伺服器的成員",
+		}
 	}
 
 	// 從伺服器移除用戶
 	err = ss.serverMemberRepo.RemoveMemberFromServer(serverID, userID)
 	if err != nil {
-		return fmt.Errorf("離開伺服器失敗: %v", err)
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "離開伺服器失敗",
+			Details: err.Error(),
+		}
 	}
 
 	// 更新伺服器成員數量快取

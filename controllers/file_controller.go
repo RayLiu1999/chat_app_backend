@@ -2,8 +2,8 @@ package controllers
 
 import (
 	"chat_app_backend/config"
+	"chat_app_backend/models"
 	"chat_app_backend/services"
-	"chat_app_backend/utils"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -29,10 +29,9 @@ func (fc *FileController) UploadFile(c *gin.Context) {
 	// 從 JWT 中獲取用戶ID
 	userID, exists := c.Get("userID")
 	if !exists {
-		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{
-			Code:        utils.ErrUnauthorized,
-			Message:     "未找到用戶ID",
-			Displayable: false,
+		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{
+			Code:    models.ErrUnauthorized,
+			Message: "未找到用戶ID",
 		})
 		return
 	}
@@ -40,30 +39,22 @@ func (fc *FileController) UploadFile(c *gin.Context) {
 	// 獲取上傳的檔案
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
-			Code:        utils.ErrInvalidParams,
-			Message:     "無法獲取上傳檔案: " + err.Error(),
-			Displayable: false,
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "無法獲取上傳檔案: " + err.Error(),
 		})
 		return
 	}
 	defer file.Close()
 
 	// 上傳檔案
-	result, err := fc.fileUploadService.UploadFile(file, header, userID.(string))
-	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
-			Code:        utils.ErrInvalidParams,
-			Message:     "檔案上傳失敗: " + err.Error(),
-			Displayable: false,
-		})
+	result, msgOpt := fc.fileUploadService.UploadFile(file, header, userID.(string))
+	if msgOpt != nil {
+		ErrorResponse(c, http.StatusBadRequest, *msgOpt)
 		return
 	}
 
-	utils.SuccessResponse(c, result, utils.MessageOptions{
-		Message:     "檔案上傳成功",
-		Displayable: false,
-	})
+	SuccessResponse(c, result, "檔案上傳成功")
 }
 
 // UploadAvatar 頭像上傳
@@ -71,10 +62,9 @@ func (fc *FileController) UploadAvatar(c *gin.Context) {
 	// 從 JWT 中獲取用戶ID
 	userID, exists := c.Get("userID")
 	if !exists {
-		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{
-			Code:        utils.ErrUnauthorized,
-			Message:     "未找到用戶ID",
-			Displayable: false,
+		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{
+			Code:    models.ErrUnauthorized,
+			Message: "未找到用戶ID",
 		})
 		return
 	}
@@ -82,30 +72,23 @@ func (fc *FileController) UploadAvatar(c *gin.Context) {
 	// 獲取上傳的檔案
 	file, header, err := c.Request.FormFile("avatar")
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
-			Code:        utils.ErrInvalidParams,
-			Message:     "無法獲取頭像檔案: " + err.Error(),
-			Displayable: false,
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "無法獲取頭像檔案",
+			Details: err.Error(),
 		})
 		return
 	}
 	defer file.Close()
 
 	// 上傳頭像
-	result, err := fc.fileUploadService.UploadAvatar(file, header, userID.(string))
-	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
-			Code:        utils.ErrInvalidParams,
-			Message:     "頭像上傳失敗: " + err.Error(),
-			Displayable: false,
-		})
+	result, msgOpt := fc.fileUploadService.UploadAvatar(file, header, userID.(string))
+	if msgOpt != nil {
+		ErrorResponse(c, http.StatusBadRequest, *msgOpt)
 		return
 	}
 
-	utils.SuccessResponse(c, result, utils.MessageOptions{
-		Message:     "頭像上傳成功",
-		Displayable: false,
-	})
+	SuccessResponse(c, result, "頭像上傳成功")
 }
 
 // UploadDocument 文件上傳
@@ -113,10 +96,9 @@ func (fc *FileController) UploadDocument(c *gin.Context) {
 	// 從 JWT 中獲取用戶ID
 	userID, exists := c.Get("userID")
 	if !exists {
-		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{
-			Code:        utils.ErrUnauthorized,
-			Message:     "未找到用戶ID",
-			Displayable: false,
+		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{
+			Code:    models.ErrUnauthorized,
+			Message: "未找到用戶ID",
 		})
 		return
 	}
@@ -124,30 +106,23 @@ func (fc *FileController) UploadDocument(c *gin.Context) {
 	// 獲取上傳的檔案
 	file, header, err := c.Request.FormFile("document")
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
-			Code:        utils.ErrInvalidParams,
-			Message:     "無法獲取文件檔案: " + err.Error(),
-			Displayable: false,
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "無法獲取文件檔案",
+			Details: err.Error(),
 		})
 		return
 	}
 	defer file.Close()
 
 	// 上傳文件
-	result, err := fc.fileUploadService.UploadDocument(file, header, userID.(string))
-	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
-			Code:        utils.ErrInvalidParams,
-			Message:     "文件上傳失敗: " + err.Error(),
-			Displayable: false,
-		})
+	result, msgOpt := fc.fileUploadService.UploadDocument(file, header, userID.(string))
+	if msgOpt != nil {
+		ErrorResponse(c, http.StatusBadRequest, *msgOpt)
 		return
 	}
 
-	utils.SuccessResponse(c, result, utils.MessageOptions{
-		Message:     "文件上傳成功",
-		Displayable: false,
-	})
+	SuccessResponse(c, result, "文件上傳成功")
 }
 
 // GetUserFiles 獲取用戶檔案列表
@@ -155,29 +130,21 @@ func (fc *FileController) GetUserFiles(c *gin.Context) {
 	// 從 JWT 中獲取用戶ID
 	userID, exists := c.Get("userID")
 	if !exists {
-		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{
-			Code:        utils.ErrUnauthorized,
-			Message:     "未找到用戶ID",
-			Displayable: false,
+		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{
+			Code:    models.ErrUnauthorized,
+			Message: "未找到用戶ID",
 		})
 		return
 	}
 
 	// 獲取用戶檔案列表
-	files, err := fc.fileUploadService.GetUserFiles(userID.(string))
-	if err != nil {
-		utils.ErrorResponse(c, http.StatusInternalServerError, utils.MessageOptions{
-			Code:        utils.ErrInternalServer,
-			Message:     "獲取檔案列表失敗: " + err.Error(),
-			Displayable: false,
-		})
+	files, msgOpt := fc.fileUploadService.GetUserFiles(userID.(string))
+	if msgOpt != nil {
+		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
 		return
 	}
 
-	utils.SuccessResponse(c, files, utils.MessageOptions{
-		Message:     "獲取檔案列表成功",
-		Displayable: false,
-	})
+	SuccessResponse(c, files, "獲取檔案列表成功")
 }
 
 // DeleteFile 刪除檔案
@@ -185,10 +152,9 @@ func (fc *FileController) DeleteFile(c *gin.Context) {
 	// 從 JWT 中獲取用戶ID
 	userID, exists := c.Get("userID")
 	if !exists {
-		utils.ErrorResponse(c, http.StatusUnauthorized, utils.MessageOptions{
-			Code:        utils.ErrUnauthorized,
-			Message:     "未找到用戶ID",
-			Displayable: false,
+		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{
+			Code:    models.ErrUnauthorized,
+			Message: "未找到用戶ID",
 		})
 		return
 	}
@@ -196,27 +162,19 @@ func (fc *FileController) DeleteFile(c *gin.Context) {
 	// 獲取檔案ID
 	fileID := c.Param("file_id")
 	if fileID == "" {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
-			Code:        utils.ErrInvalidParams,
-			Message:     "檔案ID不能為空",
-			Displayable: false,
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "檔案ID不能為空",
 		})
 		return
 	}
 
 	// 刪除檔案
-	err := fc.fileUploadService.DeleteFileByID(fileID, userID.(string))
-	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, utils.MessageOptions{
-			Code:        utils.ErrInvalidParams,
-			Message:     "檔案刪除失敗: " + err.Error(),
-			Displayable: false,
-		})
+	msgOpt := fc.fileUploadService.DeleteFileByID(fileID, userID.(string))
+	if msgOpt != nil {
+		ErrorResponse(c, http.StatusBadRequest, *msgOpt)
 		return
 	}
 
-	utils.SuccessResponse(c, nil, utils.MessageOptions{
-		Message:     "檔案刪除成功",
-		Displayable: false,
-	})
+	SuccessResponse(c, nil, "檔案刪除成功")
 }

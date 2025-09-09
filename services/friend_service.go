@@ -6,7 +6,6 @@ import (
 	"chat_app_backend/providers"
 	"chat_app_backend/repositories"
 	"context"
-	"errors"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -45,10 +44,14 @@ func (fs *FriendService) getUserPictureURL(user *models.User) string {
 	return pictureURL
 }
 
-func (fs *FriendService) GetFriendById(userID string) (*models.Friend, error) {
+func (fs *FriendService) GetFriendById(userID string) (*models.Friend, *models.MessageOptions) {
 	friend, err := fs.friendRepo.GetFriendById(userID)
 	if err != nil {
-		return nil, err
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
+			Message: "獲取好友信息失敗",
+		}
 	}
 
 	return friend, nil
@@ -62,10 +65,14 @@ const (
 )
 
 // GetFriendList 獲取好友列表
-func (fs *FriendService) GetFriendList(userID string) ([]models.FriendResponse, error) {
+func (fs *FriendService) GetFriendList(userID string) ([]models.FriendResponse, *models.MessageOptions) {
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return nil, err
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Details: err,
+			Message: "無效的用戶ID格式",
+		}
 	}
 
 	// 使用QueryBuilder構建查詢
@@ -79,7 +86,11 @@ func (fs *FriendService) GetFriendList(userID string) ([]models.FriendResponse, 
 	var friends []models.Friend
 	err = fs.odm.Find(context.Background(), qb.GetFilter(), &friends)
 	if err != nil {
-		return nil, err
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
+			Message: "查詢好友列表失敗",
+		}
 	}
 
 	if len(friends) == 0 {
@@ -111,7 +122,11 @@ func (fs *FriendService) GetFriendList(userID string) ([]models.FriendResponse, 
 	var users []models.User
 	err = fs.odm.Find(context.Background(), userQb.GetFilter(), &users)
 	if err != nil {
-		return nil, err
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
+			Message: "獲取好友用戶信息失敗",
+		}
 	}
 
 	var apiFriend []models.FriendResponse
@@ -137,10 +152,10 @@ func (fs *FriendService) GetFriendList(userID string) ([]models.FriendResponse, 
 }
 
 // AddFriendRequest 發送好友請求
-func (fs *FriendService) AddFriendRequest(userID string, username string) error {
+func (fs *FriendService) AddFriendRequest(userID string, username string) *models.MessageOptions {
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return err
+		return &models.MessageOptions{Code: models.ErrInvalidParams, Message: "無效的用戶ID", Details: err.Error()}
 	}
 
 	// 檢查好友是否存在
@@ -150,12 +165,12 @@ func (fs *FriendService) AddFriendRequest(userID string, username string) error 
 	var user models.User
 	err = fs.odm.FindOne(context.Background(), qb.GetFilter(), &user)
 	if err != nil {
-		return errors.New("好友不存在")
+		return &models.MessageOptions{Code: models.ErrUserNotFound, Message: "好友不存在", Details: err.Error()}
 	}
 
 	// 不能加自己為好友
 	if userObjectID == user.ID {
-		return errors.New("不能加自己為好友")
+		return &models.MessageOptions{Code: models.ErrInvalidParams, Message: "不能加自己為好友"}
 	}
 
 	// 檢查是否已經是好友
@@ -169,7 +184,7 @@ func (fs *FriendService) AddFriendRequest(userID string, username string) error 
 	var friend models.Friend
 	err = fs.odm.FindOne(context.Background(), friendQb.GetFilter(), &friend)
 	if err == nil {
-		return errors.New("已經有好友請求或已為好友")
+		return &models.MessageOptions{Code: models.ErrFriendExists, Message: "已經有好友請求或已為好友"}
 	}
 
 	// 建立好友請求
@@ -179,26 +194,39 @@ func (fs *FriendService) AddFriendRequest(userID string, username string) error 
 		Status:   FriendStatusPending,
 	}
 
-	return fs.odm.Create(context.Background(), &newFriend)
+	fs.odm.Create(context.Background(), &newFriend)
+
+	return &models.MessageOptions{Message: "好友請求已發送"}
 }
 
 // UpdateFriendStatus 更新好友狀態
-func (fs *FriendService) UpdateFriendStatus(userID string, friendID string, status string) error {
+func (fs *FriendService) UpdateFriendStatus(userID string, friendID string, status string) *models.MessageOptions {
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return err
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Details: err,
+			Message: "無效的用戶ID格式",
+		}
 	}
 
 	// 檢查好友是否存在
 	var user models.User
 	err = fs.odm.FindByID(context.Background(), friendID, &user)
 	if err != nil {
-		return errors.New("好友不存在")
+		return &models.MessageOptions{
+			Code:    models.ErrUserNotFound,
+			Details: err,
+			Message: "好友不存在",
+		}
 	}
 
 	// 不能加自己為好友
 	if userObjectID == user.ID {
-		return errors.New("不能加自己為好友")
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "不能對自己執行此操作",
+		}
 	}
 
 	// 檢查是否已經是好友
@@ -212,7 +240,10 @@ func (fs *FriendService) UpdateFriendStatus(userID string, friendID string, stat
 	var friend models.Friend
 	err = fs.odm.FindOne(context.Background(), qb.GetFilter(), &friend)
 	if err == nil {
-		return errors.New("已經是好友")
+		return &models.MessageOptions{
+			Code:    models.ErrFriendExists,
+			Message: "已經是好友",
+		}
 	}
 
 	// 拒絕則刪除請求紀錄
@@ -225,10 +256,22 @@ func (fs *FriendService) UpdateFriendStatus(userID string, friendID string, stat
 		var friendToDelete models.Friend
 		err = fs.odm.FindOne(context.Background(), deleteQb.GetFilter(), &friendToDelete)
 		if err != nil {
-			return err
+			return &models.MessageOptions{
+				Code:    models.ErrInternalServer,
+				Details: err,
+				Message: "找不到待處理的好友請求",
+			}
 		}
 
-		return fs.odm.Delete(context.Background(), &friendToDelete)
+		err = fs.odm.Delete(context.Background(), &friendToDelete)
+		if err != nil {
+			return &models.MessageOptions{
+				Code:    models.ErrInternalServer,
+				Details: err,
+				Message: "刪除好友請求失敗",
+			}
+		}
+		return nil
 	}
 
 	// 更新好友狀態
@@ -240,9 +283,22 @@ func (fs *FriendService) UpdateFriendStatus(userID string, friendID string, stat
 	var friendToUpdate models.Friend
 	err = fs.odm.FindOne(context.Background(), updateQb.GetFilter(), &friendToUpdate)
 	if err != nil {
-		return err
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
+			Message: "找不到待處理的好友請求",
+		}
 	}
 
 	friendToUpdate.Status = status
-	return fs.odm.Update(context.Background(), &friendToUpdate)
+	err = fs.odm.Update(context.Background(), &friendToUpdate)
+	if err != nil {
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
+			Message: "更新好友狀態失敗",
+		}
+	}
+
+	return nil
 }

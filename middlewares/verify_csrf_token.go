@@ -1,7 +1,8 @@
 package middlewares
 
 import (
-	"chat_app_backend/utils"
+	"chat_app_backend/controllers"
+	"chat_app_backend/models"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -22,7 +23,7 @@ func VerifyCsrfToken() gin.HandlerFunc {
 		// 比對 CSRF Token 與 Cookie 中的 Token 是否相同
 		cookieCsrfToken, err := c.Cookie(csrfName)
 		if err != nil || csrfToken != cookieCsrfToken {
-			utils.ErrorResponse(c, http.StatusForbidden, utils.MessageOptions{Code: utils.ErrInvalidToken})
+			controllers.ErrorResponse(c, http.StatusForbidden, models.MessageOptions{Code: models.ErrInvalidToken})
 			c.Abort()
 			return
 		}

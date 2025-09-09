@@ -27,29 +27,6 @@ type FileUploadServiceImpl struct {
 	fileRepo     repositories.FileRepositoryInterface
 }
 
-// FileResult 上傳結果結構
-type FileResult struct {
-	ID         primitive.ObjectID `json:"id"`
-	FileName   string             `json:"file_name"`
-	FilePath   string             `json:"file_path"`
-	FileURL    string             `json:"file_url"`
-	FileSize   int64              `json:"file_size"`
-	MimeType   string             `json:"mime_type"`
-	UploadedAt int64              `json:"uploaded_at"`
-	UserID     string             `json:"user_id"`
-}
-
-// FileInfo 檔案資訊結構
-type FileInfo struct {
-	ID         primitive.ObjectID `json:"id"`
-	FileName   string             `json:"file_name"`
-	FilePath   string             `json:"file_path"`
-	FileSize   int64              `json:"file_size"`
-	MimeType   string             `json:"mime_type"`
-	CreatedAt  int64              `json:"created_at"`
-	ModifiedAt int64              `json:"modified_at"`
-}
-
 // NewFileUploadService 創建新的檔案上傳服務
 func NewFileUploadService(cfg *config.Config, fileProvider providers.FileProviderInterface, odm *providers.ODM, fileRepo repositories.FileRepositoryInterface) FileUploadServiceInterface {
 	return &FileUploadServiceImpl{
@@ -61,32 +38,44 @@ func NewFileUploadService(cfg *config.Config, fileProvider providers.FileProvide
 }
 
 // UploadFileWithConfig 統一檔案上傳函數，使用配置參數
-func (fs *FileUploadServiceImpl) UploadFileWithConfig(file multipart.File, header *multipart.FileHeader, userID string, config *models.FileUploadConfig) (*FileResult, error) {
+func (fs *FileUploadServiceImpl) UploadFileWithConfig(file multipart.File, header *multipart.FileHeader, userID string, config *models.FileUploadConfig) (*models.FileResult, *models.MessageOptions) {
 	// 基本驗證
-	if err := fs.ValidateFile(header); err != nil {
-		return nil, fmt.Errorf("檔案驗證失敗: %w", err)
+	if msgOpt := fs.ValidateFile(header); msgOpt != nil {
+		return nil, msgOpt
 	}
 
 	// 檔案大小檢查
 	if header.Size > config.MaxFileSize {
-		return nil, fmt.Errorf("檔案大小超過限制 %d bytes", config.MaxFileSize)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "檔案大小超過限制",
+			Details: fmt.Sprintf("檔案大小: %d bytes, 限制: %d bytes", header.Size, config.MaxFileSize),
+		}
 	}
 
 	// 檢查副檔名
 	ext := strings.ToLower(filepath.Ext(header.Filename))
 	if !slices.Contains(config.AllowedExtensions, ext) {
-		return nil, fmt.Errorf("不支援的檔案格式: %s", ext)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "不支援的檔案格式",
+			Details: fmt.Sprintf("檔案格式: %s", ext),
+		}
 	}
 
 	// 檢查MIME類型
 	mimeType := header.Header.Get("Content-Type")
 	if !slices.Contains(config.AllowedMimeTypes, mimeType) {
-		return nil, fmt.Errorf("不支援的檔案類型: %s", mimeType)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "不支援的檔案類型",
+			Details: fmt.Sprintf("檔案類型: %s", mimeType),
+		}
 	}
 
 	// 內容安全檢查
-	if err := fs.CheckFileContent(file, header); err != nil {
-		return nil, fmt.Errorf("檔案內容檢查失敗: %w", err)
+	if msgOpt := fs.CheckFileContent(file, header); msgOpt != nil {
+		return nil, msgOpt
 	}
 
 	// 生成安全的檔案名稱
@@ -97,7 +86,11 @@ func (fs *FileUploadServiceImpl) UploadFileWithConfig(file multipart.File, heade
 	// 儲存檔案
 	fullPath, err := fs.fileProvider.SaveFile(file, relativePath)
 	if err != nil {
-		return nil, fmt.Errorf("檔案儲存失敗: %w", err)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "檔案儲存失敗",
+			Details: err.Error(),
+		}
 	}
 
 	utils.PrettyPrint("filepath", fullPath)
@@ -107,14 +100,18 @@ func (fs *FileUploadServiceImpl) UploadFileWithConfig(file multipart.File, heade
 	if err != nil {
 		// 清理已儲存的檔案
 		fs.fileProvider.DeleteFile(fullPath)
-		return nil, fmt.Errorf("檔案雜湊計算失敗: %w", err)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "檔案雜湊計算失敗",
+			Details: err.Error(),
+		}
 	}
 
 	// 惡意軟體掃描（如果配置要求）
 	if config.ScanMalware {
-		if err := fs.ScanFileForMalware(fullPath); err != nil {
+		if msgOpt := fs.ScanFileForMalware(fullPath); msgOpt != nil {
 			fs.fileProvider.DeleteFile(fullPath)
-			return nil, fmt.Errorf("檔案安全掃描失敗: %w", err)
+			return nil, msgOpt
 		}
 	}
 
@@ -134,10 +131,14 @@ func (fs *FileUploadServiceImpl) UploadFileWithConfig(file multipart.File, heade
 
 	if err := fs.fileRepo.CreateFile(uploadedFile); err != nil {
 		fs.fileProvider.DeleteFile(fullPath)
-		return nil, fmt.Errorf("資料庫記錄創建失敗: %w", err)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "資料庫記錄創建失敗",
+			Details: err.Error(),
+		}
 	}
 
-	return &FileResult{
+	return &models.FileResult{
 		ID:         uploadedFile.BaseModel.GetID(),
 		FileName:   secureFileName,
 		FilePath:   fullPath,
@@ -150,136 +151,204 @@ func (fs *FileUploadServiceImpl) UploadFileWithConfig(file multipart.File, heade
 }
 
 // UploadFile 通用檔案上傳 - 使用統一函數
-func (fs *FileUploadServiceImpl) UploadFile(file multipart.File, header *multipart.FileHeader, userID string) (*FileResult, error) {
+func (fs *FileUploadServiceImpl) UploadFile(file multipart.File, header *multipart.FileHeader, userID string) (*models.FileResult, *models.MessageOptions) {
 	config := models.GetGeneralUploadConfig()
-	return fs.UploadFileWithConfig(file, header, userID, config)
+	result, msgOpt := fs.UploadFileWithConfig(file, header, userID, config)
+	if msgOpt != nil {
+		return nil, msgOpt
+	}
+	return result, nil
 }
 
 // UploadAvatar 頭像上傳 - 使用統一函數
-func (fs *FileUploadServiceImpl) UploadAvatar(file multipart.File, header *multipart.FileHeader, userID string) (*FileResult, error) {
+func (fs *FileUploadServiceImpl) UploadAvatar(file multipart.File, header *multipart.FileHeader, userID string) (*models.FileResult, *models.MessageOptions) {
 	config := models.GetAvatarUploadConfig()
-	return fs.UploadFileWithConfig(file, header, userID, config)
+	result, msgOpt := fs.UploadFileWithConfig(file, header, userID, config)
+	if msgOpt != nil {
+		return nil, msgOpt
+	}
+	return result, nil
 }
 
 // UploadDocument 文件上傳 - 使用統一函數
-func (fs *FileUploadServiceImpl) UploadDocument(file multipart.File, header *multipart.FileHeader, userID string) (*FileResult, error) {
+func (fs *FileUploadServiceImpl) UploadDocument(file multipart.File, header *multipart.FileHeader, userID string) (*models.FileResult, *models.MessageOptions) {
 	config := models.GetDocumentUploadConfig()
-	return fs.UploadFileWithConfig(file, header, userID, config)
+	result, msgOpt := fs.UploadFileWithConfig(file, header, userID, config)
+	if msgOpt != nil {
+		return nil, msgOpt
+	}
+	return result, nil
 }
 
 // ValidateFile 基本檔案驗證
-func (fs *FileUploadServiceImpl) ValidateFile(header *multipart.FileHeader) error {
+func (fs *FileUploadServiceImpl) ValidateFile(header *multipart.FileHeader) *models.MessageOptions {
 	// 檢查檔案名稱
 	if header.Filename == "" {
-		return fmt.Errorf("檔案名稱不能為空")
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "檔案名稱不能為空",
+		}
 	}
 
 	// 檢查檔案名稱長度
 	if len(header.Filename) > 255 {
-		return fmt.Errorf("檔案名稱過長")
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "檔案名稱過長",
+		}
 	}
 
 	// 檢查檔案大小
 	if header.Size <= 0 {
-		return fmt.Errorf("檔案大小無效")
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "檔案大小無效",
+		}
 	}
 
 	// 檢查檔案名稱中的危險字符
 	dangerousChars := []string{"../", "..\\", "<", ">", ":", "\"", "|", "?", "*"}
 	for _, char := range dangerousChars {
 		if strings.Contains(header.Filename, char) {
-			return fmt.Errorf("檔案名稱包含不允許的字符: %s", char)
+			return &models.MessageOptions{
+				Code:    models.ErrInvalidParams,
+				Message: "檔案名稱包含不允許的字符",
+				Details: fmt.Sprintf("不允許的字符: %s", char),
+			}
 		}
 	}
 
 	// 檢查副檔名
 	ext := strings.ToLower(filepath.Ext(header.Filename))
 	if ext == "" {
-		return fmt.Errorf("檔案必須有副檔名")
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "檔案必須有副檔名",
+		}
 	}
 
 	// 檢查危險的副檔名
 	dangerousExts := []string{".exe", ".bat", ".cmd", ".scr", ".pif", ".com", ".vbs", ".js", ".jar", ".sh"}
 	if slices.Contains(dangerousExts, ext) {
-		return fmt.Errorf("不允許的檔案類型: %s", ext)
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "不允許的檔案類型",
+			Details: fmt.Sprintf("檔案類型: %s", ext),
+		}
 	}
 
 	return nil
 }
 
 // ValidateImage 圖片檔案驗證
-func (fs *FileUploadServiceImpl) ValidateImage(header *multipart.FileHeader) error {
-	if err := fs.ValidateFile(header); err != nil {
-		return err
+func (fs *FileUploadServiceImpl) ValidateImage(header *multipart.FileHeader) *models.MessageOptions {
+	if msgOpt := fs.ValidateFile(header); msgOpt != nil {
+		return msgOpt
 	}
 
 	config := models.GetImageUploadConfig()
 
 	// 檢查檔案大小
 	if header.Size > config.MaxFileSize {
-		return fmt.Errorf("圖片檔案大小超過限制 %d bytes", config.MaxFileSize)
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "圖片檔案大小超過限制",
+			Details: fmt.Sprintf("檔案大小: %d bytes, 限制: %d bytes", header.Size, config.MaxFileSize),
+		}
 	}
 
 	// 檢查副檔名
 	ext := strings.ToLower(filepath.Ext(header.Filename))
 	if !slices.Contains(config.AllowedExtensions, ext) {
-		return fmt.Errorf("不支援的圖片格式: %s", ext)
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "不支援的圖片格式",
+			Details: fmt.Sprintf("檔案格式: %s", ext),
+		}
 	}
 
 	// 檢查MIME類型
 	mimeType := header.Header.Get("Content-Type")
 	if !slices.Contains(config.AllowedMimeTypes, mimeType) {
-		return fmt.Errorf("不支援的圖片類型: %s", mimeType)
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "不支援的圖片類型",
+			Details: fmt.Sprintf("檔案類型: %s", mimeType),
+		}
 	}
 
 	return nil
 }
 
 // ValidateDocument 文件檔案驗證
-func (fs *FileUploadServiceImpl) ValidateDocument(header *multipart.FileHeader) error {
-	if err := fs.ValidateFile(header); err != nil {
-		return err
+func (fs *FileUploadServiceImpl) ValidateDocument(header *multipart.FileHeader) *models.MessageOptions {
+	if msgOpt := fs.ValidateFile(header); msgOpt != nil {
+		return msgOpt
 	}
 
 	config := models.GetDocumentUploadConfig()
 
 	// 檢查檔案大小
 	if header.Size > config.MaxFileSize {
-		return fmt.Errorf("文件大小超過限制 %d bytes", config.MaxFileSize)
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "文件大小超過限制",
+			Details: fmt.Sprintf("檔案大小: %d bytes, 限制: %d bytes", header.Size, config.MaxFileSize),
+		}
 	}
 
 	// 檢查副檔名
 	ext := strings.ToLower(filepath.Ext(header.Filename))
 	if !slices.Contains(config.AllowedExtensions, ext) {
-		return fmt.Errorf("不支援的文件格式: %s", ext)
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "不支援的文件格式",
+			Details: fmt.Sprintf("檔案格式: %s", ext),
+		}
 	}
 
 	// 檢查MIME類型
 	mimeType := header.Header.Get("Content-Type")
 	if !slices.Contains(config.AllowedMimeTypes, mimeType) {
-		return fmt.Errorf("不支援的文件類型: %s", mimeType)
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "不支援的文件類型",
+			Details: fmt.Sprintf("檔案類型: %s", mimeType),
+		}
 	}
 
 	return nil
 }
 
 // CheckFileContent 檢查檔案內容安全性
-func (fs *FileUploadServiceImpl) CheckFileContent(file multipart.File, header *multipart.FileHeader) error {
+func (fs *FileUploadServiceImpl) CheckFileContent(file multipart.File, header *multipart.FileHeader) *models.MessageOptions {
 	// 重置檔案指針
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return fmt.Errorf("無法重置檔案指針: %w", err)
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "無法重置檔案指針",
+			Details: err.Error(),
+		}
 	}
 
 	// 讀取檔案前512位元組進行MIME類型檢測
 	buffer := make([]byte, 512)
 	n, err := file.Read(buffer)
 	if err != nil && err != io.EOF {
-		return fmt.Errorf("無法讀取檔案內容: %w", err)
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "無法讀取檔案內容",
+			Details: err.Error(),
+		}
 	}
 
 	// 重置檔案指針
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return fmt.Errorf("無法重置檔案指針: %w", err)
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "無法重置檔案指針",
+			Details: err.Error(),
+		}
 	}
 
 	// 檢測真實的MIME類型
@@ -288,12 +357,19 @@ func (fs *FileUploadServiceImpl) CheckFileContent(file multipart.File, header *m
 
 	// 驗證MIME類型一致性（允許一些變化）
 	if !fs.isMimeTypeCompatible(detectedMimeType, declaredMimeType) {
-		return fmt.Errorf("檔案實際類型 (%s) 與聲明類型 (%s) 不符", detectedMimeType, declaredMimeType)
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "檔案實際類型與聲明類型不符",
+			Details: fmt.Sprintf("實際類型: %s, 聲明類型: %s", detectedMimeType, declaredMimeType),
+		}
 	}
 
 	// 檢查是否包含惡意內容標誌
 	if fs.containsMaliciousContent(buffer[:n]) {
-		return fmt.Errorf("檔案包含可疑內容")
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "檔案包含可疑內容",
+		}
 	}
 
 	return nil
@@ -382,13 +458,17 @@ func (fs *FileUploadServiceImpl) containsMaliciousContent(content []byte) bool {
 }
 
 // ScanFileForMalware 惡意軟體掃描（簡化實現）
-func (fs *FileUploadServiceImpl) ScanFileForMalware(filePath string) error {
+func (fs *FileUploadServiceImpl) ScanFileForMalware(filePath string) *models.MessageOptions {
 	// 這裡可以整合第三方防毒引擎，如 ClamAV
 	// 目前實現基本的檔案檢查
 
 	file, err := os.Open(filePath)
 	if err != nil {
-		return fmt.Errorf("無法開啟檔案進行掃描: %w", err)
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "無法開啟檔案進行掃描",
+			Details: err.Error(),
+		}
 	}
 	defer file.Close()
 
@@ -396,47 +476,70 @@ func (fs *FileUploadServiceImpl) ScanFileForMalware(filePath string) error {
 	buffer := make([]byte, 1024)
 	n, err := file.Read(buffer)
 	if err != nil && err != io.EOF {
-		return fmt.Errorf("無法讀取檔案進行掃描: %w", err)
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "無法讀取檔案進行掃描",
+			Details: err.Error(),
+		}
 	}
 
 	// 檢查是否包含惡意內容
 	if fs.containsMaliciousContent(buffer[:n]) {
-		return fmt.Errorf("檔案掃描發現可疑內容")
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "檔案掃描發現可疑內容",
+		}
 	}
 
 	return nil
 }
 
 // DeleteFile 刪除檔案
-func (fs *FileUploadServiceImpl) DeleteFile(filePath string) error {
+func (fs *FileUploadServiceImpl) DeleteFile(filePath string) *models.MessageOptions {
 	// 從資料庫刪除記錄
 	if err := fs.fileRepo.DeleteFileByPath(filePath); err != nil {
-		return fmt.Errorf("刪除檔案記錄失敗: %w", err)
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "刪除檔案記錄失敗",
+			Details: err.Error(),
+		}
 	}
 
 	// 從檔案系統刪除檔案
 	if err := fs.fileProvider.DeleteFile(filePath); err != nil {
-		return fmt.Errorf("刪除檔案失敗: %w", err)
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "刪除檔案失敗",
+			Details: err.Error(),
+		}
 	}
 
 	return nil
 }
 
 // GetFileInfo 取得檔案資訊
-func (fs *FileUploadServiceImpl) GetFileInfo(filePath string) (*FileInfo, error) {
+func (fs *FileUploadServiceImpl) GetFileInfo(filePath string) (*models.FileInfo, *models.MessageOptions) {
 	// 從資料庫取得檔案資訊
 	uploadedFile, err := fs.fileRepo.GetFileByPath(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("取得檔案記錄失敗: %w", err)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrNotFound,
+			Message: "取得檔案記錄失敗",
+			Details: err.Error(),
+		}
 	}
 
 	// 從檔案系統取得檔案資訊
 	fileInfo, err := fs.fileProvider.GetFileInfo(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("取得檔案系統資訊失敗: %w", err)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "取得檔案系統資訊失敗",
+			Details: err.Error(),
+		}
 	}
 
-	return &FileInfo{
+	return &models.FileInfo{
 		ID:         uploadedFile.BaseModel.GetID(),
 		FileName:   uploadedFile.FileName,
 		FilePath:   uploadedFile.FilePath,
@@ -448,18 +551,22 @@ func (fs *FileUploadServiceImpl) GetFileInfo(filePath string) (*FileInfo, error)
 }
 
 // CleanupExpiredFiles 清理過期檔案
-func (fs *FileUploadServiceImpl) CleanupExpiredFiles() error {
+func (fs *FileUploadServiceImpl) CleanupExpiredFiles() *models.MessageOptions {
 	// 取得過期的檔案列表
 	expiredFiles, err := fs.fileRepo.GetExpiredFiles()
 	if err != nil {
-		return fmt.Errorf("取得過期檔案列表失敗: %w", err)
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "取得過期檔案列表失敗",
+			Details: err.Error(),
+		}
 	}
 
 	// 刪除過期檔案
 	for _, file := range expiredFiles {
-		if err := fs.DeleteFile(file.FilePath); err != nil {
+		if msgOpt := fs.DeleteFile(file.FilePath); msgOpt != nil {
 			// 記錄錯誤但繼續處理其他檔案
-			fmt.Printf("刪除過期檔案失敗 %s: %v\n", file.FilePath, err)
+			fmt.Printf("刪除過期檔案失敗 %s: %v\n", file.FilePath, msgOpt.Details)
 		}
 	}
 
@@ -467,14 +574,21 @@ func (fs *FileUploadServiceImpl) CleanupExpiredFiles() error {
 }
 
 // GetUserFiles 獲取用戶的檔案列表
-func (fs *FileUploadServiceImpl) GetUserFiles(userID string) ([]*models.UploadedFile, error) {
+func (fs *FileUploadServiceImpl) GetUserFiles(userID string) ([]*models.UploadedFile, *models.MessageOptions) {
 	if userID == "" {
-		return nil, fmt.Errorf("用戶ID不能為空")
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "用戶ID不能為空",
+		}
 	}
 
 	files, err := fs.fileRepo.GetFilesByUserID(userID)
 	if err != nil {
-		return nil, err
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "獲取用戶檔案列表失敗",
+			Details: err.Error(),
+		}
 	}
 
 	// 轉換為指針切片
@@ -487,54 +601,93 @@ func (fs *FileUploadServiceImpl) GetUserFiles(userID string) ([]*models.Uploaded
 }
 
 // DeleteFileByID 根據檔案ID刪除檔案
-func (fs *FileUploadServiceImpl) DeleteFileByID(fileID string, userID string) error {
+func (fs *FileUploadServiceImpl) DeleteFileByID(fileID string, userID string) *models.MessageOptions {
 	if fileID == "" {
-		return fmt.Errorf("檔案ID不能為空")
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "檔案ID不能為空",
+		}
 	}
 	if userID == "" {
-		return fmt.Errorf("用戶ID不能為空")
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "用戶ID不能為空",
+		}
 	}
 
 	// 獲取檔案信息
 	file, err := fs.fileRepo.GetFileByID(fileID)
 	if err != nil {
-		return fmt.Errorf("檔案不存在: %v", err)
+		return &models.MessageOptions{
+			Code:    models.ErrNotFound,
+			Message: "檔案不存在",
+			Details: err.Error(),
+		}
 	}
 
 	// 檢查權限 - 用戶只能刪除自己的檔案
 	if file.UserID.Hex() != userID {
-		return fmt.Errorf("沒有權限刪除此檔案")
+		return &models.MessageOptions{
+			Code:    models.ErrUnauthorized,
+			Message: "沒有權限刪除此檔案",
+		}
 	}
 
 	// 從檔案系統刪除檔案
 	if err := fs.fileProvider.DeleteFile(file.FilePath); err != nil {
-		return fmt.Errorf("刪除檔案失敗: %v", err)
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "刪除檔案失敗",
+			Details: err.Error(),
+		}
 	}
 
 	// 從資料庫刪除記錄
-	return fs.fileRepo.DeleteFileByID(fileID)
+	if err := fs.fileRepo.DeleteFileByID(fileID); err != nil {
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "刪除檔案記錄失敗",
+			Details: err.Error(),
+		}
+	}
+
+	return nil
 }
 
 // GetFileURLByID 根據檔案ID獲取檔案連結
-func (fs *FileUploadServiceImpl) GetFileURLByID(fileID string) (string, error) {
+func (fs *FileUploadServiceImpl) GetFileURLByID(fileID string) (string, *models.MessageOptions) {
 	if fileID == "" {
-		return "", fmt.Errorf("檔案ID不能為空")
+		return "", &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "檔案ID不能為空",
+		}
 	}
 
 	// 從資料庫獲取檔案記錄
 	file, err := fs.fileRepo.GetFileByID(fileID)
 	if err != nil {
-		return "", fmt.Errorf("檔案不存在: %v", err)
+		return "", &models.MessageOptions{
+			Code:    models.ErrNotFound,
+			Message: "檔案不存在",
+			Details: err.Error(),
+		}
 	}
 
 	// 檢查檔案狀態
 	if file.Status != "verified" {
-		return "", fmt.Errorf("檔案尚未驗證或已損壞")
+		return "", &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "檔案尚未驗證或已損壞",
+		}
 	}
 
 	// 檢查檔案是否存在
 	if _, err := fs.fileProvider.GetFileInfo(file.FilePath); err != nil {
-		return "", fmt.Errorf("檔案不存在或已被刪除: %v", err)
+		return "", &models.MessageOptions{
+			Code:    models.ErrNotFound,
+			Message: "檔案不存在或已被刪除",
+			Details: err.Error(),
+		}
 	}
 
 	// 返回檔案URL
@@ -542,15 +695,22 @@ func (fs *FileUploadServiceImpl) GetFileURLByID(fileID string) (string, error) {
 }
 
 // GetFileInfoByID 根據檔案ID獲取完整檔案資訊
-func (fs *FileUploadServiceImpl) GetFileInfoByID(fileID string) (*models.UploadedFile, error) {
+func (fs *FileUploadServiceImpl) GetFileInfoByID(fileID string) (*models.UploadedFile, *models.MessageOptions) {
 	if fileID == "" {
-		return nil, fmt.Errorf("檔案ID不能為空")
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "檔案ID不能為空",
+		}
 	}
 
 	// 從資料庫獲取檔案記錄
 	file, err := fs.fileRepo.GetFileByID(fileID)
 	if err != nil {
-		return nil, fmt.Errorf("檔案不存在: %v", err)
+		return nil, &models.MessageOptions{
+			Code:    models.ErrNotFound,
+			Message: "檔案不存在",
+			Details: err.Error(),
+		}
 	}
 
 	return file, nil
