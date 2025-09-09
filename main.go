@@ -33,10 +33,17 @@ func main() {
 	}
 	defer mongodb.Close()
 
-	gin.SetMode(config.AppConfig.Server.Mode)
-
 	// 初始化 Gin
 	r := gin.Default()
+
+	// 設置信任的代理
+	// 在生產環境中，使用配置中的可信代理設置
+	if config.AppConfig.Server.Mode == config.ProductionMode {
+		r.SetTrustedProxies(config.AppConfig.Server.TrustedProxies)
+	} else {
+		// 開發環境不信任任何代理
+		r.SetTrustedProxies(nil)
+	}
 
 	// 構建依賴
 	deps := di.BuildDependencies(config.AppConfig, mongodb)

@@ -343,7 +343,7 @@ func (wsh *WebSocketHandler) handlePing(client *Client) {
 		Action: "pong",
 		Data: map[string]interface{}{
 			"message":   "pong",
-			"timestamp": time.Now().Unix(),
+			"timestamp": time.Now().UnixMilli(),
 		},
 	}
 

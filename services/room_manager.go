@@ -139,7 +139,7 @@ func (rm *RoomManager) JoinRoom(client *Client, roomType models.RoomType, roomID
 	client.ActivityMutex.Lock()
 	client.RoomActivity[key.String()] = time.Now()
 	client.ActivityMutex.Unlock()
-	rm.redisClient.Set(ctx, "user_id:"+client.UserID+":room:"+key.String()+":last_active", time.Now().Format(time.RFC3339), 24*time.Hour)
+	rm.redisClient.Set(ctx, "user_id:"+client.UserID+":room:"+key.String()+":last_active", time.Now().UnixMilli(), 24*time.Hour)
 }
 
 // LeaveRoom 讓使用者離開房間
@@ -273,5 +273,5 @@ func (rm *RoomManager) safelyBroadcastToClient(client *Client, message *WsMessag
 	client.ActivityMutex.Lock()
 	client.RoomActivity[message.Data.RoomID] = time.Now()
 	client.ActivityMutex.Unlock()
-	rm.redisClient.Set(context.Background(), "user:"+client.UserID+":room:"+message.Data.RoomID+":last_active", time.Now().Format(time.RFC3339), 24*time.Hour)
+	rm.redisClient.Set(context.Background(), "user:"+client.UserID+":room:"+message.Data.RoomID+":last_active", time.Now().UnixMilli(), 24*time.Hour)
 }

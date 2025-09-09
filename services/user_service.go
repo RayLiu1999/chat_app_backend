@@ -73,7 +73,8 @@ func (us *UserService) RegisterUser(user models.User) *models.MessageOptions {
 	}
 	if exists {
 		return &models.MessageOptions{
-			Code: models.ErrUsernameExists,
+			Code:    models.ErrUsernameExists,
+			Message: "用戶名已存在",
 		}
 	}
 

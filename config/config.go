@@ -32,6 +32,7 @@ type ServerConfig struct {
 	Mode           ModeConfig
 	Timezone       string
 	AllowedOrigins []string
+	TrustedProxies []string
 }
 
 type DatabaseConfig struct {
@@ -75,6 +76,7 @@ func LoadConfig() {
 			Mode:           ModeConfig(getEnv("SERVER_MODE", "development")),
 			Timezone:       getEnv("TIMEZONE", "Asia/Taipei"),
 			AllowedOrigins: strings.Split(getEnv("ALLOWED_ORIGINS", "http://localhost:3000"), ","),
+			TrustedProxies: strings.Split(getEnv("TRUSTED_PROXIES", "127.0.0.1,::1,172.16.0.0/12,10.0.0.0/8,192.168.0.0/16"), ","),
 		},
 		Database: DatabaseConfig{
 			MongoURI:        getEnv("MONGO_URI", "localhost:27017"),

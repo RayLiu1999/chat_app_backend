@@ -145,7 +145,7 @@ func (fs *FileUploadServiceImpl) UploadFileWithConfig(file multipart.File, heade
 		FileURL:    fs.fileProvider.GetFileURL(fullPath),
 		FileSize:   header.Size,
 		MimeType:   mimeType,
-		UploadedAt: time.Now().Unix(),
+		UploadedAt: time.Now().UnixMilli(),
 		UserID:     userID,
 	}, nil
 }
@@ -545,8 +545,8 @@ func (fs *FileUploadServiceImpl) GetFileInfo(filePath string) (*models.FileInfo,
 		FilePath:   uploadedFile.FilePath,
 		FileSize:   fileInfo.Size(),
 		MimeType:   uploadedFile.MimeType,
-		CreatedAt:  uploadedFile.BaseModel.CreatedAt.Unix(),
-		ModifiedAt: fileInfo.ModTime().Unix(),
+		CreatedAt:  uploadedFile.BaseModel.CreatedAt.UnixMilli(),
+		ModifiedAt: fileInfo.ModTime().UnixMilli(),
 	}, nil
 }
 

@@ -186,7 +186,7 @@ func (cc *ChannelController) CreateChannel(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, utils.APIResponse{
+	c.JSON(http.StatusCreated, models.APIResponse{
 		Status:  "success",
 		Message: "創建頻道成功",
 		Data:    createdChannel,

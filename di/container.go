@@ -86,11 +86,24 @@ func initServices(cfg *config.Config, providers *ProviderContainer, repos *Repos
 	serverService.UpdateUserService(finalUserService)
 
 	return &ServiceContainer{
-		UserService:       finalUserService,
-		ChatService:       chatService,
-		ServerService:     serverService,
-		FriendService:     services.NewFriendService(cfg, providers.ODM, repos.FriendRepo, repos.UserRepo, finalUserService, fileUploadService), // 傳入最終的 UserService
-		ChannelService:    services.NewChannelService(cfg, providers.ODM, repos.ChannelRepo, repos.ServerRepo, repos.ServerMemberRepo, repos.UserRepo, repos.ChatRepo),
+		UserService:   finalUserService,
+		ChatService:   chatService,
+		ServerService: serverService,
+		FriendService: services.NewFriendService(
+			cfg,
+			providers.ODM,
+			repos.FriendRepo,
+			repos.UserRepo,
+			finalUserService,
+			fileUploadService),
+		ChannelService: services.NewChannelService(
+			cfg,
+			providers.ODM,
+			repos.ChannelRepo,
+			repos.ServerRepo,
+			repos.ServerMemberRepo,
+			repos.UserRepo,
+			repos.ChatRepo),
 		FileUploadService: fileUploadService,
 	}
 }

@@ -18,8 +18,10 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, mongodb *providers.MongoWrap
 	uploadsAbsPath := filepath.Join(".", "uploads")
 	r.Static("/uploads", uploadsAbsPath)
 
-	// 健康檢查
-	r.GET("/health", controllers.HealthController.HealthCheck)
+	// 健康檢查 - 使用中介軟體保護
+	r.GET("/health", middlewares.HealthCheckAuth(cfg), controllers.HealthController.HealthCheck)
+	r.GET("/health/proxy", middlewares.PublicHealthCheckAuth(cfg), controllers.HealthController.ProxyCheck)
+	r.GET("/health/detailed", middlewares.HealthCheckAuth(cfg), controllers.HealthController.DetailedHealthCheck)
 
 	// 驗證前端來源
 	if cfg.Server.Mode == config.ProductionMode {
@@ -68,10 +70,24 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, mongodb *providers.MongoWrap
 	// auth.GET("/users/:id/online-status", controllers.UserController.CheckUserOnlineStatus) // 檢查特定用戶在線狀態
 
 	// friend
-	auth.GET("/friends", controllers.FriendController.GetFriendList)                 // 取得好友清單
-	auth.POST("/friends", controllers.FriendController.AddFriendRequest)             // 建立好友請求
-	auth.PUT("/friends/:friend_id", controllers.FriendController.UpdateFriendStatus) // 更新好友狀態
-	// auth.DELETE("/friends/:friend_id", controllers.FriendController.RemoveFriend)     // 刪除好友
+	auth.GET("/friends", controllers.FriendController.GetFriendList)
+
+	// 新增的 API
+	auth.GET("/friends/pending", controllers.FriendController.GetPendingRequests) // 獲取待處理請求
+	auth.GET("/friends/blocked", controllers.FriendController.GetBlockedUsers)    // 獲取封鎖列表
+
+	// 好友請求管理
+	auth.POST("/friends/requests", controllers.FriendController.SendFriendRequest)                       // 發送好友請求
+	auth.PUT("/friends/requests/:request_id/accept", controllers.FriendController.AcceptFriendRequest)   // 接受請求
+	auth.PUT("/friends/requests/:request_id/decline", controllers.FriendController.DeclineFriendRequest) // 拒絕請求
+	auth.DELETE("/friends/requests/:request_id", controllers.FriendController.CancelFriendRequest)       // 取消請求
+
+	// 封鎖管理
+	auth.POST("/friends/:user_id/block", controllers.FriendController.BlockUser)     // 封鎖用戶
+	auth.DELETE("/friends/:user_id/block", controllers.FriendController.UnblockUser) // 解除封鎖
+
+	// 刪除好友
+	auth.DELETE("/friends/remove/:friend_id", controllers.FriendController.RemoveFriend) // 刪除好友
 
 	// dm room
 	auth.GET("/dm_rooms", controllers.ChatController.GetDMRoomList)                   // 獲取聊天列表

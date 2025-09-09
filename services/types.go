@@ -121,7 +121,7 @@ func (c *Client) SendError(errorType, message string) {
 		Data: map[string]interface{}{
 			"error_type": errorType,
 			"message":    message,
-			"timestamp":  time.Now().Unix(),
+			"timestamp":  time.Now().UnixMilli(),
 		},
 	}
 	c.SendMessage(errorMsg)

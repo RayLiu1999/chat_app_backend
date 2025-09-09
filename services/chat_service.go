@@ -151,7 +151,7 @@ func (cs *ChatService) GetDMRoomResponseList(userID string, includeHidden bool) 
 			RoomID:     chat.RoomID,
 			Nickname:   user.Nickname,
 			PictureURL: cs.getUserPictureURL(&user),
-			Timestamp:  chat.UpdatedAt.Unix(),
+			Timestamp:  chat.UpdatedAt.UnixMilli(),
 			IsOnline:   isOnline,
 		})
 	}
@@ -278,10 +278,8 @@ func (cs *ChatService) CreateDMRoom(userID string, chatWithUserID string) (*mode
 					RoomID:     room.RoomID,
 					Nickname:   user.Nickname,
 					PictureURL: cs.getUserPictureURL(&user),
-					Timestamp:  room.UpdatedAt.Unix(),
-				}
-
-				// 如果isHidden為true，則將isHidden設為false
+					Timestamp:  room.UpdatedAt.UnixMilli(),
+				} // 如果isHidden為true，則將isHidden設為false
 				if room.IsHidden {
 					updateFields := bson.M{"is_hidden": false}
 					cs.odm.UpdateFields(context.Background(), &room, updateFields)
@@ -319,7 +317,7 @@ func (cs *ChatService) CreateDMRoom(userID string, chatWithUserID string) (*mode
 				RoomID:     room.RoomID,
 				Nickname:   user.Nickname,
 				PictureURL: cs.getUserPictureURL(&user),
-				Timestamp:  dmRoom.UpdatedAt.Unix(),
+				Timestamp:  dmRoom.UpdatedAt.UnixMilli(),
 			}
 
 			return &dmRoomResponse, nil
@@ -331,7 +329,7 @@ func (cs *ChatService) CreateDMRoom(userID string, chatWithUserID string) (*mode
 				RoomID:     room.RoomID,
 				Nickname:   user.Nickname,
 				PictureURL: cs.getUserPictureURL(&user),
-				Timestamp:  room.UpdatedAt.Unix(),
+				Timestamp:  room.UpdatedAt.UnixMilli(),
 			}
 
 			return &dmRoomResponse, nil
@@ -361,7 +359,7 @@ func (cs *ChatService) CreateDMRoom(userID string, chatWithUserID string) (*mode
 			RoomID:     dmRoom.RoomID,
 			Nickname:   user.Nickname,
 			PictureURL: cs.getUserPictureURL(&user),
-			Timestamp:  dmRoom.UpdatedAt.Unix(),
+			Timestamp:  dmRoom.UpdatedAt.UnixMilli(),
 		}
 
 		return &dmRoomResponse, nil

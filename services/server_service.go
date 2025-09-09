@@ -370,7 +370,7 @@ func (ss *ServerService) SearchPublicServers(userID string, request models.Serve
 			MemberCount: server.MemberCount,
 			IsJoined:    isJoined,
 			OwnerName:   ownerName,
-			CreatedAt:   server.CreatedAt.Unix(),
+			CreatedAt:   server.CreatedAt.UnixMilli(),
 		}
 
 		serverResponses = append(serverResponses, serverResponse)
@@ -682,8 +682,8 @@ func (ss *ServerService) GetServerDetailByID(userID string, serverID string) (*m
 					PictureURL:   ss.getUserPictureURL(&user),
 					Role:         member.Role,
 					IsOnline:     isOnline,
-					LastActiveAt: member.LastActiveAt.Unix(),
-					JoinedAt:     member.JoinedAt.Unix(),
+					LastActiveAt: member.LastActiveAt.UnixMilli(),
+					JoinedAt:     member.JoinedAt.UnixMilli(),
 				})
 			}
 		}
