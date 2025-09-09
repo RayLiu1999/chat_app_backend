@@ -142,17 +142,35 @@ type ServerServiceInterface interface {
 }
 
 type FriendServiceInterface interface {
-	// GetFriendById 根據ID獲取好友信息
-	GetFriendById(userID string) (*models.Friend, *models.MessageOptions)
-
 	// GetFriendList 獲取好友列表
 	GetFriendList(userID string) ([]models.FriendResponse, *models.MessageOptions)
 
 	// AddFriendRequest 發送好友請求
 	AddFriendRequest(userID string, username string) *models.MessageOptions
 
-	// UpdateFriendStatus 更新好友狀態
-	UpdateFriendStatus(userID string, friendID string, status string) *models.MessageOptions
+	// GetPendingRequests 獲取待處理好友請求
+	GetPendingRequests(userID string) (*models.PendingRequestsResponse, *models.MessageOptions)
+
+	// GetBlockedUsers 獲取封鎖用戶列表
+	GetBlockedUsers(userID string) ([]models.BlockedUserResponse, *models.MessageOptions)
+
+	// AcceptFriendRequest 接受好友請求
+	AcceptFriendRequest(userID string, requestID string) *models.MessageOptions
+
+	// DeclineFriendRequest 拒絕好友請求
+	DeclineFriendRequest(userID string, requestID string) *models.MessageOptions
+
+	// CancelFriendRequest 取消好友請求
+	CancelFriendRequest(userID string, requestID string) *models.MessageOptions
+
+	// BlockUser 封鎖用戶
+	BlockUser(userID string, targetUserID string) *models.MessageOptions
+
+	// UnblockUser 解除封鎖用戶
+	UnblockUser(userID string, targetUserID string) *models.MessageOptions
+
+	// RemoveFriend 刪除好友
+	RemoveFriend(userID string, friendID string) *models.MessageOptions
 }
 
 type ChannelServiceInterface interface {

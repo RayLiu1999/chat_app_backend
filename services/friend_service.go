@@ -5,6 +5,7 @@ import (
 	"chat_app_backend/models"
 	"chat_app_backend/providers"
 	"chat_app_backend/repositories"
+	"chat_app_backend/utils"
 	"context"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -20,7 +21,13 @@ type FriendService struct {
 	odm               *providers.ODM
 }
 
-func NewFriendService(cfg *config.Config, odm *providers.ODM, friendRepo repositories.FriendRepositoryInterface, userRepo repositories.UserRepositoryInterface, userService UserServiceInterface, fileUploadService FileUploadServiceInterface) *FriendService {
+func NewFriendService(
+	cfg *config.Config,
+	odm *providers.ODM,
+	friendRepo repositories.FriendRepositoryInterface,
+	userRepo repositories.UserRepositoryInterface,
+	userService UserServiceInterface,
+	fileUploadService FileUploadServiceInterface) *FriendService {
 	return &FriendService{
 		config:            cfg,
 		friendRepo:        friendRepo,
@@ -42,19 +49,6 @@ func (fs *FriendService) getUserPictureURL(user *models.User) string {
 		return ""
 	}
 	return pictureURL
-}
-
-func (fs *FriendService) GetFriendById(userID string) (*models.Friend, *models.MessageOptions) {
-	friend, err := fs.friendRepo.GetFriendById(userID)
-	if err != nil {
-		return nil, &models.MessageOptions{
-			Code:    models.ErrInternalServer,
-			Details: err,
-			Message: "獲取好友信息失敗",
-		}
-	}
-
-	return friend, nil
 }
 
 // 定義好友請求狀態的可能值
@@ -173,18 +167,18 @@ func (fs *FriendService) AddFriendRequest(userID string, username string) *model
 		return &models.MessageOptions{Code: models.ErrInvalidParams, Message: "不能加自己為好友"}
 	}
 
-	// 檢查是否已經是好友
+	// 檢查是否已經是好友或已有請求或被封鎖
 	friendQb := providers.NewQueryBuilder()
 	orConditions := []bson.M{
-		{"user_id": userObjectID, "friend_id": user.ID, "status": FriendStatusAccepted},
-		{"user_id": user.ID, "friend_id": userObjectID, "status": FriendStatusAccepted},
+		{"user_id": userObjectID, "friend_id": user.ID},
+		{"user_id": user.ID, "friend_id": userObjectID},
 	}
 	friendQb.OrWhere(orConditions)
 
 	var friend models.Friend
 	err = fs.odm.FindOne(context.Background(), friendQb.GetFilter(), &friend)
 	if err == nil {
-		return &models.MessageOptions{Code: models.ErrFriendExists, Message: "已經有好友請求或已為好友"}
+		return &models.MessageOptions{Code: models.ErrFriendExists, Message: "已經有好友請求或已為好友或被封鎖"}
 	}
 
 	// 建立好友請求
@@ -196,107 +190,517 @@ func (fs *FriendService) AddFriendRequest(userID string, username string) *model
 
 	fs.odm.Create(context.Background(), &newFriend)
 
-	return &models.MessageOptions{Message: "好友請求已發送"}
+	return nil
 }
 
-// UpdateFriendStatus 更新好友狀態
-func (fs *FriendService) UpdateFriendStatus(userID string, friendID string, status string) *models.MessageOptions {
+// GetPendingRequests 獲取待處理好友請求
+func (fs *FriendService) GetPendingRequests(userID string) (*models.PendingRequestsResponse, *models.MessageOptions) {
+	userObjectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "無效的用戶ID",
+			Details: err.Error(),
+		}
+	}
+
+	// 查詢我發送的請求
+	sentQb := providers.NewQueryBuilder()
+	sentQb.Where("user_id", userObjectID)
+	sentQb.Where("status", FriendStatusPending)
+
+	var sentRequests []models.Friend
+	err = fs.odm.Find(context.Background(), sentQb.GetFilter(), &sentRequests)
+	if err != nil {
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "獲取發送的請求失敗",
+			Details: err.Error(),
+		}
+	}
+
+	// 查詢我收到的請求
+	receivedQb := providers.NewQueryBuilder()
+	receivedQb.Where("friend_id", userObjectID)
+	receivedQb.Where("status", FriendStatusPending)
+
+	var receivedRequests []models.Friend
+	err = fs.odm.Find(context.Background(), receivedQb.GetFilter(), &receivedRequests)
+	if err != nil {
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "獲取收到的請求失敗",
+			Details: err.Error(),
+		}
+	}
+
+	// 轉換為響應格式
+	var sentPending []models.PendingFriendRequest
+	for _, req := range sentRequests {
+		user, err := fs.userRepo.GetUserById(req.FriendID.Hex())
+		if err != nil {
+			continue
+		}
+
+		sentPending = append(sentPending, models.PendingFriendRequest{
+			RequestID:  req.ID.Hex(),
+			UserID:     user.ID.Hex(),
+			Username:   user.Username,
+			Nickname:   user.Nickname,
+			PictureURL: fs.getUserPictureURL(user),
+			SentAt:     req.CreatedAt.UnixMilli(),
+			Type:       "sent",
+		})
+	}
+
+	var receivedPending []models.PendingFriendRequest
+	for _, req := range receivedRequests {
+		user, err := fs.userRepo.GetUserById(req.UserID.Hex())
+		if err != nil {
+			continue
+		}
+
+		receivedPending = append(receivedPending, models.PendingFriendRequest{
+			RequestID:  req.ID.Hex(),
+			UserID:     user.ID.Hex(),
+			Username:   user.Username,
+			Nickname:   user.Nickname,
+			PictureURL: fs.getUserPictureURL(user),
+			SentAt:     req.CreatedAt.UnixMilli(),
+			Type:       "received",
+		})
+	}
+
+	response := &models.PendingRequestsResponse{
+		Sent:     sentPending,
+		Received: receivedPending,
+	}
+	response.Count.Sent = len(sentPending)
+	response.Count.Received = len(receivedPending)
+	response.Count.Total = response.Count.Sent + response.Count.Received
+
+	return response, nil
+}
+
+// GetBlockedUsers 獲取封鎖用戶列表
+func (fs *FriendService) GetBlockedUsers(userID string) ([]models.BlockedUserResponse, *models.MessageOptions) {
+	userObjectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "無效的用戶ID",
+			Details: err.Error(),
+		}
+	}
+
+	// 查詢被我封鎖的用戶
+	qb := providers.NewQueryBuilder()
+	qb.Where("user_id", userObjectID)
+	qb.Where("status", "blocked")
+
+	var blockedFriends []models.Friend
+	err = fs.odm.Find(context.Background(), qb.GetFilter(), &blockedFriends)
+	if err != nil {
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "獲取封鎖列表失敗",
+			Details: err.Error(),
+		}
+	}
+
+	var blockedUsers []models.BlockedUserResponse
+	for _, blocked := range blockedFriends {
+		user, err := fs.userRepo.GetUserById(blocked.FriendID.Hex())
+		if err != nil {
+			continue
+		}
+
+		blockedUsers = append(blockedUsers, models.BlockedUserResponse{
+			UserID:     user.ID.Hex(),
+			Username:   user.Username,
+			Nickname:   user.Nickname,
+			PictureURL: fs.getUserPictureURL(user),
+			BlockedAt:  blocked.UpdatedAt.UnixMilli(),
+		})
+	}
+
+	return blockedUsers, nil
+}
+
+// AcceptFriendRequest 接受好友請求
+func (fs *FriendService) AcceptFriendRequest(userID string, requestID string) *models.MessageOptions {
+	requestObjectID, err := primitive.ObjectIDFromHex(requestID)
+	if err != nil {
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "無效的請求ID",
+			Details: err.Error(),
+		}
+	}
+
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return &models.MessageOptions{
 			Code:    models.ErrInvalidParams,
-			Details: err,
-			Message: "無效的用戶ID格式",
+			Message: "無效的用戶ID",
+			Details: err.Error(),
 		}
 	}
 
-	// 檢查好友是否存在
-	var user models.User
-	err = fs.odm.FindByID(context.Background(), friendID, &user)
+	// 查找請求
+	qb := providers.NewQueryBuilder()
+	qb.Where("_id", requestObjectID)
+	qb.Where("friend_id", userObjectID)
+	qb.Where("status", FriendStatusPending)
+
+	utils.PrettyPrint("qb.GetFilter(): ", qb.GetFilter())
+
+	var friendRequest models.Friend
+	err = fs.odm.FindOne(context.Background(), qb.GetFilter(), &friendRequest)
 	if err != nil {
 		return &models.MessageOptions{
-			Code:    models.ErrUserNotFound,
-			Details: err,
-			Message: "好友不存在",
+			Code:    models.ErrNotFound,
+			Message: "找不到待處理的好友請求",
+			Details: err.Error(),
 		}
 	}
 
-	// 不能加自己為好友
-	if userObjectID == user.ID {
+	// 更新狀態為接受
+	friendRequest.Status = FriendStatusAccepted
+	err = fs.odm.Update(context.Background(), &friendRequest)
+	if err != nil {
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "接受好友請求失敗",
+			Details: err.Error(),
+		}
+	}
+
+	return nil
+}
+
+// DeclineFriendRequest 拒絕好友請求
+func (fs *FriendService) DeclineFriendRequest(userID string, requestID string) *models.MessageOptions {
+	requestObjectID, err := primitive.ObjectIDFromHex(requestID)
+	if err != nil {
 		return &models.MessageOptions{
 			Code:    models.ErrInvalidParams,
-			Message: "不能對自己執行此操作",
+			Message: "無效的請求ID",
+			Details: err.Error(),
 		}
 	}
 
-	// 檢查是否已經是好友
+	userObjectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "無效的用戶ID",
+			Details: err.Error(),
+		}
+	}
+
+	// 查找並刪除請求
+	qb := providers.NewQueryBuilder()
+	qb.Where("_id", requestObjectID)
+	qb.Where("friend_id", userObjectID)
+	qb.Where("status", FriendStatusPending)
+
+	var friendRequest models.Friend
+	err = fs.odm.FindOne(context.Background(), qb.GetFilter(), &friendRequest)
+	if err != nil {
+		return &models.MessageOptions{
+			Code:    models.ErrNotFound,
+			Message: "找不到待處理的好友請求",
+			Details: err.Error(),
+		}
+	}
+
+	err = fs.odm.Delete(context.Background(), &friendRequest)
+	if err != nil {
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "拒絕好友請求失敗",
+			Details: err.Error(),
+		}
+	}
+
+	return nil
+}
+
+// CancelFriendRequest 取消好友請求
+func (fs *FriendService) CancelFriendRequest(userID string, requestID string) *models.MessageOptions {
+	requestObjectID, err := primitive.ObjectIDFromHex(requestID)
+	if err != nil {
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "無效的請求ID",
+			Details: err.Error(),
+		}
+	}
+
+	userObjectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "無效的用戶ID",
+			Details: err.Error(),
+		}
+	}
+
+	// 查找並刪除我發送的請求
+	qb := providers.NewQueryBuilder()
+	qb.Where("_id", requestObjectID)
+	qb.Where("user_id", userObjectID)
+	qb.Where("status", FriendStatusPending)
+
+	var friendRequest models.Friend
+	err = fs.odm.FindOne(context.Background(), qb.GetFilter(), &friendRequest)
+	if err != nil {
+		return &models.MessageOptions{
+			Code:    models.ErrNotFound,
+			Message: "找不到要取消的好友請求",
+			Details: err.Error(),
+		}
+	}
+
+	err = fs.odm.Delete(context.Background(), &friendRequest)
+	if err != nil {
+		return &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "取消好友請求失敗",
+			Details: err.Error(),
+		}
+	}
+
+	return nil
+}
+
+// BlockUser 封鎖用戶
+func (fs *FriendService) BlockUser(userID string, targetUserID string) *models.MessageOptions {
+	// targetUserID不能為自己
+	if userID == targetUserID {
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "不能封鎖自己",
+		}
+	}
+
+	userObjectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "無效的用戶ID",
+			Details: err.Error(),
+		}
+	}
+
+	targetObjectID, err := primitive.ObjectIDFromHex(targetUserID)
+	if err != nil {
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "無效的目標用戶ID",
+			Details: err.Error(),
+		}
+	}
+
+	// 檢查目標用戶是否存在
+	_, err = fs.userRepo.GetUserById(targetUserID)
+	if err != nil {
+		return &models.MessageOptions{
+			Code:    models.ErrNotFound,
+			Message: "目標用戶不存在",
+			Details: err.Error(),
+		}
+	}
+
+	// 查找現有關係
 	qb := providers.NewQueryBuilder()
 	orConditions := []bson.M{
-		{"user_id": userObjectID, "friend_id": user.ID, "status": FriendStatusAccepted},
-		{"user_id": user.ID, "friend_id": userObjectID, "status": FriendStatusAccepted},
+		{"user_id": userObjectID, "friend_id": targetObjectID},
+		{"friend_id": userObjectID, "user_id": targetObjectID},
 	}
 	qb.OrWhere(orConditions)
 
-	var friend models.Friend
-	err = fs.odm.FindOne(context.Background(), qb.GetFilter(), &friend)
-	if err == nil {
-		return &models.MessageOptions{
-			Code:    models.ErrFriendExists,
-			Message: "已經是好友",
+	var existingFriend models.Friend
+	err = fs.odm.FindOne(context.Background(), qb.GetFilter(), &existingFriend)
+
+	if err != nil {
+		// 如果沒有現有關係，創建新的封鎖關係
+		blockedFriend := models.Friend{
+			UserID:   userObjectID,
+			FriendID: targetObjectID,
+			Status:   "blocked",
 		}
-	}
 
-	// 拒絕則刪除請求紀錄
-	if status == FriendStatusRejected {
-		deleteQb := providers.NewQueryBuilder()
-		deleteQb.Where("user_id", user.ID).
-			Where("friend_id", userObjectID).
-			Where("status", FriendStatusPending)
-
-		var friendToDelete models.Friend
-		err = fs.odm.FindOne(context.Background(), deleteQb.GetFilter(), &friendToDelete)
+		err = fs.odm.Create(context.Background(), &blockedFriend)
 		if err != nil {
 			return &models.MessageOptions{
 				Code:    models.ErrInternalServer,
-				Details: err,
-				Message: "找不到待處理的好友請求",
+				Message: "封鎖用戶失敗",
+				Details: err.Error(),
 			}
 		}
+	} else {
+		// 更新現有關係為封鎖
+		existingFriend.Status = "blocked"
 
-		err = fs.odm.Delete(context.Background(), &friendToDelete)
+		err = fs.odm.Update(context.Background(), &existingFriend)
 		if err != nil {
 			return &models.MessageOptions{
 				Code:    models.ErrInternalServer,
-				Details: err,
-				Message: "刪除好友請求失敗",
+				Message: "更新封鎖狀態失敗",
+				Details: err.Error(),
 			}
 		}
-		return nil
 	}
 
-	// 更新好友狀態
-	updateQb := providers.NewQueryBuilder()
-	updateQb.Where("user_id", user.ID).
-		Where("friend_id", userObjectID).
-		Where("status", FriendStatusPending)
+	return nil
+}
 
-	var friendToUpdate models.Friend
-	err = fs.odm.FindOne(context.Background(), updateQb.GetFilter(), &friendToUpdate)
-	if err != nil {
+// UnblockUser 解除封鎖用戶
+func (fs *FriendService) UnblockUser(userID string, targetUserID string) *models.MessageOptions {
+	// targetUserID不能為自己
+	if userID == targetUserID {
 		return &models.MessageOptions{
-			Code:    models.ErrInternalServer,
-			Details: err,
-			Message: "找不到待處理的好友請求",
+			Code:    models.ErrInvalidParams,
+			Message: "不能解除封鎖自己",
 		}
 	}
 
-	friendToUpdate.Status = status
-	err = fs.odm.Update(context.Background(), &friendToUpdate)
+	userObjectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "無效的用戶ID",
+			Details: err.Error(),
+		}
+	}
+
+	targetObjectID, err := primitive.ObjectIDFromHex(targetUserID)
+	if err != nil {
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "無效的目標用戶ID",
+			Details: err.Error(),
+		}
+	}
+
+	// 查找並刪除封鎖關係
+	qb := providers.NewQueryBuilder()
+	orConditions := []bson.M{
+		{"user_id": userObjectID, "friend_id": targetObjectID, "status": "blocked"},
+		{"friend_id": userObjectID, "user_id": targetObjectID, "status": "blocked"},
+	}
+	qb.OrWhere(orConditions)
+
+	var blockedFriend models.Friend
+	err = fs.odm.FindOne(context.Background(), qb.GetFilter(), &blockedFriend)
+	if err != nil {
+		return &models.MessageOptions{
+			Code:    models.ErrNotFound,
+			Message: "找不到要解除的封鎖關係",
+			Details: err.Error(),
+		}
+	}
+
+	err = fs.odm.Delete(context.Background(), &blockedFriend)
 	if err != nil {
 		return &models.MessageOptions{
 			Code:    models.ErrInternalServer,
-			Details: err,
-			Message: "更新好友狀態失敗",
+			Message: "解除封鎖失敗",
+			Details: err.Error(),
+		}
+	}
+
+	return nil
+}
+
+// RemoveFriend 刪除好友
+func (fs *FriendService) RemoveFriend(userID string, friendID string) *models.MessageOptions {
+	// 檢查userID和friendID是否相同
+	if userID == friendID {
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "無法刪除自己",
+		}
+	}
+
+	userObjectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "無效的用戶ID",
+			Details: err.Error(),
+		}
+	}
+
+	friendObjectID, err := primitive.ObjectIDFromHex(friendID)
+	if err != nil {
+		return &models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "無效的好友ID",
+			Details: err.Error(),
+		}
+	}
+
+	// 檢查目標用戶是否存在
+	_, err = fs.userRepo.GetUserById(friendID)
+	if err != nil {
+		return &models.MessageOptions{
+			Code:    models.ErrNotFound,
+			Message: "好友不存在",
+			Details: err.Error(),
+		}
+	}
+
+	// 查找並刪除雙向好友關係
+	// 首先查找從 userID 到 friendID 的關係
+	qb1 := providers.NewQueryBuilder()
+	qb1.Where("user_id", userObjectID)
+	qb1.Where("friend_id", friendObjectID)
+	qb1.Where("status", FriendStatusAccepted)
+
+	var friendRelation1 models.Friend
+	err1 := fs.odm.FindOne(context.Background(), qb1.GetFilter(), &friendRelation1)
+
+	// 查找從 friendID 到 userID 的關係
+	qb2 := providers.NewQueryBuilder()
+	qb2.Where("user_id", friendObjectID)
+	qb2.Where("friend_id", userObjectID)
+	qb2.Where("status", FriendStatusAccepted)
+
+	var friendRelation2 models.Friend
+	err2 := fs.odm.FindOne(context.Background(), qb2.GetFilter(), &friendRelation2)
+
+	// 如果兩個關係都不存在，表示不是好友
+	if err1 != nil && err2 != nil {
+		return &models.MessageOptions{
+			Code:    models.ErrNotFound,
+			Message: "好友關係不存在",
+			Details: "未找到好友關係",
+		}
+	}
+
+	// 刪除找到的好友關係
+	if err1 == nil {
+		err = fs.odm.Delete(context.Background(), &friendRelation1)
+		if err != nil {
+			return &models.MessageOptions{
+				Code:    models.ErrInternalServer,
+				Message: "刪除好友關係失敗",
+				Details: err.Error(),
+			}
+		}
+	}
+
+	if err2 == nil {
+		err = fs.odm.Delete(context.Background(), &friendRelation2)
+		if err != nil {
+			return &models.MessageOptions{
+				Code:    models.ErrInternalServer,
+				Message: "刪除好友關係失敗",
+				Details: err.Error(),
+			}
 		}
 	}
 

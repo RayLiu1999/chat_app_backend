@@ -83,8 +83,182 @@ func (uc *FriendController) AddFriendRequest(c *gin.Context) {
 	SuccessResponse(c, nil, "好友請求已發送")
 }
 
-// 更新好友狀態
-func (uc *FriendController) UpdateFriendStatus(c *gin.Context) {
+// GetPendingRequests 獲取待處理好友請求
+func (fc *FriendController) GetPendingRequests(c *gin.Context) {
+	userID, _, err := utils.GetUserIDFromHeader(c)
+	if err != nil {
+		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{Code: models.ErrUnauthorized})
+		return
+	}
+
+	pendingRequests, msgOpt := fc.friendService.GetPendingRequests(userID)
+	if msgOpt != nil {
+		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
+		return
+	}
+
+	SuccessResponse(c, pendingRequests, "待處理請求獲取成功")
+}
+
+// GetBlockedUsers 獲取封鎖用戶列表
+func (fc *FriendController) GetBlockedUsers(c *gin.Context) {
+	userID, _, err := utils.GetUserIDFromHeader(c)
+	if err != nil {
+		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{Code: models.ErrUnauthorized})
+		return
+	}
+
+	blockedUsers, msgOpt := fc.friendService.GetBlockedUsers(userID)
+	if msgOpt != nil {
+		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
+		return
+	}
+
+	SuccessResponse(c, blockedUsers, "封鎖列表獲取成功")
+}
+
+// SendFriendRequest 發送好友請求
+func (fc *FriendController) SendFriendRequest(c *gin.Context) {
+	userID, _, err := utils.GetUserIDFromHeader(c)
+	if err != nil {
+		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{Code: models.ErrUnauthorized})
+		return
+	}
+
+	var request struct {
+		Username string `json:"username" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{Code: models.ErrInvalidParams})
+		return
+	}
+
+	msgOpt := fc.friendService.AddFriendRequest(userID, request.Username)
+	if msgOpt != nil {
+		ErrorResponse(c, http.StatusBadRequest, *msgOpt)
+		return
+	}
+
+	SuccessResponse(c, nil, "好友請求已發送")
+}
+
+// AcceptFriendRequest 接受好友請求
+func (fc *FriendController) AcceptFriendRequest(c *gin.Context) {
+	userID, _, err := utils.GetUserIDFromHeader(c)
+	if err != nil {
+		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{Code: models.ErrUnauthorized})
+		return
+	}
+
+	requestID := c.Param("request_id")
+	if requestID == "" {
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{Code: models.ErrInvalidParams})
+		return
+	}
+
+	msgOpt := fc.friendService.AcceptFriendRequest(userID, requestID)
+	if msgOpt != nil {
+		ErrorResponse(c, http.StatusBadRequest, *msgOpt)
+		return
+	}
+
+	SuccessResponse(c, nil, "已接受好友請求")
+}
+
+// DeclineFriendRequest 拒絕好友請求
+func (fc *FriendController) DeclineFriendRequest(c *gin.Context) {
+	userID, _, err := utils.GetUserIDFromHeader(c)
+	if err != nil {
+		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{Code: models.ErrUnauthorized})
+		return
+	}
+
+	requestID := c.Param("request_id")
+	if requestID == "" {
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{Code: models.ErrInvalidParams})
+		return
+	}
+
+	msgOpt := fc.friendService.DeclineFriendRequest(userID, requestID)
+	if msgOpt != nil {
+		ErrorResponse(c, http.StatusBadRequest, *msgOpt)
+		return
+	}
+
+	SuccessResponse(c, nil, "已拒絕好友請求")
+}
+
+// CancelFriendRequest 取消好友請求
+func (fc *FriendController) CancelFriendRequest(c *gin.Context) {
+	userID, _, err := utils.GetUserIDFromHeader(c)
+	if err != nil {
+		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{Code: models.ErrUnauthorized})
+		return
+	}
+
+	requestID := c.Param("request_id")
+	if requestID == "" {
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{Code: models.ErrInvalidParams})
+		return
+	}
+
+	msgOpt := fc.friendService.CancelFriendRequest(userID, requestID)
+	if msgOpt != nil {
+		ErrorResponse(c, http.StatusBadRequest, *msgOpt)
+		return
+	}
+
+	SuccessResponse(c, nil, "已取消好友請求")
+}
+
+// BlockUser 封鎖用戶
+func (fc *FriendController) BlockUser(c *gin.Context) {
+	userID, _, err := utils.GetUserIDFromHeader(c)
+	if err != nil {
+		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{Code: models.ErrUnauthorized})
+		return
+	}
+
+	targetUserID := c.Param("user_id")
+	if targetUserID == "" {
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{Code: models.ErrInvalidParams})
+		return
+	}
+
+	msgOpt := fc.friendService.BlockUser(userID, targetUserID)
+	if msgOpt != nil {
+		ErrorResponse(c, http.StatusBadRequest, *msgOpt)
+		return
+	}
+
+	SuccessResponse(c, nil, "已封鎖用戶")
+}
+
+// UnblockUser 解除封鎖用戶
+func (fc *FriendController) UnblockUser(c *gin.Context) {
+	userID, _, err := utils.GetUserIDFromHeader(c)
+	if err != nil {
+		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{Code: models.ErrUnauthorized})
+		return
+	}
+
+	targetUserID := c.Param("user_id")
+	if targetUserID == "" {
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{Code: models.ErrInvalidParams})
+		return
+	}
+
+	msgOpt := fc.friendService.UnblockUser(userID, targetUserID)
+	if msgOpt != nil {
+		ErrorResponse(c, http.StatusBadRequest, *msgOpt)
+		return
+	}
+
+	SuccessResponse(c, nil, "已解除封鎖")
+}
+
+// RemoveFriend 刪除好友
+func (fc *FriendController) RemoveFriend(c *gin.Context) {
 	userID, _, err := utils.GetUserIDFromHeader(c)
 	if err != nil {
 		ErrorResponse(c, http.StatusUnauthorized, models.MessageOptions{Code: models.ErrUnauthorized})
@@ -92,27 +266,16 @@ func (uc *FriendController) UpdateFriendStatus(c *gin.Context) {
 	}
 
 	friendID := c.Param("friend_id")
-
-	// 取得put中status資料
-	var requestBody FriendRequestStatus
-	if err := c.ShouldBindJSON(&requestBody); err != nil {
+	if friendID == "" {
 		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{Code: models.ErrInvalidParams})
 		return
 	}
 
-	// 使用service層的業務邏輯
-	msgOpt := uc.friendService.UpdateFriendStatus(userID, friendID, requestBody.Status)
+	msgOpt := fc.friendService.RemoveFriend(userID, friendID)
 	if msgOpt != nil {
 		ErrorResponse(c, http.StatusBadRequest, *msgOpt)
 		return
 	}
 
-	var message string
-	if requestBody.Status == FriendStatusAccepted {
-		message = "已接受好友請求"
-	} else {
-		message = "已拒絕好友請求"
-	}
-
-	SuccessResponse(c, nil, message)
+	SuccessResponse(c, nil, "已刪除好友")
 }

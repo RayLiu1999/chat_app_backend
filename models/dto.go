@@ -91,6 +91,37 @@ type FriendResponse struct {
 	IsOnline   bool   `json:"is_online" bson:"is_online"` // 在線狀態
 }
 
+// PendingFriendRequest 待處理好友請求
+type PendingFriendRequest struct {
+	RequestID  string `json:"request_id" bson:"_id"`
+	UserID     string `json:"user_id" bson:"user_id"`
+	Username   string `json:"username" bson:"username"`
+	Nickname   string `json:"nickname" bson:"nickname"`
+	PictureURL string `json:"picture_url" bson:"picture_url"`
+	SentAt     int64  `json:"sent_at" bson:"sent_at"`
+	Type       string `json:"type" bson:"type"` // "sent" or "received"
+}
+
+// PendingRequestsResponse 待處理請求響應
+type PendingRequestsResponse struct {
+	Sent     []PendingFriendRequest `json:"sent"`     // 我發送的請求
+	Received []PendingFriendRequest `json:"received"` // 我收到的請求
+	Count    struct {
+		Sent     int `json:"sent"`
+		Received int `json:"received"`
+		Total    int `json:"total"`
+	} `json:"count"`
+}
+
+// BlockedUserResponse 被封鎖用戶響應
+type BlockedUserResponse struct {
+	UserID     string `json:"user_id" bson:"user_id"`
+	Username   string `json:"username" bson:"username"`
+	Nickname   string `json:"nickname" bson:"nickname"`
+	PictureURL string `json:"picture_url" bson:"picture_url"`
+	BlockedAt  int64  `json:"blocked_at" bson:"blocked_at"`
+}
+
 // ServerSearchRequest 伺服器搜尋請求
 type ServerSearchRequest struct {
 	Query     string `json:"q" form:"q"`                   // 搜尋關鍵字
