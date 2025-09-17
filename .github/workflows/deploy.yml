@@ -41,6 +41,7 @@ jobs:
             --exclude='tmp/' \
             --exclude='test_results/' \
             --exclude='.env' \
+            --exclude='uploads/' \
             . ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:~/docker_pj/chat_app_backend/
 
       - name: Run remote deploy/reload command
