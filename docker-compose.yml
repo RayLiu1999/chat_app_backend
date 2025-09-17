@@ -1,17 +1,173 @@
 services:
+  # 聊天應用後端服務
   app:
-    image: golang:1.22.4
-    # 若有 Dockerfile 可改用 build: .
-    depends_on:
-      - redis
-  
-  redis:
-    image: redis
+    build: .
+    container_name: chat_app_backend
+    user: "${UID}:${GID}"
+    restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "${SERVER_PORT}:${SERVER_PORT}"
+    env_file:
+      .env
+    environment:
+      # redis設定
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      HEALTH_CHECK_URL: http://localhost:${SERVER_PORT}/health
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    networks:
+      - chat-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "${HEALTH_CHECK_URL}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 512M
+        reservations:
+          cpus: "0.2"
+          memory: 256M
+
+  # MongoDB 資料庫
+  mongodb:
+    image: mongo:7.0
+    container_name: chat_mongodb
+    restart: unless-stopped
+    ports:
+      - "${MONGODB_OUT_PORT}:${MONGODB_PORT}"
+    env_file:
+      .env
+    environment:
+      MONGODB_PORT: ${MONGODB_PORT}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE}
+    volumes:
+      - mongodb-data:/data/db
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    command: mongod --bind_ip_all --auth  # 新增：允許所有 IP 連線並啟用認證
+    networks:
+      - chat-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.2"
+          memory: 256M
+
+  # Redis 快取和訊息廣播
+  redis:
+    image: redis:7.2-alpine
+    container_name: chat_redis
+    restart: unless-stopped
+    expose:
+      - "${REDIS_PORT}"
+    env_file:
+      .env
+    environment:
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
     volumes:
       - redis-data:/data
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD} --save 60 1
+    networks:
+      - chat-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # Redis 管理界面 (可選)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: chat_redis_commander
+    restart: unless-stopped
+    ports:
+      - "${REDIS_COMMANDER_PORT}:${REDIS_COMMANDER_PORT}"
+    env_file:
+      .env
+    environment:
+      REDIS_COMMANDER_PORT: ${REDIS_COMMANDER_PORT}
+      REDIS_HOSTS: "local:redis:${REDIS_PORT}:0:${REDIS_PASSWORD}"
+    depends_on:
+      - redis
+    profiles:
+      - tools
+    networks:
+      - chat-network
+
+  # grafana:
+  #   image: grafana/grafana:latest
+  #   container_name: chat_grafana
+  #   restart: unless-stopped
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     GF_SECURITY_ADMIN_PASSWORD: admin123
+  #   depends_on:
+  #     # - prometheus
+  #     - influxdb
+  #   networks:
+  #     - chat-network
+
+  # influxdb:
+  #   image: influxdb:latest
+  #   container_name: chat_influxdb
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8086:8086"
+  #   volumes:
+  #     - influxdb-data:/var/lib/influxdb
+  #   networks:
+  #     - chat-network
+  #   environment:
+  #     INFLUXDB_DB: k6
+  #     INFLUXDB_ADMIN_USER: admin
+  #     INFLUXDB_ADMIN_PASSWORD: admin123
+
+  # Prometheus 監控服務 (可選)
+  # prometheus:
+  #   image: prom/prometheus:latest
+  #   container_name: chat_prometheus
+  #   restart: unless-stopped
+  #   ports:
+  #     - "9090:9090"
+  #   volumes:
+  #     - ./prometheus:/etc/prometheus
+  #   networks:
+  #     - chat-network
 
 volumes:
+  mongodb-data:
   redis-data:
+  # influxdb-data:
+
+networks:
+  chat-network:
+    driver: bridge
