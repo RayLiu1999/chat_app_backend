@@ -53,6 +53,7 @@ jobs:
           script: |
             cd ~/docker_pj/chat_app_backend
             echo "Building and restarting containers..."
+            mkdir -p uploads # 確保 uploads 目錄存在
             docker-compose down
             docker-compose up -d --build
             echo "Deployed!" 
