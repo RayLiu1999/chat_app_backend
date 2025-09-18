@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetCookie(c *gin.Context, cfg *config.Config, name string, value string, maxAge int) {
+func SetCookie(c *gin.Context, cfg *config.Config, name string, value string, maxAge int, httpOnly bool) {
 	mainDomain := cfg.Server.MainDomain
 	secure := true
 	if cfg.Server.Mode == config.DevelopmentMode {
@@ -14,9 +14,9 @@ func SetCookie(c *gin.Context, cfg *config.Config, name string, value string, ma
 		secure = false
 	}
 
-	c.SetCookie(name, value, maxAge, "/", mainDomain, secure, true)
+	c.SetCookie(name, value, maxAge, "/", mainDomain, secure, httpOnly)
 }
 
 func ClearCookie(c *gin.Context, cfg *config.Config, name string) {
-	SetCookie(c, cfg, name, "", -1)
+	SetCookie(c, cfg, name, "", -1, true)
 }

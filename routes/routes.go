@@ -19,7 +19,8 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, mongodb *providers.MongoWrap
 	r.Static("/uploads", uploadsAbsPath)
 
 	// 健康檢查 - 使用中介軟體保護
-	r.GET("/health", middlewares.HealthCheckAuth(cfg), controllers.HealthController.HealthCheck)
+	// r.GET("/health", middlewares.HealthCheckAuth(cfg), controllers.HealthController.HealthCheck)
+	r.GET("/health", controllers.HealthController.HealthCheck)
 	r.GET("/health/proxy", middlewares.PublicHealthCheckAuth(cfg), controllers.HealthController.ProxyCheck)
 	r.GET("/health/detailed", middlewares.HealthCheckAuth(cfg), controllers.HealthController.DetailedHealthCheck)
 
@@ -42,12 +43,15 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, mongodb *providers.MongoWrap
 	public := r.Group("/")
 	public.POST("/register", controllers.UserController.Register)
 	public.POST("/login", controllers.UserController.Login)
-	public.POST("/logout", controllers.UserController.Logout)
-	public.POST("/refresh_token", controllers.UserController.RefreshToken)
+	public.POST("/logout", middlewares.VerifyCSRFToken(), controllers.UserController.Logout)
+	public.POST("/refresh_token", middlewares.VerifyCSRFToken(), controllers.UserController.RefreshToken)
 
 	// 需要認證的路由
 	auth := r.Group("/")
 	auth.Use(middlewares.Auth())
+
+	authWithCSRF := auth.Group("/")
+	authWithCSRF.Use(middlewares.VerifyCSRFToken())
 
 	// WebSocket
 	auth.GET("/ws", controllers.ChatController.HandleConnections)
@@ -57,15 +61,13 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, mongodb *providers.MongoWrap
 
 	// User Profile APIs
 	auth.GET("/user/profile", controllers.UserController.GetUserProfile)
-	auth.PUT("/user/profile", controllers.UserController.UpdateUserProfile)
-	auth.POST("/user/upload-image", controllers.UserController.UploadUserImage)
-	auth.DELETE("/user/avatar", controllers.UserController.DeleteUserAvatar)
-	auth.DELETE("/user/banner", controllers.UserController.DeleteUserBanner)
-	auth.PUT("/user/password", controllers.UserController.UpdateUserPassword)
-	// auth.GET("/user/two-factor-status", controllers.UserController.GetTwoFactorStatus)
-	// auth.PUT("/user/two-factor", controllers.UserController.UpdateTwoFactorStatus)
-	auth.PUT("/user/deactivate", controllers.UserController.DeactivateAccount)
-	auth.DELETE("/user/delete", controllers.UserController.DeleteAccount)
+	authWithCSRF.PUT("/user/profile", controllers.UserController.UpdateUserProfile)
+	authWithCSRF.POST("/user/upload-image", controllers.UserController.UploadUserImage)
+	authWithCSRF.DELETE("/user/avatar", controllers.UserController.DeleteUserAvatar)
+	authWithCSRF.DELETE("/user/banner", controllers.UserController.DeleteUserBanner)
+	authWithCSRF.PUT("/user/password", controllers.UserController.UpdateUserPassword)
+	authWithCSRF.PUT("/user/deactivate", controllers.UserController.DeactivateAccount)
+	authWithCSRF.DELETE("/user/delete", controllers.UserController.DeleteAccount)
 
 	// auth.GET("/users/:id/online-status", controllers.UserController.CheckUserOnlineStatus) // 檢查特定用戶在線狀態
 
@@ -77,47 +79,47 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, mongodb *providers.MongoWrap
 	auth.GET("/friends/blocked", controllers.FriendController.GetBlockedUsers)    // 獲取封鎖列表
 
 	// 好友請求管理
-	auth.POST("/friends/requests", controllers.FriendController.SendFriendRequest)                       // 發送好友請求
-	auth.PUT("/friends/requests/:request_id/accept", controllers.FriendController.AcceptFriendRequest)   // 接受請求
-	auth.PUT("/friends/requests/:request_id/decline", controllers.FriendController.DeclineFriendRequest) // 拒絕請求
-	auth.DELETE("/friends/requests/:request_id", controllers.FriendController.CancelFriendRequest)       // 取消請求
+	authWithCSRF.POST("/friends/requests", controllers.FriendController.SendFriendRequest)                       // 發送好友請求
+	authWithCSRF.PUT("/friends/requests/:request_id/accept", controllers.FriendController.AcceptFriendRequest)   // 接受請求
+	authWithCSRF.PUT("/friends/requests/:request_id/decline", controllers.FriendController.DeclineFriendRequest) // 拒絕請求
+	authWithCSRF.DELETE("/friends/requests/:request_id", controllers.FriendController.CancelFriendRequest)       // 取消請求
 
 	// 封鎖管理
-	auth.POST("/friends/:user_id/block", controllers.FriendController.BlockUser)     // 封鎖用戶
-	auth.DELETE("/friends/:user_id/block", controllers.FriendController.UnblockUser) // 解除封鎖
+	authWithCSRF.POST("/friends/:user_id/block", controllers.FriendController.BlockUser)     // 封鎖用戶
+	authWithCSRF.DELETE("/friends/:user_id/block", controllers.FriendController.UnblockUser) // 解除封鎖
 
 	// 刪除好友
-	auth.DELETE("/friends/remove/:friend_id", controllers.FriendController.RemoveFriend) // 刪除好友
+	authWithCSRF.DELETE("/friends/remove/:friend_id", controllers.FriendController.RemoveFriend) // 刪除好友
 
 	// dm room
 	auth.GET("/dm_rooms", controllers.ChatController.GetDMRoomList)                   // 獲取聊天列表
-	auth.PUT("/dm_rooms", controllers.ChatController.UpdateDMRoom)                    // 更新聊天列表狀態
-	auth.POST("/dm_rooms", controllers.ChatController.CreateDMRoom)                   // 保存聊天列表
+	authWithCSRF.PUT("/dm_rooms", controllers.ChatController.UpdateDMRoom)            // 更新聊天列表狀態
+	authWithCSRF.POST("/dm_rooms", controllers.ChatController.CreateDMRoom)           // 保存聊天列表
 	auth.GET("/dm_rooms/:room_id/messages", controllers.ChatController.GetDMMessages) // 獲取私聊訊息
 
 	// server
 	auth.GET("/servers", controllers.ServerController.GetServerList)
-	auth.POST("/servers", controllers.ServerController.CreateServer)
+	authWithCSRF.POST("/servers", controllers.ServerController.CreateServer)
 	auth.GET("/servers/search", controllers.ServerController.SearchPublicServers)            // 搜尋公開伺服器
 	auth.GET("/servers/:server_id", controllers.ServerController.GetServerByID)              // 獲取單個伺服器信息
 	auth.GET("/servers/:server_id/detail", controllers.ServerController.GetServerDetailByID) // 獲取伺服器詳細信息（含成員）
-	auth.PUT("/servers/:server_id", controllers.ServerController.UpdateServer)               // 更新伺服器信息
-	auth.DELETE("/servers/:server_id", controllers.ServerController.DeleteServer)            // 刪除伺服器
-	auth.POST("/servers/:server_id/join", controllers.ServerController.JoinServer)           // 請求加入伺服器
-	auth.POST("/servers/:server_id/leave", controllers.ServerController.LeaveServer)         // 離開伺服器
+	authWithCSRF.PUT("/servers/:server_id", controllers.ServerController.UpdateServer)       // 更新伺服器信息
+	authWithCSRF.DELETE("/servers/:server_id", controllers.ServerController.DeleteServer)    // 刪除伺服器
+	authWithCSRF.POST("/servers/:server_id/join", controllers.ServerController.JoinServer)   // 請求加入伺服器
+	authWithCSRF.POST("/servers/:server_id/leave", controllers.ServerController.LeaveServer) // 離開伺服器
 
 	// channel
-	auth.GET("/servers/:server_id/channels", controllers.ChannelController.GetChannelsByServerID) // 獲取伺服器頻道列表
-	auth.GET("/channels/:channel_id", controllers.ChannelController.GetChannelByID)               // 獲取單個頻道信息
-	auth.POST("/servers/:server_id/channels", controllers.ChannelController.CreateChannel)        // 創建新頻道
-	auth.PUT("/channels/:channel_id", controllers.ChannelController.UpdateChannel)                // 更新頻道信息
-	auth.DELETE("/channels/:channel_id", controllers.ChannelController.DeleteChannel)             // 刪除頻道
-	auth.GET("/channels/:channel_id/messages", controllers.ChatController.GetChannelMessages)     // 獲取頻道訊息
+	auth.GET("/servers/:server_id/channels", controllers.ChannelController.GetChannelsByServerID)  // 獲取伺服器頻道列表
+	auth.GET("/channels/:channel_id", controllers.ChannelController.GetChannelByID)                // 獲取單個頻道信息
+	authWithCSRF.POST("/servers/:server_id/channels", controllers.ChannelController.CreateChannel) // 創建新頻道
+	authWithCSRF.PUT("/channels/:channel_id", controllers.ChannelController.UpdateChannel)         // 更新頻道信息
+	authWithCSRF.DELETE("/channels/:channel_id", controllers.ChannelController.DeleteChannel)      // 刪除頻道
+	auth.GET("/channels/:channel_id/messages", controllers.ChatController.GetChannelMessages)      // 獲取頻道訊息
 
 	// file upload
-	auth.POST("/upload/file", controllers.FileController.UploadFile)         // 通用檔案上傳
-	auth.POST("/upload/avatar", controllers.FileController.UploadAvatar)     // 頭像上傳
-	auth.POST("/upload/document", controllers.FileController.UploadDocument) // 文件上傳
-	auth.GET("/files", controllers.FileController.GetUserFiles)              // 獲取用戶檔案列表
-	auth.DELETE("/files/:file_id", controllers.FileController.DeleteFile)    // 刪除檔案
+	authWithCSRF.POST("/upload/file", controllers.FileController.UploadFile)         // 通用檔案上傳
+	authWithCSRF.POST("/upload/avatar", controllers.FileController.UploadAvatar)     // 頭像上傳
+	authWithCSRF.POST("/upload/document", controllers.FileController.UploadDocument) // 文件上傳
+	auth.GET("/files", controllers.FileController.GetUserFiles)                      // 獲取用戶檔案列表
+	authWithCSRF.DELETE("/files/:file_id", controllers.FileController.DeleteFile)    // 刪除檔案
 }

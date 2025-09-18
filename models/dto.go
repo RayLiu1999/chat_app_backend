@@ -17,6 +17,13 @@ type UserResponse struct {
 type LoginResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token,omitempty"`
+	CSRFToken    string `json:"csrf_token"`
+}
+
+// RefreshTokenResponse 包含刷新令牌後返回的資訊
+type RefreshTokenResponse struct {
+	AccessToken string `json:"access_token"`
+	CSRFToken   string `json:"csrf_token"`
 }
 
 type ServerResponse struct {

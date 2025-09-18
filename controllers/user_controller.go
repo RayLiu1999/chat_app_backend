@@ -75,7 +75,10 @@ func (uc *UserController) Login(c *gin.Context) {
 	}
 
 	// 將 refresh token 寫入 cookie
-	utils.SetCookie(c, uc.config, "refresh_token", response.RefreshToken, 3600*72)
+	utils.SetCookie(c, uc.config, "refresh_token", response.RefreshToken, uc.config.Server.RefreshExpireHours*3600, true)
+
+	// 將 CSRF token 寫入 cookie（不設定 HttpOnly，讓前端可以讀取）
+	utils.SetCookie(c, uc.config, "csrf_token", response.CSRFToken, uc.config.Server.RefreshExpireHours*3600, false)
 
 	// 返回 access token 給客戶端
 	SuccessResponse(c, gin.H{"access_token": response.AccessToken}, "登入成功")
@@ -101,7 +104,7 @@ func (uc *UserController) RefreshToken(c *gin.Context) {
 	}
 
 	// 調用服務層的 RefreshToken 方法
-	accessToken, appErr := uc.userService.RefreshToken(token)
+	response, appErr := uc.userService.RefreshToken(token)
 	if appErr != nil {
 		statusCode := http.StatusInternalServerError
 		if appErr.Code == models.ErrInvalidToken {
@@ -115,7 +118,10 @@ func (uc *UserController) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	SuccessResponse(c, gin.H{"access_token": accessToken}, "令牌刷新成功")
+	// 將新的 csrf token 寫入 cookie
+	utils.SetCookie(c, uc.config, "csrf_token", response.CSRFToken, uc.config.Server.RefreshExpireHours*3600, false)
+
+	SuccessResponse(c, gin.H{"access_token": response.AccessToken}, "令牌刷新成功")
 }
 
 // 取得用戶資訊

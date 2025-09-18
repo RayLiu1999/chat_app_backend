@@ -41,6 +41,7 @@ jobs:
             --exclude='tmp/' \
             --exclude='test_results/' \
             --exclude='.env' \
+            --exclude='.env.example' \
             --exclude='uploads/' \
             . ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:~/docker_pj/chat_app_backend/
 
@@ -54,6 +55,7 @@ jobs:
             cd ~/docker_pj/chat_app_backend
             echo "Building and restarting containers..."
             mkdir -p uploads # 確保 uploads 目錄存在
+            mkdir -p logs   # 確保 logs 目錄存在
             docker-compose down
             docker-compose up -d --build
             echo "Deployed!" 

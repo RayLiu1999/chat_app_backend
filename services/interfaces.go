@@ -24,7 +24,7 @@ type UserServiceInterface interface {
 	Logout(c *gin.Context) *models.MessageOptions
 
 	// RefreshToken 刷新令牌
-	RefreshToken(refreshToken string) (string, *models.MessageOptions)
+	RefreshToken(refreshToken string) (*models.RefreshTokenResponse, *models.MessageOptions)
 
 	// SetUserOnline 設置用戶為在線狀態
 	SetUserOnline(userID string) error

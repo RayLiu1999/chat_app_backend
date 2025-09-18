@@ -211,10 +211,21 @@ func (us *UserService) Login(loginUser models.User) (*models.LoginResponse, *mod
 		}
 	}
 
+	// 生成 CSRF Token
+	csrfToken, err := utils.GenerateCSRFToken()
+	if err != nil {
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
+			Message: "生成 CSRF 令牌失敗",
+		}
+	}
+
 	// 返回 tokens
 	return &models.LoginResponse{
 		AccessToken:  accessTokenResponse.Token,
 		RefreshToken: refreshTokenResponse.Token,
+		CSRFToken:    csrfToken,
 	}, nil
 }
 
@@ -245,12 +256,12 @@ func (us *UserService) Logout(c *gin.Context) *models.MessageOptions {
 }
 
 // RefreshToken 刷新令牌
-func (us *UserService) RefreshToken(refreshToken string) (string, *models.MessageOptions) {
+func (us *UserService) RefreshToken(refreshToken string) (*models.RefreshTokenResponse, *models.MessageOptions) {
 	// 查詢 refresh token
 	var refreshTokenDoc models.RefreshToken
 	err := us.odm.FindOne(context.Background(), bson.M{"token": refreshToken}, &refreshTokenDoc)
 	if err != nil {
-		return "", &models.MessageOptions{
+		return nil, &models.MessageOptions{
 			Code: models.ErrInvalidToken,
 		}
 	}
@@ -260,13 +271,13 @@ func (us *UserService) RefreshToken(refreshToken string) (string, *models.Messag
 		// 移除 refresh token
 		err = us.odm.Delete(context.Background(), &refreshTokenDoc)
 		if err != nil {
-			return "", &models.MessageOptions{
+			return nil, &models.MessageOptions{
 				Code:    models.ErrInternalServer,
 				Details: err,
 			}
 		}
 
-		return "", &models.MessageOptions{
+		return nil, &models.MessageOptions{
 			Code: models.ErrInvalidToken,
 		}
 	}
@@ -274,9 +285,19 @@ func (us *UserService) RefreshToken(refreshToken string) (string, *models.Messag
 	// 生成新的 access token
 	accessTokenResponse, err := utils.GenAccessToken(refreshTokenDoc.UserID.Hex())
 	if err != nil {
-		return "", &models.MessageOptions{
+		return nil, &models.MessageOptions{
 			Code:    models.ErrInternalServer,
 			Details: err,
+		}
+	}
+
+	// 生成 CSRF Token
+	csrfToken, err := utils.GenerateCSRFToken()
+	if err != nil {
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Details: err,
+			Message: "生成 CSRF 令牌失敗",
 		}
 	}
 
@@ -284,13 +305,16 @@ func (us *UserService) RefreshToken(refreshToken string) (string, *models.Messag
 	refreshTokenDoc.ExpiresAt = time.Now().Add(time.Hour * 24 * 7).Unix()
 	err = us.odm.Update(context.Background(), &refreshTokenDoc)
 	if err != nil {
-		return "", &models.MessageOptions{
+		return nil, &models.MessageOptions{
 			Code:    models.ErrInternalServer,
 			Details: err,
 		}
 	}
 
-	return accessTokenResponse.Token, nil
+	return &models.RefreshTokenResponse{
+		AccessToken: accessTokenResponse.Token,
+		CSRFToken:   csrfToken,
+	}, nil
 }
 
 // 清除過期或被註銷的 refresh token
