@@ -30,6 +30,7 @@
   - 靜態路徑 `uploads/`，支援多檔案類型
 
 - **系統架構**
+  - 採用 `app` 目錄封裝核心業務邏輯
   - 三層分層：Controller → Service → Repository
   - 依賴注入（手寫 DI）
   - 配置集中管理（Viper 讀取 YAML/ENV）

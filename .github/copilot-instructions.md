@@ -20,18 +20,20 @@
 ### 目錄結構
 ```
 chat_app_backend/
-├── config/          # 配置管理
-├── controllers/     # HTTP 控制器
-├── di/             # 依賴注入容器
-├── middlewares/    # 中介軟體
-├── models/         # 資料模型
-├── providers/      # 資料庫連接提供者
-├── repositories/   # 資料訪問層
-├── routes/         # 路由配置
-├── services/       # 業務邏輯層（已模組化）
-├── utils/          # 工具函數
-├── uploads/        # 靜態檔案存儲
-└── main.go         # 程式入口點
+├── app/              # 核心應用程式邏輯
+│   ├── http/         # HTTP 相關模組
+│   │   ├── controllers/  # HTTP 控制器
+│   │   ├── middlewares/  # HTTP 中介軟體
+│   ├── models/       # 資料模型
+│   ├── providers/    # 資料庫連接提供者
+│   ├── repositories/ # 資料訪問層
+│   └── services/     # 業務邏輯層
+├── config/           # 配置管理
+├── di/               # 依賴注入容器
+├── routes/           # 路由配置
+├── utils/            # 工具函數
+├── uploads/          # 靜態檔案存儲
+└── main.go           # 程式入口點
 ```
 
 ### 核心模組
