@@ -4,7 +4,6 @@ import (
 	"chat_app_backend/app/models"
 	"chat_app_backend/config"
 	"context"
-	"log"
 
 	"chat_app_backend/app/providers"
 
@@ -29,7 +28,6 @@ func NewServerRepository(cfg *config.Config, odm *providers.ODM) *ServerReposito
 func (sr *ServerRepository) CreateServer(server *models.Server) (models.Server, error) {
 	err := sr.odm.Create(context.Background(), server)
 	if err != nil {
-		log.Printf("保存伺服器失敗: %v", err)
 		return models.Server{}, err
 	}
 	return *server, nil

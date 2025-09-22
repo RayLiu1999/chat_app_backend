@@ -85,20 +85,20 @@ func (cm *ClientManager) GetAllClients() map[*Client]bool {
 // handleRegister 處理客戶端註冊
 func (cm *ClientManager) handleRegister() {
 	for client := range cm.register {
-		utils.PrettyPrintf("Handling Register event for user %s", client.UserID)
+		utils.PrettyPrintf("正在處理用戶 %s 的註冊事件", client.UserID)
 		cm.registerClient(client)
 		cm.updateClientStatus(client, "online")
-		utils.PrettyPrintf("Register event completed for user %s", client.UserID)
+		utils.PrettyPrintf("用戶 %s 的註冊事件已完成", client.UserID)
 	}
 }
 
 // handleUnregister 處理客戶端註銷
 func (cm *ClientManager) handleUnregister() {
 	for client := range cm.unregister {
-		utils.PrettyPrintf("Handling Unregister event for user %s", client.UserID)
+		utils.PrettyPrintf("正在處理用戶 %s 的註銷事件", client.UserID)
 		cm.unregisterClient(client)
 		cm.updateClientStatus(client, "offline")
-		utils.PrettyPrintf("Unregister event completed for user %s", client.UserID)
+		utils.PrettyPrintf("用戶 %s 的註銷事件已完成", client.UserID)
 	}
 }
 
@@ -150,7 +150,7 @@ func (cm *ClientManager) unregisterClient(client *Client) {
 func (cm *ClientManager) updateClientStatus(client *Client, status string) {
 	ctx := context.Background()
 	cm.redisClient.Set(ctx, "user:"+client.UserID+":status", status, 24*time.Hour)
-	utils.PrettyPrintf("Update status for user %s: %s", client.UserID, status)
+	utils.PrettyPrintf("更新用戶 %s 的狀態：%s", client.UserID, status)
 }
 
 // CheckClientsHealth 檢查所有客戶端的健康狀態

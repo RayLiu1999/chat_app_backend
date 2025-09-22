@@ -3,7 +3,6 @@ package utils
 import (
 	"context"
 	"errors"
-	"log"
 	"runtime"
 	"sync"
 	"time"
@@ -89,7 +88,7 @@ func SafeGoroutine(fn func(), onPanic ...func(interface{})) {
 				// 記錄 panic 堆棧
 				stack := make([]byte, 4096)
 				stack = stack[:runtime.Stack(stack, false)]
-				log.Printf("Goroutine panic: %v\n%s", r, stack)
+				PrettyPrintf("Goroutine panic: %v\n%s", r, stack)
 
 				// 調用自定義 panic 處理
 				if len(onPanic) > 0 && onPanic[0] != nil {
@@ -148,7 +147,7 @@ func (p *WorkerPool) worker() {
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
-						log.Printf("Worker panic: %v", r)
+						PrettyPrintf("工作池工作 panic: %v", r)
 					}
 				}()
 

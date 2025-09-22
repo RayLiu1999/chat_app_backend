@@ -4,9 +4,9 @@ import (
 	"chat_app_backend/app/models"
 	"chat_app_backend/app/providers"
 	"chat_app_backend/app/repositories"
+	"chat_app_backend/utils"
 	"context"
 	"encoding/json"
-	"log"
 	"sync"
 	"time"
 
@@ -63,7 +63,6 @@ func (rm *RoomManager) InitRoom(roomType models.RoomType, roomID string) *Room {
 	rm.mutex.RUnlock()
 
 	if exists {
-		log.Printf("Room %s already exists", key.String())
 		return room
 	}
 
@@ -103,7 +102,7 @@ func (rm *RoomManager) InitRoom(roomType models.RoomType, roomID string) *Room {
 		for msg := range pubsub.Channel() {
 			var message *WsMessage[MessageResponse]
 			if err := json.Unmarshal([]byte(msg.Payload), &message); err != nil {
-				log.Printf("Failed to unmarshal message: %v", err)
+				utils.PrettyPrintf("解析消息失敗: %v", err)
 				continue
 			}
 			room.Mutex.RLock()
@@ -124,7 +123,7 @@ func (rm *RoomManager) JoinRoom(client *Client, roomType models.RoomType, roomID
 	room, exists := rm.rooms[key.String()]
 	rm.mutex.RUnlock()
 	if !exists {
-		log.Printf("Room %s not found", key.String())
+		utils.PrettyPrintf("房間 %s 未找到", key.String())
 		return
 	}
 
@@ -149,7 +148,7 @@ func (rm *RoomManager) LeaveRoom(client *Client, roomType models.RoomType, roomI
 	room, exists := rm.rooms[key.String()]
 	rm.mutex.RUnlock()
 	if !exists {
-		log.Printf("Room %s not found", key.String())
+		utils.PrettyPrintf("房間 %s 未找到", key.String())
 		return
 	}
 
@@ -170,8 +169,6 @@ func (rm *RoomManager) LeaveRoom(client *Client, roomType models.RoomType, roomI
 	if clientCount == 0 {
 		rm.cleanupRoom(key.String())
 	}
-
-	log.Printf("User %s left room %s", client.UserID, key.String())
 }
 
 // CleanupRoom 清理空房間
@@ -190,7 +187,6 @@ func (rm *RoomManager) cleanupRoom(roomKey string) {
 		rm.pubSubMutex.Unlock()
 
 		delete(rm.rooms, roomKey)
-		log.Printf("Room %s cleaned up", roomKey)
 	}
 }
 
@@ -239,7 +235,7 @@ func (rm *RoomManager) checkUserAllowedJoinRoom(userID string, roomID string, ro
 		// 使用 ServerMemberRepository 檢查用戶是否為伺服器成員
 		isMember, err := rm.serverMemberRepo.IsMemberOfServer(channel.ServerID.Hex(), userID)
 		if err != nil {
-			log.Printf("Error checking server membership: %v", err)
+			utils.PrettyPrintf("檢查伺服器成員失敗: %v", err)
 			return false, err
 		}
 
@@ -263,7 +259,7 @@ func (rm *RoomManager) broadcastWorker(room *Room) {
 func (rm *RoomManager) safelyBroadcastToClient(client *Client, message *WsMessage[MessageResponse]) {
 	// 使用統一的發送機制，而不是直接寫入 WebSocket
 	if err := client.SendMessage(message); err != nil {
-		log.Printf("Failed to send to user %s: %v", client.UserID, err)
+		utils.PrettyPrintf("發送消息失敗: %v", err)
 		// 標記客戶端為非活躍，讓健康檢查清理
 		client.IsActive = false
 		return

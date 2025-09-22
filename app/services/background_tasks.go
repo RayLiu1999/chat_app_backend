@@ -1,6 +1,7 @@
 package services
 
 import (
+	"chat_app_backend/utils"
 	"log"
 	"time"
 )
@@ -23,13 +24,11 @@ func (bt *BackgroundTasks) StartOfflineUserChecker(intervalMinutes, offlineThres
 	ticker := time.NewTicker(time.Duration(intervalMinutes) * time.Minute)
 	defer ticker.Stop()
 
-	log.Printf("Started offline user checker: checking every %d minutes, threshold %d minutes", intervalMinutes, offlineThresholdMinutes)
+	utils.PrettyPrintf("離線用戶檢查任務已啟動: 每 %d 分鐘檢查一次，閾值 %d 分鐘", intervalMinutes, offlineThresholdMinutes)
 
 	for range ticker.C {
 		if err := bt.userService.CheckAndSetOfflineUsers(offlineThresholdMinutes); err != nil {
-			log.Printf("Error checking offline users: %v", err)
-		} else {
-			log.Printf("Offline user check completed")
+			utils.PrettyPrintf("離線用戶檢查失敗: %v", err)
 		}
 	}
 }
@@ -39,5 +38,5 @@ func (bt *BackgroundTasks) StartAllBackgroundTasks() {
 	// 啟動離線用戶檢查任務 - 每5分鐘檢查一次，15分鐘未活動則設為離線
 	go bt.StartOfflineUserChecker(5, 15)
 
-	log.Println("All background tasks started")
+	log.Println("所有後台任務已啟動")
 }

@@ -57,11 +57,8 @@ func PrettyPrint(prefix string, data interface{}) {
 }
 
 // PrettyPrintf 打印格式化的調試信息
-// prefix: 可選的前綴說明文字
 // format: 格式化字符串
 // args: 變長參數列表
-// 這個函數會自動添加調用者的文件名、行號
-// Example: utils.PrettyPrintf("MyPrefix", "Hello %s", "World")
 func PrettyPrintf(format string, args ...interface{}) {
 	// 獲取調用者信息
 	pc, file, line, _ := runtime.Caller(1)
@@ -74,11 +71,10 @@ func PrettyPrintf(format string, args ...interface{}) {
 	// 構建標頭
 	header := fmt.Sprintf("\033[1;36m[DEBUG] %s:%d %s()\033[0m", callerFile, line, callerFunc)
 
-	// if prefix != "" {
-	// 	header += fmt.Sprintf(" \033[1;33m%s\033[0m", prefix)
-	// }
+	// 上色格式化字符串
+	coloredFormat := "\033[1;33m" + format + "\033[0m"
 
-	log.Printf("%s: "+format, append([]interface{}{header}, args...)...)
+	log.Printf("%s: "+coloredFormat, append([]interface{}{header}, args...)...)
 }
 
 // PrettyPrintError 打印錯誤信息

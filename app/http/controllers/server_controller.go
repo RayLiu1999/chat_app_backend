@@ -5,7 +5,6 @@ import (
 	"chat_app_backend/app/services"
 	"chat_app_backend/config"
 	"chat_app_backend/utils"
-	"log"
 	"mime/multipart"
 	"net/http"
 
@@ -74,7 +73,6 @@ func (sc *ServerController) CreateServer(c *gin.Context) {
 		// 開啟檔案
 		file, err = picture.Open()
 		if err != nil {
-			log.Printf("Error opening file: %v", err)
 			ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
 				Code:    models.ErrInvalidParams,
 				Message: "無法開啟檔案",
@@ -87,7 +85,6 @@ func (sc *ServerController) CreateServer(c *gin.Context) {
 	// 透過Service創建伺服器（包含檔案上傳）
 	serverResponse, msgOpt := sc.serverService.CreateServer(userID, name, file, picture)
 	if msgOpt != nil {
-		log.Printf("Error creating server: %v", msgOpt.Details)
 		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
 		return
 	}
@@ -132,7 +129,6 @@ func (sc *ServerController) SearchPublicServers(c *gin.Context) {
 	// 透過Service搜尋伺服器
 	searchResults, msgOpt := sc.serverService.SearchPublicServers(userID, request)
 	if msgOpt != nil {
-		log.Printf("Error searching servers: %v", msgOpt.Details)
 		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
 		return
 	}
@@ -199,7 +195,6 @@ func (sc *ServerController) UpdateServer(c *gin.Context) {
 	// 透過Service更新伺服器
 	serverResponse, msgOpt := sc.serverService.UpdateServer(userID, serverID, updates)
 	if msgOpt != nil {
-		log.Printf("Error updating server: %v", msgOpt.Details)
 		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
 		return
 	}
@@ -230,7 +225,6 @@ func (sc *ServerController) DeleteServer(c *gin.Context) {
 	// 透過Service刪除伺服器
 	msgOpt := sc.serverService.DeleteServer(userID, serverID)
 	if msgOpt != nil {
-		log.Printf("Error deleting server: %v", msgOpt.Details)
 		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
 		return
 	}
@@ -261,7 +255,6 @@ func (sc *ServerController) GetServerByID(c *gin.Context) {
 	// 透過Service獲取伺服器
 	serverResponse, msgOpt := sc.serverService.GetServerByID(userID, serverID)
 	if msgOpt != nil {
-		log.Printf("Error getting server: %v", msgOpt.Details)
 		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
 		return
 	}
@@ -292,7 +285,6 @@ func (sc *ServerController) GetServerDetailByID(c *gin.Context) {
 	// 透過Service獲取伺服器詳細信息
 	serverDetailResponse, msgOpt := sc.serverService.GetServerDetailByID(userID, serverID)
 	if msgOpt != nil {
-		log.Printf("Error getting server detail: %v", msgOpt.Details)
 		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
 		return
 	}
@@ -323,7 +315,6 @@ func (sc *ServerController) JoinServer(c *gin.Context) {
 	// 透過Service加入伺服器
 	msgOpt := sc.serverService.JoinServer(userID, serverID)
 	if msgOpt != nil {
-		log.Printf("Error joining server: %v", msgOpt.Details)
 		ErrorResponse(c, http.StatusBadRequest, *msgOpt)
 		return
 	}
@@ -354,7 +345,6 @@ func (sc *ServerController) LeaveServer(c *gin.Context) {
 	// 透過Service離開伺服器
 	msgOpt := sc.serverService.LeaveServer(userID, serverID)
 	if msgOpt != nil {
-		log.Printf("Error leaving server: %v", msgOpt.Details)
 		ErrorResponse(c, http.StatusBadRequest, *msgOpt)
 		return
 	}

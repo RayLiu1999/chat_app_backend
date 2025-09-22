@@ -65,6 +65,6 @@ func main() {
 	}
 
 	// 啟動服務器
-	log.Println("Server starting on :" + config.AppConfig.Server.Port)
+	log.Println("服務器已啟動，Port: " + config.AppConfig.Server.Port)
 	r.Run(":" + config.AppConfig.Server.Port)
 }

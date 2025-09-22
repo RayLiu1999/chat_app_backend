@@ -67,7 +67,7 @@ var AppConfig *Config
 func LoadConfig() {
 	// 載入 .env 檔案
 	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found, using system environment variables")
+		log.Println("未找到 .env 檔案，使用系統環境變數")
 	}
 
 	AppConfig = &Config{

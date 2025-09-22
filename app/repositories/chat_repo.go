@@ -5,7 +5,6 @@ import (
 	"chat_app_backend/app/providers"
 	"chat_app_backend/config"
 	"context"
-	"log"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -36,7 +35,6 @@ func (cr *ChatRepository) SaveMessage(message models.Message) (string, error) {
 
 	err := cr.odm.Create(ctx, &message)
 	if err != nil {
-		log.Printf("保存聊天消息失敗: %v", err)
 		return "", err
 	}
 
@@ -50,7 +48,6 @@ func (cr *ChatRepository) GetMessagesByRoomID(roomID string, limit int64) ([]mod
 
 	roomObjectID, err := primitive.ObjectIDFromHex(roomID)
 	if err != nil {
-		log.Printf("轉換房間ID失敗: %v", err)
 		return nil, err
 	}
 
@@ -66,7 +63,6 @@ func (cr *ChatRepository) GetMessagesByRoomID(roomID string, limit int64) ([]mod
 	var messages []models.Message
 	err = cr.odm.FindWithOptions(ctx, filter, &messages, &queryOptions)
 	if err != nil {
-		log.Printf("查詢房間消息失敗: %v", err)
 		return nil, err
 	}
 
@@ -80,7 +76,6 @@ func (cr *ChatRepository) GetDMRoomListByUserID(userID string, includeHidden boo
 
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		log.Printf("轉換用戶ID失敗: %v", err)
 		return nil, err
 	}
 
@@ -100,7 +95,6 @@ func (cr *ChatRepository) GetDMRoomListByUserID(userID string, includeHidden boo
 	var chatLists []models.DMRoom
 	err = cr.odm.FindWithOptions(ctx, filter, &chatLists, &queryOptions)
 	if err != nil {
-		log.Printf("查詢聊天列表失敗: %v", err)
 		return nil, err
 	}
 
@@ -114,12 +108,10 @@ func (cr *ChatRepository) UpdateDMRoom(userID string, chatWithUserID string, IsH
 
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		log.Printf("轉換用戶ID失敗: %v", err)
 		return err
 	}
 	chatWithUserObjectID, err := primitive.ObjectIDFromHex(chatWithUserID)
 	if err != nil {
-		log.Printf("轉換聊天對象ID失敗: %v", err)
 		return err
 	}
 
@@ -137,7 +129,6 @@ func (cr *ChatRepository) UpdateDMRoom(userID string, chatWithUserID string, IsH
 
 	err = cr.odm.UpdateMany(ctx, &models.DMRoom{}, filter, update)
 	if err != nil {
-		log.Printf("更新聊天列表刪除狀態失敗: %v", err)
 		return err
 	}
 
@@ -173,7 +164,6 @@ func (cr *ChatRepository) SaveOrUpdateDMRoom(chat models.DMRoom) (models.DMRoom,
 
 		err = cr.odm.UpdateMany(ctx, &models.DMRoom{}, filter, update)
 		if err != nil {
-			log.Printf("更新聊天列表失敗: %v", err)
 			return models.DMRoom{}, err
 		}
 	} else if err == mongo.ErrNoDocuments {
@@ -185,12 +175,10 @@ func (cr *ChatRepository) SaveOrUpdateDMRoom(chat models.DMRoom) (models.DMRoom,
 
 		err = cr.odm.Create(ctx, &chat)
 		if err != nil {
-			log.Printf("創建聊天列表失敗: %v", err)
 			return models.DMRoom{}, err
 		}
 	} else {
 		// 其他錯誤
-		log.Printf("查詢聊天列表時發生錯誤: %v", err)
 		return models.DMRoom{}, err
 	}
 
@@ -211,10 +199,8 @@ func (cr *ChatRepository) DeleteMessagesByRoomID(roomID string) error {
 	filter := bson.M{"room_id": roomObjectID}
 	_, err = cr.odm.GetDatabase().Collection("messages").DeleteMany(ctx, filter)
 	if err != nil {
-		log.Printf("刪除房間 %s 的訊息失敗: %v", roomID, err)
 		return err
 	}
 
-	log.Printf("成功刪除房間 %s 的所有訊息", roomID)
 	return nil
 }

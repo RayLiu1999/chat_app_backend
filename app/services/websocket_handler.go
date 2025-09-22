@@ -43,7 +43,6 @@ func (wsh *WebSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) 
 
 	// 設置 pong 處理器
 	ws.SetPongHandler(func(string) error {
-		utils.PrettyPrintf("收到來自客戶端 %s 的 pong", userID)
 		ws.SetReadDeadline(time.Now().Add(PongWait))
 		client.UpdateLastSeen()
 		return nil
@@ -54,7 +53,7 @@ func (wsh *WebSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) 
 
 	// 設置用戶為在線狀態
 	if err := wsh.userService.SetUserOnline(userID); err != nil {
-		utils.PrettyPrintf("Failed to set user %s online: %v", userID, err)
+		utils.PrettyPrintf("無法將用戶 %s 設定為在線：%v", userID, err)
 	}
 
 	// 啟動讀寫協程
@@ -67,7 +66,7 @@ func (wsh *WebSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) 
 	// 清理工作
 	wsh.clientManager.Unregister(client)
 	if err := wsh.userService.SetUserOffline(userID); err != nil {
-		utils.PrettyPrintf("Failed to set user %s offline: %v", userID, err)
+		utils.PrettyPrintf("無法將用戶 %s 設定為離線：%v", userID, err)
 	}
 }
 
@@ -75,13 +74,13 @@ func (wsh *WebSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) 
 func (wsh *WebSocketHandler) handleDMRoomCreation(roomID, userID string) {
 	roomObjectID, err := primitive.ObjectIDFromHex(roomID)
 	if err != nil {
-		utils.PrettyPrintf("Failed to parse room_id: %v", err)
+		utils.PrettyPrintf("無法解析房間 ID：%v", err)
 		return
 	}
 
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		utils.PrettyPrintf("Failed to parse user_id: %v", err)
+		utils.PrettyPrintf("無法解析用戶 ID：%v", err)
 		return
 	}
 
@@ -89,7 +88,7 @@ func (wsh *WebSocketHandler) handleDMRoomCreation(roomID, userID string) {
 	var dmRoomList []models.DMRoom
 	err = wsh.odm.Find(ctx, map[string]interface{}{"room_id": roomObjectID}, &dmRoomList)
 	if err != nil {
-		utils.PrettyPrintf("Failed to find dm room: %v", err)
+		utils.PrettyPrintf("無法找到私聊房間：%v", err)
 		return
 	}
 
@@ -114,10 +113,10 @@ func (wsh *WebSocketHandler) handleDMRoomCreation(roomID, userID string) {
 		}
 		err := wsh.odm.Create(ctx, newRoom)
 		if err != nil {
-			utils.PrettyPrintf("Failed to create dm room for user %s: %v", userID, err)
+			utils.PrettyPrintf("無法為用戶 %s 創建私聊房間：%v", userID, err)
 			return
 		}
-		utils.PrettyPrintf("Created DM room record for user %s in room %s", userID, roomID)
+		utils.PrettyPrintf("已為用戶 %s 在房間 %s 中創建私聊房間記錄", userID, roomID)
 	}
 
 	if partnerUserRoom == nil && currentUserRoom != nil {
@@ -129,10 +128,10 @@ func (wsh *WebSocketHandler) handleDMRoomCreation(roomID, userID string) {
 		}
 		err := wsh.odm.Create(ctx, newRoom)
 		if err != nil {
-			utils.PrettyPrintf("Failed to create dm room for partner: %v", err)
+			utils.PrettyPrintf("無法為對方創建私聊房間：%v", err)
 			return
 		}
-		utils.PrettyPrintf("Created DM room record for partner in room %s", roomID)
+		utils.PrettyPrintf("已為對方在房間 %s 中創建私聊房間記錄", roomID)
 	}
 }
 
@@ -140,7 +139,7 @@ func (wsh *WebSocketHandler) handleDMRoomCreation(roomID, userID string) {
 func (wsh *WebSocketHandler) clientReadPump(client *Client) {
 	defer func() {
 		if r := recover(); r != nil {
-			utils.PrettyPrintf("Read pump panic recovered for user %s: %v", client.UserID, r)
+			utils.PrettyPrintf("讀取泵 panic 已恢復，用戶 %s：%v", client.UserID, r)
 		}
 		client.Cancel() // 取消所有協程
 	}()
@@ -158,9 +157,9 @@ func (wsh *WebSocketHandler) clientReadPump(client *Client) {
 			err := client.Conn.ReadJSON(&msg)
 			if err != nil {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-					utils.PrettyPrintf("WebSocket unexpected close error for user %s: %v", client.UserID, err)
+					utils.PrettyPrintf("WebSocket 意外關閉錯誤，用戶 %s：%v", client.UserID, err)
 				} else {
-					utils.PrettyPrintf("Read message failed for user %s: %v", client.UserID, err)
+					utils.PrettyPrintf("讀取訊息失敗，用戶 %s：%v", client.UserID, err)
 				}
 				return
 			}
@@ -170,7 +169,7 @@ func (wsh *WebSocketHandler) clientReadPump(client *Client) {
 
 			// 更新用戶活動時間
 			if err := wsh.userService.UpdateUserActivity(client.UserID); err != nil {
-				utils.PrettyPrintf("Failed to update user activity for %s: %v", client.UserID, err)
+				utils.PrettyPrintf("無法更新用戶 %s 的活動：%v", client.UserID, err)
 			}
 
 			// 處理訊息
@@ -185,7 +184,7 @@ func (wsh *WebSocketHandler) clientWritePump(client *Client) {
 	defer func() {
 		ticker.Stop()
 		if r := recover(); r != nil {
-			utils.PrettyPrintf("Write pump panic recovered for user %s: %v", client.UserID, r)
+			utils.PrettyPrintf("寫入泵 panic 已恢復，用戶 %s：%v", client.UserID, r)
 		}
 		client.Conn.Close()
 	}()
@@ -214,7 +213,6 @@ func (wsh *WebSocketHandler) clientWritePump(client *Client) {
 				utils.PrettyPrintf("發送 Ping 失敗 for user %s: %v", client.UserID, err)
 				return
 			}
-			utils.PrettyPrintf("發送 Ping 給客戶端 %s", client.UserID)
 		}
 	}
 }
@@ -223,19 +221,18 @@ func (wsh *WebSocketHandler) clientWritePump(client *Client) {
 func (wsh *WebSocketHandler) handleClientMessage(client *Client, msg WsMessage[json.RawMessage]) {
 	switch msg.Action {
 	case "join_room":
-		utils.PrettyPrintf("User %s is joining room: %s", client.UserID, msg.Data)
+		utils.PrettyPrintf("用戶 %s 正在加入房間：%s", client.UserID, msg.Data)
 		wsh.handleJoinRoom(client, msg.Data)
 	case "leave_room":
 		wsh.handleLeaveRoom(client, msg.Data)
 	case "send_message":
-		utils.PrettyPrintf("User %s is sending message in room: %s", client.UserID, msg.Data)
+		utils.PrettyPrintf("用戶 %s 正在發送訊息到房間：%s", client.UserID, msg.Data)
 		wsh.handleSendMessage(client, msg.Data)
 	case "ping":
 		// 處理客戶端ping
-		utils.PrettyPrintf("收到來自客戶端 %s 的 ping，發送 pong...", client.UserID)
 		wsh.handlePing(client)
 	default:
-		utils.PrettyPrintf("Unknown action from user %s: %s", client.UserID, msg.Action)
+		utils.PrettyPrintf("來自用戶 %s 的未知動作：%s", client.UserID, msg.Action)
 		client.SendError("unknown_action", "未知的動作類型")
 	}
 }
@@ -248,7 +245,7 @@ func (wsh *WebSocketHandler) handleJoinRoom(client *Client, data json.RawMessage
 	}
 	err := json.Unmarshal(data, &requestData)
 	if err != nil {
-		utils.PrettyPrintf("Failed to parse join_room data: %v", err)
+		utils.PrettyPrintf("無法解析加入房間數據：%v", err)
 		client.SendError("invalid_data", "無法解析加入房間數據")
 		return
 	}
@@ -286,7 +283,7 @@ func (wsh *WebSocketHandler) handleLeaveRoom(client *Client, data json.RawMessag
 	}
 	err := json.Unmarshal(data, &requestData)
 	if err != nil {
-		utils.PrettyPrintf("Failed to parse leave_room data: %v", err)
+		utils.PrettyPrintf("無法解析離開房間數據：%v", err)
 		client.SendError("invalid_data", "無法解析離開房間數據")
 		return
 	}
@@ -310,7 +307,7 @@ func (wsh *WebSocketHandler) handleSendMessage(client *Client, data json.RawMess
 	}
 	err := json.Unmarshal(data, &requestData)
 	if err != nil {
-		utils.PrettyPrintf("Failed to parse send_message data: %v", err)
+		utils.PrettyPrintf("無法解析發送訊息數據：%v", err)
 		client.SendError("invalid_data", "無法解析發送訊息數據")
 		return
 	}
@@ -348,6 +345,6 @@ func (wsh *WebSocketHandler) handlePing(client *Client) {
 	}
 
 	if err := client.SendMessage(pongMsg); err != nil {
-		utils.PrettyPrintf("Failed to send pong to client %s: %v", client.UserID, err)
+		utils.PrettyPrintf("無法向客戶端 %s 發送 pong：%v", client.UserID, err)
 	}
 }

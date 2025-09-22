@@ -7,7 +7,6 @@ import (
 	"chat_app_backend/config"
 	"chat_app_backend/utils"
 	"context"
-	"log"
 	"strconv"
 	"time"
 
@@ -43,8 +42,7 @@ func NewChatService(cfg *config.Config, odm *providers.ODM, chatRepo repositorie
 		Password: cfg.Redis.Password,
 	})
 	if _, err := redisClient.Ping(context.Background()).Result(); err != nil {
-		log.Printf("Failed to ping Redis: %v", err)
-		utils.PrettyPrint("Failed to ping Redis:", err)
+		utils.PrettyPrintf("Redis連線失敗: %v", err)
 	}
 
 	// 創建模組化組件
@@ -88,7 +86,6 @@ func (cs *ChatService) getUserPictureURL(user *models.User) string {
 // HandleWebSocket 處理 WebSocket 連線
 func (cs *ChatService) HandleWebSocket(ws *websocket.Conn, userID string) {
 	cs.websocketHandler.HandleWebSocket(ws, userID)
-	utils.PrettyPrintf("WebSocket connection established for user: %s", userID)
 }
 
 // GetClientManager 獲取客戶端管理器

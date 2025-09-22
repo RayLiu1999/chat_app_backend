@@ -5,8 +5,7 @@ import (
 	"chat_app_backend/app/providers"
 	"chat_app_backend/app/repositories"
 	"chat_app_backend/config"
-
-	"log"
+	"chat_app_backend/utils"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -300,7 +299,7 @@ func (cs *ChannelService) DeleteChannel(userID string, channelID string) *models
 	err = cs.chatRepo.DeleteMessagesByRoomID(channelID)
 	if err != nil {
 		// 記錄錯誤但不阻止頻道刪除
-		log.Printf("刪除頻道 %s 的訊息失敗: %v", channelID, err)
+		utils.PrettyPrintf("刪除頻道 %s 的訊息失敗: %v", channelID, err)
 	}
 
 	// 然後刪除頻道本身

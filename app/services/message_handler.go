@@ -3,8 +3,8 @@ package services
 import (
 	"chat_app_backend/app/models"
 	"chat_app_backend/app/providers"
+	"chat_app_backend/utils"
 	"context"
-	"log"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -32,7 +32,7 @@ func (mh *MessageHandler) HandleMessage(message *WsMessage[MessageResponse]) {
 	// 檢查房間是否存在
 	room, exists := mh.roomManager.GetRoom(message.Data.RoomType, message.Data.RoomID)
 	if !exists {
-		log.Printf("Room %s not found, message saved to DB but no clients to broadcast", message.Data.RoomID)
+		utils.PrettyPrintf("房間 %s 不存在，消息已儲存到資料庫，但沒有客戶端可廣播", message.Data.RoomID)
 		return
 	}
 
@@ -49,7 +49,7 @@ func (mh *MessageHandler) HandleMessage(message *WsMessage[MessageResponse]) {
 		go func(c *Client) {
 			// 檢查連線是否仍然有效
 			if !mh.isClientConnectionValid(c) {
-				log.Printf("Client %s connection is invalid, removing from room", c.UserID)
+				utils.PrettyPrintf("客戶端 %s 連線已失效，從房間中移除", c.UserID)
 				go mh.roomManager.LeaveRoom(c, message.Data.RoomType, message.Data.RoomID)
 				return
 			}
@@ -68,7 +68,7 @@ func (mh *MessageHandler) HandleMessage(message *WsMessage[MessageResponse]) {
 			}
 
 			if err := c.SendMessage(outMsg); err != nil {
-				log.Printf("Failed to send message to client %s: %v", c.UserID, err)
+				utils.PrettyPrintf("發送消息失敗: %v", err)
 				// 異步移除有問題的客戶端
 				go mh.roomManager.LeaveRoom(c, message.Data.RoomType, message.Data.RoomID)
 			}
@@ -80,13 +80,13 @@ func (mh *MessageHandler) HandleMessage(message *WsMessage[MessageResponse]) {
 func (mh *MessageHandler) saveMessageToDB(data MessageResponse) {
 	roomObjectID, err := primitive.ObjectIDFromHex(data.RoomID)
 	if err != nil {
-		log.Printf("Failed to parse room_id: %v", err)
+		utils.PrettyPrintf("解析房間ID失敗: %v", err)
 		return
 	}
 
 	senderObjectID, err := primitive.ObjectIDFromHex(data.SenderID)
 	if err != nil {
-		log.Printf("Failed to parse sender_id: %v", err)
+		utils.PrettyPrintf("解析發送者ID失敗: %v", err)
 		return
 	}
 
@@ -102,11 +102,11 @@ func (mh *MessageHandler) saveMessageToDB(data MessageResponse) {
 
 	err = mh.odm.Create(ctx, message)
 	if err != nil {
-		log.Printf("Failed to save message: %v", err)
+		utils.PrettyPrintf("儲存消息失敗: %v", err)
 		return
 	}
 
-	log.Printf("Message saved to DB: room=%s, sender=%s, content=%s", data.RoomID, data.SenderID, data.Content)
+	utils.PrettyPrintf("消息已儲存到資料庫: 房間=%s, 發送者=%s, 內容=%s", data.RoomID, data.SenderID, data.Content)
 
 	mh.updateRoomLastMessage(data.RoomID, data.RoomType)
 }
@@ -115,7 +115,7 @@ func (mh *MessageHandler) saveMessageToDB(data MessageResponse) {
 func (mh *MessageHandler) updateRoomLastMessage(roomID string, roomType models.RoomType) {
 	roomObjectID, err := primitive.ObjectIDFromHex(roomID)
 	if err != nil {
-		log.Printf("Failed to parse room_id: %v", err)
+		utils.PrettyPrintf("解析房間ID失敗: %v", err)
 		return
 	}
 
@@ -128,7 +128,7 @@ func (mh *MessageHandler) updateRoomLastMessage(roomID string, roomType models.R
 		dmRoom := &models.DMRoom{}
 		err = mh.odm.UpdateMany(ctx, dmRoom, map[string]interface{}{"room_id": roomObjectID}, map[string]interface{}{"$set": map[string]interface{}{"updated_at": time.Now()}})
 		if err != nil {
-			log.Printf("Failed to update dm room last message time: %v", err)
+			utils.PrettyPrintf("更新 dm 房間最後訊息時間失敗: %v", err)
 		}
 	case models.RoomTypeChannel:
 		// 更新 channels 的 last_message_at
@@ -137,7 +137,7 @@ func (mh *MessageHandler) updateRoomLastMessage(roomID string, roomType models.R
 			map[string]interface{}{"_id": roomObjectID},
 			map[string]interface{}{"$set": map[string]interface{}{"last_message_at": now}})
 		if err != nil {
-			log.Printf("Failed to update channel last message time: %v", err)
+			utils.PrettyPrintf("更新 channel 房間最後訊息時間失敗: %v", err)
 		}
 	}
 }
@@ -156,14 +156,14 @@ func (mh *MessageHandler) isClientConnectionValid(client *Client) bool {
 
 	// 檢查最後 pong 時間是否過久（超過 2 分鐘）
 	if time.Since(client.LastPongTime) > 2*time.Minute {
-		log.Printf("Client %s last pong time too old: %v", client.UserID, client.LastPongTime)
+		utils.PrettyPrintf("客戶端 %s 最後 Pong 時間過久: %v", client.UserID, client.LastPongTime)
 		client.IsActive = false
 		return false
 	}
 
 	// 檢查連線時間是否過久（超過 24 小時）
 	if time.Since(client.ConnectedAt) > 24*time.Hour {
-		log.Printf("Client %s connection too old: %v", client.UserID, client.ConnectedAt)
+		utils.PrettyPrintf("客戶端 %s 連線時間過久: %v", client.UserID, client.ConnectedAt)
 		client.IsActive = false
 		return false
 	}

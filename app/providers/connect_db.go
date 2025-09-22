@@ -3,11 +3,11 @@ package providers
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
 	"chat_app_backend/config"
+	"chat_app_backend/utils"
 
 	"github.com/jackc/pgx/v4/pgxpool"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -38,7 +38,7 @@ func (mw *MongoWrapper) Close() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := mw.Client.Disconnect(ctx); err != nil {
-		log.Printf("Error disconnecting from MongoDB: %v", err)
+		utils.PrettyPrintf("Error disconnecting from MongoDB: %v", err)
 	}
 }
 

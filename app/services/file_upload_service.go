@@ -5,7 +5,6 @@ import (
 	"chat_app_backend/app/providers"
 	"chat_app_backend/app/repositories"
 	"chat_app_backend/config"
-	"chat_app_backend/utils"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -92,8 +91,6 @@ func (fs *FileUploadServiceImpl) UploadFileWithConfig(file multipart.File, heade
 			Details: err.Error(),
 		}
 	}
-
-	utils.PrettyPrint("filepath", fullPath)
 
 	// 生成檔案雜湊
 	fileHash, err := providers.GenerateFileHash(file)

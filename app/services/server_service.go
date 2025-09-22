@@ -5,7 +5,6 @@ import (
 	"chat_app_backend/app/providers"
 	"chat_app_backend/app/repositories"
 	"chat_app_backend/config"
-	"chat_app_backend/utils"
 	"context"
 	"fmt"
 	"mime/multipart"
@@ -183,8 +182,6 @@ func (ss *ServerService) CreateServer(userID string, name string, file multipart
 			Message: "創建伺服器失敗",
 		}
 	}
-
-	utils.PrettyPrint("Created Server", createdServer)
 
 	// 將擁有者添加到 ServerMember 表
 	err = ss.serverMemberRepo.AddMemberToServer(createdServer.BaseModel.GetID().Hex(), userID, "owner")
