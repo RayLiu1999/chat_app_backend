@@ -1,11 +1,11 @@
 package di
 
 import (
+	"chat_app_backend/app/http/controllers"
+	"chat_app_backend/app/providers"
+	"chat_app_backend/app/repositories"
+	"chat_app_backend/app/services"
 	"chat_app_backend/config"
-	"chat_app_backend/controllers"
-	"chat_app_backend/providers"
-	"chat_app_backend/repositories"
-	"chat_app_backend/services"
 )
 
 // Repository容器

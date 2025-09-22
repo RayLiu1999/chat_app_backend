@@ -1,10 +1,10 @@
 package routes
 
 import (
+	"chat_app_backend/app/http/middlewares"
+	"chat_app_backend/app/providers"
 	"chat_app_backend/config"
 	"chat_app_backend/di"
-	"chat_app_backend/middlewares"
-	"chat_app_backend/providers"
 	"path/filepath"
 	"time"
 

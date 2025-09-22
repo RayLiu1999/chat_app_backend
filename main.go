@@ -5,9 +5,9 @@ import (
 	"os"
 	"time"
 
+	"chat_app_backend/app/providers"
 	"chat_app_backend/config"
 	"chat_app_backend/di"
-	"chat_app_backend/providers"
 	"chat_app_backend/routes"
 
 	"github.com/gin-gonic/gin"
