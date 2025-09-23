@@ -33,6 +33,17 @@ func main() {
 	}
 	defer mongodb.Close()
 
+	// 初始化 Redis 連接
+	redis, err := providers.NewRedisClient(config.AppConfig)
+	if err != nil {
+		log.Fatalf("Redis 初始化失敗: %v", err)
+	}
+
+	if err := redis.Ping(); err != nil {
+		log.Fatalf("Redis 連線測試失敗: %v", err)
+	}
+	defer redis.Close()
+
 	// 初始化 Gin
 	r := gin.Default()
 
@@ -46,7 +57,7 @@ func main() {
 	}
 
 	// 構建依賴
-	deps := di.BuildDependencies(config.AppConfig, mongodb)
+	deps := di.BuildDependencies(config.AppConfig, mongodb, redis)
 
 	// // 使用依賴容器中的 UserService 來啟動後台任務
 	// backgroundTasks := services.NewBackgroundTasks(deps.Services.UserService)
@@ -56,7 +67,7 @@ func main() {
 	// pprof.Register(r)
 
 	// 設置路由
-	routes.SetupRoutes(r, config.AppConfig, mongodb, deps.Controllers)
+	routes.SetupRoutes(r, config.AppConfig, deps.Controllers)
 
 	// 確保上傳目錄存在
 	err = os.MkdirAll("uploads", 0755)

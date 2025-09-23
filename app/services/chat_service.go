@@ -5,7 +5,6 @@ import (
 	"chat_app_backend/app/providers"
 	"chat_app_backend/app/repositories"
 	"chat_app_backend/config"
-	"chat_app_backend/utils"
 	"context"
 	"strconv"
 	"time"
@@ -36,14 +35,15 @@ type ChatService struct {
 }
 
 // NewChatService 初始化聊天室服務
-func NewChatService(cfg *config.Config, odm *providers.ODM, chatRepo repositories.ChatRepositoryInterface, serverRepo repositories.ServerRepositoryInterface, serverMemberRepo repositories.ServerMemberRepositoryInterface, userRepo repositories.UserRepositoryInterface, userService UserServiceInterface, fileUploadService FileUploadServiceInterface) *ChatService {
-	redisClient := redis.NewClient(&redis.Options{
-		Addr:     cfg.Redis.Addr,
-		Password: cfg.Redis.Password,
-	})
-	if _, err := redisClient.Ping(context.Background()).Result(); err != nil {
-		utils.PrettyPrintf("Redis連線失敗: %v", err)
-	}
+func NewChatService(cfg *config.Config,
+	odm *providers.ODM,
+	redisClient *redis.Client,
+	chatRepo repositories.ChatRepositoryInterface,
+	serverRepo repositories.ServerRepositoryInterface,
+	serverMemberRepo repositories.ServerMemberRepositoryInterface,
+	userRepo repositories.UserRepositoryInterface,
+	userService UserServiceInterface,
+	fileUploadService FileUploadServiceInterface) *ChatService {
 
 	// 創建模組化組件
 	clientManager := NewClientManager(redisClient)

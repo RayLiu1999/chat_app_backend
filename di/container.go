@@ -62,31 +62,25 @@ func initRepositories(cfg *config.Config, providers *ProviderContainer) *Reposit
 }
 
 // 初始化Services
-func initServices(cfg *config.Config, providers *ProviderContainer, repos *RepositoryContainer) *ServiceContainer {
-	// 先初始化檔案上傳服務
+func initServices(cfg *config.Config, providers *ProviderContainer, repos *RepositoryContainer, redis *providers.RedisWrapper) *ServiceContainer {
+	// 1. 將 ClientManager 的初始化提前
+	clientManager := services.NewClientManager(redis.Client)
+
+	// 2. 初始化檔案上傳服務
 	fileUploadService := services.NewFileUploadService(cfg, providers.FileProvider, providers.ODM, repos.FileRepo)
 
-	// 先創建一個臨時的 UserService（沒有 ClientManager）
-	tempUserService := services.NewUserService(cfg, providers.ODM, repos.UserRepo, nil, fileUploadService)
+	// 3. 現在可以直接創建最終的 UserService
+	userService := services.NewUserService(cfg, providers.ODM, repos.UserRepo, clientManager, fileUploadService)
 
-	// 創建 ChatService（會初始化 ClientManager）
-	chatService := services.NewChatService(cfg, providers.ODM, repos.ChatRepo, repos.ServerRepo, repos.ServerMemberRepo, repos.UserRepo, tempUserService, fileUploadService)
+	// 4. 創建 ChatService，並傳入已經建立好的 UserService
+	//    (需要稍微修改 NewChatService 的參數)
+	chatService := services.NewChatService(cfg, providers.ODM, redis.Client, repos.ChatRepo, repos.ServerRepo, repos.ServerMemberRepo, repos.UserRepo, userService, fileUploadService)
 
-	// 獲取 ClientManager 並創建最終的 UserService
-	clientManager := chatService.GetClientManager()
-	finalUserService := services.NewUserService(cfg, providers.ODM, repos.UserRepo, clientManager, fileUploadService)
-
-	// 更新 ChatService 中的 UserService 引用
-	chatService.UpdateUserService(finalUserService)
-
-	// 創建其他服務並傳入最終的 UserService
-	serverService := services.NewServerService(cfg, providers.ODM, repos.ServerRepo, repos.ServerMemberRepo, repos.UserRepo, repos.ChannelRepo, repos.ChannelCategoryRepo, repos.ChatRepo, fileUploadService, finalUserService)
-
-	// 更新 ServerService 中的 UserService 引用
-	serverService.UpdateUserService(finalUserService)
+	// 5. 創建其他服務
+	serverService := services.NewServerService(cfg, providers.ODM, repos.ServerRepo, repos.ServerMemberRepo, repos.UserRepo, repos.ChannelRepo, repos.ChannelCategoryRepo, repos.ChatRepo, fileUploadService, userService)
 
 	return &ServiceContainer{
-		UserService:   finalUserService,
+		UserService:   userService,
 		ChatService:   chatService,
 		ServerService: serverService,
 		FriendService: services.NewFriendService(
@@ -94,7 +88,7 @@ func initServices(cfg *config.Config, providers *ProviderContainer, repos *Repos
 			providers.ODM,
 			repos.FriendRepo,
 			repos.UserRepo,
-			finalUserService,
+			userService,
 			fileUploadService),
 		ChannelService: services.NewChannelService(
 			cfg,
@@ -138,10 +132,10 @@ type ApplicationContainer struct {
 }
 
 // 創建應用程式依賴
-func BuildDependencies(cfg *config.Config, mongodb *providers.MongoWrapper) *ApplicationContainer {
+func BuildDependencies(cfg *config.Config, mongodb *providers.MongoWrapper, redis *providers.RedisWrapper) *ApplicationContainer {
 	providers := initProviders(cfg, mongodb)
 	repos := initRepositories(cfg, providers)
-	services := initServices(cfg, providers, repos)
+	services := initServices(cfg, providers, repos, redis)
 	controllers := initControllers(cfg, mongodb, services, repos)
 
 	return &ApplicationContainer{

@@ -2,7 +2,6 @@ package routes
 
 import (
 	"chat_app_backend/app/http/middlewares"
-	"chat_app_backend/app/providers"
 	"chat_app_backend/config"
 	"chat_app_backend/di"
 	"path/filepath"
@@ -12,7 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRoutes(r *gin.Engine, cfg *config.Config, mongodb *providers.MongoWrapper, controllers *di.ControllerContainer) {
+func SetupRoutes(r *gin.Engine, cfg *config.Config, controllers *di.ControllerContainer) {
 	// 設定靜態文件服務
 	// 使用絕對路徑，確保在任何環境下都可以正確訪問上傳的文件
 	uploadsAbsPath := filepath.Join(".", "uploads")
