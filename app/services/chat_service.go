@@ -140,8 +140,8 @@ func (cs *ChatService) GetDMRoomResponseList(userID string, includeHidden bool) 
 
 		// 檢查用戶在線狀態
 		isOnline := false
-		if cs.userService != nil {
-			isOnline = cs.userService.IsUserOnlineByWebSocket(chat.ChatWithUserID.Hex())
+		if cs.clientManager != nil {
+			isOnline = cs.clientManager.IsUserOnline(chat.ChatWithUserID.Hex())
 		}
 
 		chatResponseList = append(chatResponseList, models.DMRoomResponse{

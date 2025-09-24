@@ -130,14 +130,14 @@ func (rm *RoomManager) JoinRoom(client *Client, roomType models.RoomType, roomID
 	room.Clients[client] = true
 	room.Mutex.Unlock()
 
-	ctx := context.Background()
-	rm.redisClient.SAdd(ctx, "room:"+key.String()+":members", client.UserID)
-	rm.redisClient.SAdd(ctx, "user_id:"+client.UserID+":rooms", key.String())
+	// ctx := context.Background()
+	// rm.redisClient.SAdd(ctx, "room:"+key.String()+":members", client.UserID)
+	// rm.redisClient.SAdd(ctx, "user_id:"+client.UserID+":rooms", key.String())
 
 	client.ActivityMutex.Lock()
 	client.RoomActivity[key.String()] = time.Now()
 	client.ActivityMutex.Unlock()
-	rm.redisClient.Set(ctx, "user_id:"+client.UserID+":room:"+key.String()+":last_active", time.Now().UnixMilli(), 24*time.Hour)
+	// rm.redisClient.Set(ctx, "user_id:"+client.UserID+":room:"+key.String()+":last_active", time.Now().UnixMilli(), 24*time.Hour)
 }
 
 // LeaveRoom 讓使用者離開房間
@@ -156,14 +156,14 @@ func (rm *RoomManager) LeaveRoom(client *Client, roomType models.RoomType, roomI
 	clientCount := len(room.Clients)
 	room.Mutex.Unlock()
 
-	ctx := context.Background()
-	rm.redisClient.SRem(ctx, "room:"+key.String()+":members", client.UserID)
-	rm.redisClient.SRem(ctx, "user:"+client.UserID+":rooms", key.String())
+	// ctx := context.Background()
+	// rm.redisClient.SRem(ctx, "room:"+key.String()+":members", client.UserID)
+	// rm.redisClient.SRem(ctx, "user:"+client.UserID+":rooms", key.String())
 
 	client.ActivityMutex.Lock()
 	delete(client.RoomActivity, key.String())
 	client.ActivityMutex.Unlock()
-	rm.redisClient.Del(ctx, "user:"+client.UserID+":room:"+key.String()+":last_active")
+	// rm.redisClient.Del(ctx, "user:"+client.UserID+":room:"+key.String()+":last_active")
 
 	if clientCount == 0 {
 		rm.cleanupRoom(key.String())
@@ -268,5 +268,5 @@ func (rm *RoomManager) safelyBroadcastToClient(client *Client, message *WsMessag
 	client.ActivityMutex.Lock()
 	client.RoomActivity[message.Data.RoomID] = time.Now()
 	client.ActivityMutex.Unlock()
-	rm.redisClient.Set(context.Background(), "user:"+client.UserID+":room:"+message.Data.RoomID+":last_active", time.Now().UnixMilli(), 24*time.Hour)
+	// rm.redisClient.Set(context.Background(), "user:"+client.UserID+":room:"+message.Data.RoomID+":last_active", time.Now().UnixMilli(), 24*time.Hour)
 }

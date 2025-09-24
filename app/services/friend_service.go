@@ -14,11 +14,12 @@ import (
 
 type FriendService struct {
 	config            *config.Config
+	odm               *providers.ODM
 	friendRepo        repositories.FriendRepositoryInterface
 	userRepo          repositories.UserRepositoryInterface
 	userService       UserServiceInterface       // 添加 UserService 來查詢在線狀態
 	fileUploadService FileUploadServiceInterface // 添加 FileUploadService 依賴
-	odm               *providers.ODM
+	clientManager     *ClientManager
 }
 
 func NewFriendService(
@@ -27,14 +28,17 @@ func NewFriendService(
 	friendRepo repositories.FriendRepositoryInterface,
 	userRepo repositories.UserRepositoryInterface,
 	userService UserServiceInterface,
-	fileUploadService FileUploadServiceInterface) *FriendService {
+	fileUploadService FileUploadServiceInterface,
+	clientManager *ClientManager,
+) *FriendService {
 	return &FriendService{
 		config:            cfg,
+		odm:               odm,
 		friendRepo:        friendRepo,
 		userRepo:          userRepo,
 		userService:       userService,
 		fileUploadService: fileUploadService,
-		odm:               odm,
+		clientManager:     clientManager,
 	}
 }
 
@@ -128,8 +132,8 @@ func (fs *FriendService) GetFriendList(userID string) ([]models.FriendResponse, 
 		status := friendsStatusMap[user.ID.Hex()]
 		// 查詢好友的在線狀態
 		isOnline := false
-		if fs.userService != nil {
-			isOnline = fs.userService.IsUserOnlineByWebSocket(user.ID.Hex())
+		if fs.clientManager != nil {
+			isOnline = fs.clientManager.IsUserOnline(user.ID.Hex())
 		}
 
 		apiFriend = append(apiFriend, models.FriendResponse{

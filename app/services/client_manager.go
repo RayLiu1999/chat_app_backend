@@ -3,6 +3,7 @@ package services
 import (
 	"chat_app_backend/utils"
 	"context"
+	"maps"
 	"sync"
 	"time"
 
@@ -76,9 +77,7 @@ func (cm *ClientManager) GetAllClients() map[*Client]bool {
 	cm.mutex.RLock()
 	defer cm.mutex.RUnlock()
 	result := make(map[*Client]bool)
-	for client, active := range cm.clients {
-		result[client] = active
-	}
+	maps.Copy(result, cm.clients)
 	return result
 }
 
@@ -136,7 +135,7 @@ func (cm *ClientManager) unregisterClient(client *Client) {
 	delete(cm.clientsByUserID, client.UserID)
 
 	// 清理用戶相關的 Redis 數據
-	cm.redisClient.Del(context.Background(), "user:"+client.UserID+":rooms")
+	// cm.redisClient.Del(context.Background(), "user:"+client.UserID+":rooms")
 
 	// 關閉 WebSocket 連線
 	if client.Conn != nil {
@@ -185,4 +184,20 @@ func (cm *ClientManager) StartHealthChecker(ctx context.Context) {
 			cm.CheckClientsHealth()
 		}
 	}
+}
+
+// IsUserOnline 基於 WebSocket 連線檢查用戶是否在線
+func (cm *ClientManager) IsUserOnline(userID string) bool {
+	_, exists := cm.GetClient(userID)
+
+	// 如果沒有 WebSocket 連線，檢查 Redis 狀態
+	if !exists {
+		ctx := context.Background()
+		status, err := cm.redisClient.Get(ctx, "user:"+userID+":status").Result()
+		if err == nil && status == "online" {
+			return true
+		}
+	}
+
+	return exists
 }

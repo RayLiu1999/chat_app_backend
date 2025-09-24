@@ -15,18 +15,30 @@ import (
 
 type ServerService struct {
 	config              *config.Config
+	odm                 *providers.ODM
 	serverRepo          repositories.ServerRepositoryInterface
 	serverMemberRepo    repositories.ServerMemberRepositoryInterface
 	userRepo            repositories.UserRepositoryInterface
 	channelRepo         repositories.ChannelRepositoryInterface
 	channelCategoryRepo repositories.ChannelCategoryRepositoryInterface
 	chatRepo            repositories.ChatRepositoryInterface
-	odm                 *providers.ODM
 	fileUploadService   FileUploadServiceInterface
 	userService         UserServiceInterface
+	clientManager       *ClientManager
 }
 
-func NewServerService(cfg *config.Config, odm *providers.ODM, serverRepo repositories.ServerRepositoryInterface, serverMemberRepo repositories.ServerMemberRepositoryInterface, userRepo repositories.UserRepositoryInterface, channelRepo repositories.ChannelRepositoryInterface, channelCategoryRepo repositories.ChannelCategoryRepositoryInterface, chatRepo repositories.ChatRepositoryInterface, fileUploadService FileUploadServiceInterface, userService UserServiceInterface) *ServerService {
+func NewServerService(cfg *config.Config,
+	odm *providers.ODM,
+	serverRepo repositories.ServerRepositoryInterface,
+	serverMemberRepo repositories.ServerMemberRepositoryInterface,
+	userRepo repositories.UserRepositoryInterface,
+	channelRepo repositories.ChannelRepositoryInterface,
+	channelCategoryRepo repositories.ChannelCategoryRepositoryInterface,
+	chatRepo repositories.ChatRepositoryInterface,
+	fileUploadService FileUploadServiceInterface,
+	userService UserServiceInterface,
+	clientManager *ClientManager,
+) *ServerService {
 	return &ServerService{
 		config:              cfg,
 		serverRepo:          serverRepo,
@@ -38,6 +50,7 @@ func NewServerService(cfg *config.Config, odm *providers.ODM, serverRepo reposit
 		odm:                 odm,
 		fileUploadService:   fileUploadService,
 		userService:         userService,
+		clientManager:       clientManager,
 	}
 }
 
@@ -668,8 +681,8 @@ func (ss *ServerService) GetServerDetailByID(userID string, serverID string) (*m
 
 				// 檢查用戶在線狀態
 				isOnline := false
-				if ss.userService != nil {
-					isOnline = ss.userService.IsUserOnlineByWebSocket(member.UserID.Hex())
+				if ss.clientManager != nil {
+					isOnline = ss.clientManager.IsUserOnline(member.UserID.Hex())
 				}
 
 				members = append(members, models.ServerMemberResponse{

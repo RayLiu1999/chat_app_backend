@@ -343,12 +343,6 @@ func (us *UserService) UpdateUserActivity(userID string) error {
 	return us.userRepo.UpdateUserLastActiveTime(userID, timestamp)
 }
 
-// IsUserOnlineByWebSocket 基於 WebSocket 連線檢查用戶是否在線
-func (us *UserService) IsUserOnlineByWebSocket(userID string) bool {
-	_, exists := us.clientManager.GetClient(userID)
-	return exists
-}
-
 // CheckAndSetOfflineUsers 檢查並設置離線用戶（定期任務用）
 // 現在這個方法主要用於數據庫狀態同步，實際在線狀態以 WebSocket 為準
 func (us *UserService) CheckAndSetOfflineUsers(offlineThresholdMinutes int) error {

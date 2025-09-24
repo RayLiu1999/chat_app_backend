@@ -38,9 +38,6 @@ type UserServiceInterface interface {
 	// CheckAndSetOfflineUsers 檢查並設置離線用戶
 	CheckAndSetOfflineUsers(offlineThresholdMinutes int) error
 
-	// IsUserOnlineByWebSocket 基於 WebSocket 連線檢查用戶是否在線
-	IsUserOnlineByWebSocket(userID string) bool
-
 	// GetUserProfile 獲取用戶個人資料
 	GetUserProfile(userID string) (*models.UserProfileResponse, error)
 

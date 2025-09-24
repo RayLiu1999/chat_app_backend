@@ -12,16 +12,18 @@ import (
 )
 
 type UserController struct {
-	config       *config.Config
-	mongoConnect *mongo.Database
-	userService  services.UserServiceInterface
+	config        *config.Config
+	mongoConnect  *mongo.Database
+	userService   services.UserServiceInterface
+	clientManager *services.ClientManager
 }
 
-func NewUserController(cfg *config.Config, mongodb *mongo.Database, userService services.UserServiceInterface) *UserController {
+func NewUserController(cfg *config.Config, mongodb *mongo.Database, userService services.UserServiceInterface, clientManager *services.ClientManager) *UserController {
 	return &UserController{
-		config:       cfg,
-		mongoConnect: mongodb,
-		userService:  userService,
+		config:        cfg,
+		mongoConnect:  mongodb,
+		userService:   userService,
+		clientManager: clientManager,
 	}
 }
 
@@ -156,7 +158,7 @@ func (uc *UserController) CheckUserOnlineStatus(c *gin.Context) {
 		return
 	}
 
-	isOnline := uc.userService.IsUserOnlineByWebSocket(userID)
+	isOnline := uc.clientManager.IsUserOnline(userID)
 	SuccessResponse(c, map[string]any{
 		"user_id":   userID,
 		"is_online": isOnline,
