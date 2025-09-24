@@ -157,7 +157,7 @@ func (uc *UserController) CheckUserOnlineStatus(c *gin.Context) {
 	}
 
 	isOnline := uc.userService.IsUserOnlineByWebSocket(userID)
-	SuccessResponse(c, map[string]interface{}{
+	SuccessResponse(c, map[string]any{
 		"user_id":   userID,
 		"is_online": isOnline,
 	}, "用戶在線狀態檢查完成")
@@ -192,7 +192,7 @@ func (uc *UserController) UpdateUserProfile(c *gin.Context) {
 		return
 	}
 
-	var updates map[string]interface{}
+	var updates map[string]any
 	if err := c.ShouldBindJSON(&updates); err != nil {
 		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
 			Code:    models.ErrInvalidParams,

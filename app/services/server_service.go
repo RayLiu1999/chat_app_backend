@@ -389,7 +389,7 @@ func (ss *ServerService) SearchPublicServers(userID string, request models.Serve
 }
 
 // UpdateServer 更新伺服器信息
-func (ss *ServerService) UpdateServer(userID string, serverID string, updates map[string]interface{}) (*models.ServerResponse, *models.MessageOptions) {
+func (ss *ServerService) UpdateServer(userID string, serverID string, updates map[string]any) (*models.ServerResponse, *models.MessageOptions) {
 	// 驗證用戶是否存在
 	_, err := ss.userRepo.GetUserById(userID)
 	if err != nil {

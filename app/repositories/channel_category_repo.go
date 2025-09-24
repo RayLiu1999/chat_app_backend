@@ -63,7 +63,7 @@ func (r *ChannelCategoryRepository) GetChannelCategoryByID(categoryID string) (*
 }
 
 // UpdateChannelCategory 更新頻道類別
-func (r *ChannelCategoryRepository) UpdateChannelCategory(categoryID string, updates map[string]interface{}) error {
+func (r *ChannelCategoryRepository) UpdateChannelCategory(categoryID string, updates map[string]any) error {
 	categoryObjectID, err := primitive.ObjectIDFromHex(categoryID)
 	if err != nil {
 		return fmt.Errorf("無效的類別ID: %v", err)

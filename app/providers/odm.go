@@ -126,8 +126,8 @@ func (o *ODM) InsertMany(ctx context.Context, models []Model) error {
 		return nil
 	}
 
-	// 將 []Model 轉換為 []interface{}
-	interfaces := make([]interface{}, len(models))
+	// 將 []Model 轉換為 []any
+	interfaces := make([]any, len(models))
 	for i, model := range models {
 		// 設定創建和更新時間
 		setTimestamps(model, true)
@@ -188,7 +188,7 @@ func (o *ODM) FindOne(ctx context.Context, filter bson.M, model Model) error {
 }
 
 // Find 查找多個文檔
-func (o *ODM) Find(ctx context.Context, filter bson.M, models interface{}) error {
+func (o *ODM) Find(ctx context.Context, filter bson.M, models any) error {
 	// 確保models是指向切片的指針
 	modelsValue := reflect.ValueOf(models)
 	if modelsValue.Kind() != reflect.Ptr || modelsValue.Elem().Kind() != reflect.Slice {
@@ -337,7 +337,7 @@ func (o *ODM) ExistsByID(ctx context.Context, ID string, model Model) (bool, err
 // ===== 高級查詢操作 =====
 
 // FindWithOptions 使用自定義選項查找文檔
-func (o *ODM) FindWithOptions(ctx context.Context, filter bson.M, models interface{}, options *QueryOptions) error {
+func (o *ODM) FindWithOptions(ctx context.Context, filter bson.M, models any, options *QueryOptions) error {
 	// 確保models是指向切片的指針
 	modelsValue := reflect.ValueOf(models)
 	if modelsValue.Kind() != reflect.Ptr || modelsValue.Elem().Kind() != reflect.Slice {
@@ -368,7 +368,7 @@ func (o *ODM) FindWithOptions(ctx context.Context, filter bson.M, models interfa
 }
 
 // Aggregate 執行聚合查詢
-func (o *ODM) Aggregate(ctx context.Context, pipeline interface{}, models interface{}, model Model) error {
+func (o *ODM) Aggregate(ctx context.Context, pipeline any, models any, model Model) error {
 	cursor, err := o.Collection(model).Aggregate(ctx, pipeline)
 	if err != nil {
 		return err

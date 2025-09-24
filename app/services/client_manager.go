@@ -39,10 +39,10 @@ func NewClientManager(redisClient *redis.Client) *ClientManager {
 // NewClient 創建新的客戶端
 func (cm *ClientManager) NewClient(userID string, ws *websocket.Conn) *Client {
 	return &Client{
-		UserID:        userID,
-		Conn:          ws,
-		Subscribed:    make(map[string]bool),
-		RoomActivity:  make(map[string]time.Time),
+		UserID:       userID,
+		Conn:         ws,
+		RoomActivity: make(map[string]time.Time),
+		// Subscribed:    make(map[string]bool),
 		ActivityMutex: sync.RWMutex{},
 		ConnectedAt:   time.Now(),
 		LastPongTime:  time.Now(),

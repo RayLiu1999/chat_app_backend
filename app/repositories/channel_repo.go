@@ -56,7 +56,7 @@ func (cr *ChannelRepository) CreateChannel(channel *models.Channel) error {
 }
 
 // UpdateChannel 更新頻道
-func (cr *ChannelRepository) UpdateChannel(channelID string, updates map[string]interface{}) error {
+func (cr *ChannelRepository) UpdateChannel(channelID string, updates map[string]any) error {
 	var channel models.Channel
 	err := cr.odm.FindByID(context.Background(), channelID, &channel)
 	if err != nil {
@@ -64,7 +64,7 @@ func (cr *ChannelRepository) UpdateChannel(channelID string, updates map[string]
 	}
 
 	// 將map轉換為bson.M
-	bsonUpdates := make(map[string]interface{})
+	bsonUpdates := make(map[string]any)
 	for k, v := range updates {
 		bsonUpdates[k] = v
 	}

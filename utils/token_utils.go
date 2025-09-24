@@ -106,7 +106,7 @@ func ValidateAccessToken(tokenString string) (bool, error) {
 	jwtSecret := []byte(config.AppConfig.JWT.AccessSecret)
 
 	// 解析和驗證 JWT 簽章
-	token, err := jwt.ParseWithClaims(tokenString, &AccessTokenClaims{}, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &AccessTokenClaims{}, func(token *jwt.Token) (any, error) {
 		// 檢查簽名方法是否為預期的 HMAC 方法
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("unexpected signing method")
@@ -139,7 +139,7 @@ func GetUserFromToken(tokenString string) (string, primitive.ObjectID, error) {
 	jwtSecret := []byte(config.AppConfig.JWT.AccessSecret)
 
 	// 解析和驗證 JWT token
-	token, err := jwt.ParseWithClaims(tokenString, &AccessTokenClaims{}, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &AccessTokenClaims{}, func(token *jwt.Token) (any, error) {
 		return jwtSecret, nil
 	})
 	if err != nil {

@@ -45,7 +45,7 @@ type UserServiceInterface interface {
 	GetUserProfile(userID string) (*models.UserProfileResponse, error)
 
 	// UpdateUserProfile 更新用戶基本資料
-	UpdateUserProfile(userID string, updates map[string]interface{}) error
+	UpdateUserProfile(userID string, updates map[string]any) error
 
 	// UploadUserImage 上傳用戶頭像或橫幅
 	UploadUserImage(userID string, file multipart.File, header *multipart.FileHeader, imageType string) (*models.UserImageResponse, error)
@@ -73,7 +73,7 @@ type UserServiceInterface interface {
 
 	// 未來可能添加的其他方法
 	// CreateUser(user *models.User) (primitive.ObjectID, error)
-	// UpdateUser(userID primitive.ObjectID, updates map[string]interface{}) error
+	// UpdateUser(userID primitive.ObjectID, updates map[string]any) error
 	// DeleteUser(userID primitive.ObjectID) error
 	// VerifyUserCredentials(username, password string) (*models.User, error)
 	// ... 其他方法 ...
@@ -120,7 +120,7 @@ type ServerServiceInterface interface {
 	SearchPublicServers(userID string, request models.ServerSearchRequest) (*models.ServerSearchResults, *models.MessageOptions)
 
 	// UpdateServer 更新伺服器信息
-	UpdateServer(userID string, serverID string, updates map[string]interface{}) (*models.ServerResponse, *models.MessageOptions)
+	UpdateServer(userID string, serverID string, updates map[string]any) (*models.ServerResponse, *models.MessageOptions)
 
 	// DeleteServer 刪除伺服器
 	DeleteServer(userID string, serverID string) *models.MessageOptions
@@ -184,7 +184,7 @@ type ChannelServiceInterface interface {
 	CreateChannel(userID string, channel *models.Channel) (*models.ChannelResponse, *models.MessageOptions)
 
 	// UpdateChannel 更新頻道信息
-	UpdateChannel(userID string, channelID string, updates map[string]interface{}) (*models.ChannelResponse, *models.MessageOptions)
+	UpdateChannel(userID string, channelID string, updates map[string]any) (*models.ChannelResponse, *models.MessageOptions)
 
 	// DeleteChannel 刪除頻道
 	DeleteChannel(userID string, channelID string) *models.MessageOptions

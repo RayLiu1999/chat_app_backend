@@ -157,7 +157,7 @@ func (sc *ServerController) UpdateServer(c *gin.Context) {
 	}
 
 	// 解析請求體
-	var updateRequest map[string]interface{}
+	var updateRequest map[string]any
 	if err := c.ShouldBindJSON(&updateRequest); err != nil {
 		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
 			Code:    models.ErrInvalidParams,
@@ -177,7 +177,7 @@ func (sc *ServerController) UpdateServer(c *gin.Context) {
 		"max_members": true,
 	}
 
-	updates := make(map[string]interface{})
+	updates := make(map[string]any)
 	for key, value := range updateRequest {
 		if allowedFields[key] {
 			updates[key] = value

@@ -235,7 +235,7 @@ func (cc *ChannelController) UpdateChannel(c *gin.Context) {
 	}
 
 	// 構建更新字段
-	updates := make(map[string]interface{})
+	updates := make(map[string]any)
 	if req.Name != "" {
 		updates["name"] = req.Name
 	}

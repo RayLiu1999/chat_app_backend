@@ -27,7 +27,7 @@ func NewQueryBuilder() *QueryBuilder {
 }
 
 // Where 添加一個等於條件
-func (q *QueryBuilder) Where(field string, value interface{}) *QueryBuilder {
+func (q *QueryBuilder) Where(field string, value any) *QueryBuilder {
 	q.filter[field] = value
 	return q
 }
@@ -43,43 +43,43 @@ func (q *QueryBuilder) WhereID(id string) (*QueryBuilder, error) {
 }
 
 // WhereIn 添加一個 $in 條件
-func (q *QueryBuilder) WhereIn(field string, values interface{}) *QueryBuilder {
+func (q *QueryBuilder) WhereIn(field string, values any) *QueryBuilder {
 	q.filter[field] = bson.M{"$in": values}
 	return q
 }
 
 // WhereNotIn 添加一個 $nin 條件
-func (q *QueryBuilder) WhereNotIn(field string, values interface{}) *QueryBuilder {
+func (q *QueryBuilder) WhereNotIn(field string, values any) *QueryBuilder {
 	q.filter[field] = bson.M{"$nin": values}
 	return q
 }
 
 // WhereGt 添加一個大於條件
-func (q *QueryBuilder) WhereGt(field string, value interface{}) *QueryBuilder {
+func (q *QueryBuilder) WhereGt(field string, value any) *QueryBuilder {
 	q.filter[field] = bson.M{"$gt": value}
 	return q
 }
 
 // WhereGte 添加一個大於等於條件
-func (q *QueryBuilder) WhereGte(field string, value interface{}) *QueryBuilder {
+func (q *QueryBuilder) WhereGte(field string, value any) *QueryBuilder {
 	q.filter[field] = bson.M{"$gte": value}
 	return q
 }
 
 // WhereLt 添加一個小於條件
-func (q *QueryBuilder) WhereLt(field string, value interface{}) *QueryBuilder {
+func (q *QueryBuilder) WhereLt(field string, value any) *QueryBuilder {
 	q.filter[field] = bson.M{"$lt": value}
 	return q
 }
 
 // WhereLte 添加一個小於等於條件
-func (q *QueryBuilder) WhereLte(field string, value interface{}) *QueryBuilder {
+func (q *QueryBuilder) WhereLte(field string, value any) *QueryBuilder {
 	q.filter[field] = bson.M{"$lte": value}
 	return q
 }
 
 // WhereNe 添加一個不等於條件
-func (q *QueryBuilder) WhereNe(field string, value interface{}) *QueryBuilder {
+func (q *QueryBuilder) WhereNe(field string, value any) *QueryBuilder {
 	q.filter[field] = bson.M{"$ne": value}
 	return q
 }
@@ -234,7 +234,7 @@ func (q *QueryBuilder) WhereNotNull(field string) *QueryBuilder {
 }
 
 // WhereBetween 添加一個範圍條件
-func (q *QueryBuilder) WhereBetween(field string, min, max interface{}) *QueryBuilder {
+func (q *QueryBuilder) WhereBetween(field string, min, max any) *QueryBuilder {
 	q.filter[field] = bson.M{
 		"$gte": min,
 		"$lte": max,
@@ -243,7 +243,7 @@ func (q *QueryBuilder) WhereBetween(field string, min, max interface{}) *QueryBu
 }
 
 // WhereNotBetween 添加一個不在範圍內的條件
-func (q *QueryBuilder) WhereNotBetween(field string, min, max interface{}) *QueryBuilder {
+func (q *QueryBuilder) WhereNotBetween(field string, min, max any) *QueryBuilder {
 	q.filter["$or"] = []bson.M{
 		{field: bson.M{"$lt": min}},
 		{field: bson.M{"$gt": max}},
@@ -258,7 +258,7 @@ func (q *QueryBuilder) WhereSize(field string, size int) *QueryBuilder {
 }
 
 // WhereAll 添加一個包含所有元素的條件
-func (q *QueryBuilder) WhereAll(field string, values interface{}) *QueryBuilder {
+func (q *QueryBuilder) WhereAll(field string, values any) *QueryBuilder {
 	q.filter[field] = bson.M{"$all": values}
 	return q
 }

@@ -20,8 +20,8 @@ type DBConnection interface {
 	Close()                         // 例如，mongo.Client 有 Close() 方法，pgxpool.Pool 也有 Close() 方法
 	Ping(ctx context.Context) error // 例如，mongo.Client 和 pgxpool.Pool 都有 Ping() 方法
 	// 根據你的需求，可以添加更多通用方法，例如：
-	// Query(ctx context.Context, query string, args ...interface{}) (Rows, error)
-	// Execute(ctx context.Context, query string, args ...interface{}) (Result, error)
+	// Query(ctx context.Context, query string, args ...any) (Rows, error)
+	// Execute(ctx context.Context, query string, args ...any) (Result, error)
 }
 
 // MongoWrapper 結構體包裝 *mongo.Database，使其實現 DBConnection 介面

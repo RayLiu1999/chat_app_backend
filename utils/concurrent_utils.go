@@ -81,7 +81,7 @@ func RetryWithBackoff(fn func() error, maxRetries int, initialBackoff int) error
 // 參數：
 //   - fn: 要執行的函數
 //   - onPanic: 發生 panic 時的處理函數，接收 panic 值
-func SafeGoroutine(fn func(), onPanic ...func(interface{})) {
+func SafeGoroutine(fn func(), onPanic ...func(any)) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {

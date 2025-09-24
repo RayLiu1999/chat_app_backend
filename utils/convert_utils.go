@@ -15,7 +15,7 @@ import (
 //
 // 返回：
 //   - JSON 字串和錯誤信息
-func StructToJSON(v interface{}, pretty ...bool) (string, error) {
+func StructToJSON(v any, pretty ...bool) (string, error) {
 	var (
 		bytes []byte
 		err   error
@@ -41,17 +41,17 @@ func StructToJSON(v interface{}, pretty ...bool) (string, error) {
 //
 // 返回：
 //   - 錯誤信息
-func JSONToStruct(jsonStr string, v interface{}) error {
+func JSONToStruct(jsonStr string, v any) error {
 	return json.Unmarshal([]byte(jsonStr), v)
 }
 
-// StructToMap 將結構體轉換為 map[string]interface{}
+// StructToMap 將結構體轉換為 map[string]any
 // 參數：
 //   - obj: 要轉換的結構體
 //
 // 返回：
 //   - 轉換後的 map 和錯誤信息
-func StructToMap(obj interface{}) (map[string]interface{}, error) {
+func StructToMap(obj any) (map[string]any, error) {
 	// 先轉為 JSON
 	jsonStr, err := StructToJSON(obj)
 	if err != nil {
@@ -59,7 +59,7 @@ func StructToMap(obj interface{}) (map[string]interface{}, error) {
 	}
 
 	// 再解析為 map
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func StructToMap(obj interface{}) (map[string]interface{}, error) {
 //
 // 返回：
 //   - 錯誤信息
-func DeepCopy(src, dst interface{}) error {
+func DeepCopy(src, dst any) error {
 	if src == nil {
 		return errors.New("源物件不能為 nil")
 	}
@@ -93,7 +93,7 @@ func DeepCopy(src, dst interface{}) error {
 //
 // 返回：
 //   - 轉換後的字串
-func ToStr(value interface{}) string {
+func ToStr(value any) string {
 	if value == nil {
 		return ""
 	}

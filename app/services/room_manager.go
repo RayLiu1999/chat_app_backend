@@ -6,7 +6,6 @@ import (
 	"chat_app_backend/app/repositories"
 	"chat_app_backend/utils"
 	"context"
-	"encoding/json"
 	"sync"
 	"time"
 
@@ -17,21 +16,21 @@ import (
 
 // RoomManager 管理房間的創建、加入、離開等操作
 type RoomManager struct {
-	odm              *providers.ODM
-	rooms            map[string]*Room
-	roomPubSubs      map[string]*redis.PubSub
+	odm   *providers.ODM
+	rooms map[string]*Room
+	// roomPubSubs      map[string]*redis.PubSub
 	redisClient      *redis.Client
 	serverMemberRepo repositories.ServerMemberRepositoryInterface
 	mutex            sync.RWMutex
-	pubSubMutex      sync.RWMutex
+	// pubSubMutex      sync.RWMutex
 }
 
 // NewRoomManager 創建新的房間管理器
 func NewRoomManager(odm *providers.ODM, redisClient *redis.Client, serverMemberRepo repositories.ServerMemberRepositoryInterface) *RoomManager {
 	return &RoomManager{
-		odm:              odm,
-		rooms:            make(map[string]*Room, 1000),
-		roomPubSubs:      make(map[string]*redis.PubSub),
+		odm:   odm,
+		rooms: make(map[string]*Room, 1000),
+		// roomPubSubs:      make(map[string]*redis.PubSub),
 		redisClient:      redisClient,
 		serverMemberRepo: serverMemberRepo,
 	}
@@ -85,33 +84,33 @@ func (rm *RoomManager) InitRoom(roomType models.RoomType, roomID string) *Room {
 	}
 
 	// 設置 Redis Pub/Sub
-	go func() {
-		pubsub := rm.redisClient.Subscribe(context.Background(), "room:"+key.String())
+	// go func() {
+	// 	pubsub := rm.redisClient.Subscribe(context.Background(), "room:"+key.String())
 
-		rm.pubSubMutex.Lock()
-		rm.roomPubSubs[key.String()] = pubsub
-		rm.pubSubMutex.Unlock()
+	// 	// rm.pubSubMutex.Lock()
+	// 	// rm.roomPubSubs[key.String()] = pubsub
+	// 	// rm.pubSubMutex.Unlock()
 
-		defer func() {
-			pubsub.Close()
-			rm.pubSubMutex.Lock()
-			delete(rm.roomPubSubs, key.String())
-			rm.pubSubMutex.Unlock()
-		}()
+	// 	defer func() {
+	// 		pubsub.Close()
+	// 		// rm.pubSubMutex.Lock()
+	// 		// delete(rm.roomPubSubs, key.String())
+	// 		// rm.pubSubMutex.Unlock()
+	// 	}()
 
-		for msg := range pubsub.Channel() {
-			var message *WsMessage[MessageResponse]
-			if err := json.Unmarshal([]byte(msg.Payload), &message); err != nil {
-				utils.PrettyPrintf("解析消息失敗: %v", err)
-				continue
-			}
-			room.Mutex.RLock()
-			for client := range room.Clients {
-				go rm.safelyBroadcastToClient(client, message)
-			}
-			room.Mutex.RUnlock()
-		}
-	}()
+	// 	for msg := range pubsub.Channel() {
+	// 		var message *WsMessage[MessageResponse]
+	// 		if err := json.Unmarshal([]byte(msg.Payload), &message); err != nil {
+	// 			utils.PrettyPrintf("解析消息失敗: %v", err)
+	// 			continue
+	// 		}
+	// 		room.Mutex.RLock()
+	// 		for client := range room.Clients {
+	// 			go rm.safelyBroadcastToClient(client, message)
+	// 		}
+	// 		room.Mutex.RUnlock()
+	// 	}
+	// }()
 
 	return room
 }
@@ -179,12 +178,12 @@ func (rm *RoomManager) cleanupRoom(roomKey string) {
 	if room, exists := rm.rooms[roomKey]; exists && len(room.Clients) == 0 {
 		close(room.Broadcast)
 
-		rm.pubSubMutex.Lock()
-		if pubsub, exists := rm.roomPubSubs[roomKey]; exists {
-			pubsub.Unsubscribe(context.Background(), "room:"+roomKey)
-			delete(rm.roomPubSubs, roomKey)
-		}
-		rm.pubSubMutex.Unlock()
+		// rm.pubSubMutex.Lock()
+		// if pubsub, exists := rm.roomPubSubs[roomKey]; exists {
+		// 	pubsub.Unsubscribe(context.Background(), "room:"+roomKey)
+		// 	delete(rm.roomPubSubs, roomKey)
+		// }
+		// rm.pubSubMutex.Unlock()
 
 		delete(rm.rooms, roomKey)
 	}

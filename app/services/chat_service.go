@@ -180,7 +180,7 @@ func (cs *ChatService) UpdateDMRoom(userID string, roomID string, isHidden bool)
 	}
 
 	var dmRoom models.DMRoom
-	filter := map[string]interface{}{
+	filter := map[string]any{
 		"user_id": userObjID,
 		"room_id": roomObjID,
 	}

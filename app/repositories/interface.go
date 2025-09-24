@@ -38,7 +38,7 @@ type ServerRepositoryInterface interface {
 	CheckUserInServer(userID, serverID string) (bool, error)
 
 	// UpdateServer 更新伺服器信息
-	UpdateServer(serverID string, updates map[string]interface{}) error
+	UpdateServer(serverID string, updates map[string]any) error
 
 	// DeleteServer 刪除伺服器
 	DeleteServer(serverID string) error
@@ -96,7 +96,7 @@ type UserRepositoryInterface interface {
 	UpdateUserLastActiveTime(userID string, timestamp int64) error
 
 	// UpdateUser 更新用戶信息
-	UpdateUser(userID string, updates map[string]interface{}) error
+	UpdateUser(userID string, updates map[string]any) error
 
 	// DeleteUser 刪除用戶
 	DeleteUser(userID string) error
@@ -118,7 +118,7 @@ type ChannelRepositoryInterface interface {
 	CreateChannel(channel *models.Channel) error
 
 	// UpdateChannel 更新頻道
-	UpdateChannel(channelID string, updates map[string]interface{}) error
+	UpdateChannel(channelID string, updates map[string]any) error
 
 	// DeleteChannel 刪除頻道
 	DeleteChannel(channelID string) error
@@ -167,7 +167,7 @@ type ChannelCategoryRepositoryInterface interface {
 	GetChannelCategoryByID(categoryID string) (*models.ChannelCategory, error)
 
 	// UpdateChannelCategory 更新頻道類別
-	UpdateChannelCategory(categoryID string, updates map[string]interface{}) error
+	UpdateChannelCategory(categoryID string, updates map[string]any) error
 
 	// DeleteChannelCategory 刪除頻道類別
 	DeleteChannelCategory(categoryID string) error

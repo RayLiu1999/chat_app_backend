@@ -41,6 +41,16 @@ type MessageResponse struct {
 	Timestamp int64           `json:"timestamp"`
 }
 
+// ErrorResponse 定義錯誤回應結構
+type ErrorResponse struct {
+	OriginalAction string `json:"original_action"`
+	Message        string `json:"message"`
+}
+
+type PingResponse struct {
+	Timestamp int64 `json:"timestamp"`
+}
+
 // Notification 定義通知結構
 type Notification struct {
 	Action      string          `json:"action"`
@@ -52,12 +62,12 @@ type Notification struct {
 
 // Client 定義 WebSocket 客戶端
 type Client struct {
-	UserID        string
-	Conn          *websocket.Conn
-	Send          chan []byte    // 發送訊息通道
-	Hub           *ClientManager // 所屬的客戶端管理器
-	Subscribed    map[string]bool
-	SubscribedMux sync.RWMutex
+	UserID string
+	Conn   *websocket.Conn
+	Send   chan []byte    // 發送訊息通道
+	Hub    *ClientManager // 所屬的客戶端管理器
+	// Subscribed    map[string]bool
+	// SubscribedMux sync.RWMutex
 	// 房間活躍時間追蹤
 	RoomActivity  map[string]time.Time // 房間ID -> 最後活躍時間
 	ActivityMutex sync.RWMutex
@@ -95,7 +105,7 @@ func (rk RoomKey) String() string {
 // Client 方法
 
 // SendMessage 發送 JSON 訊息
-func (c *Client) SendMessage(message interface{}) error {
+func (c *Client) SendMessage(message any) error {
 	select {
 	case c.Send <- encodeMessage(message):
 		return nil
@@ -115,13 +125,12 @@ func (c *Client) SendText(text string) error {
 }
 
 // SendError 發送錯誤訊息
-func (c *Client) SendError(errorType, message string) {
-	errorMsg := WsMessage[map[string]interface{}]{
+func (c *Client) SendError(OriginalAction, message string) {
+	errorMsg := WsMessage[ErrorResponse]{
 		Action: "error",
-		Data: map[string]interface{}{
-			"error_type": errorType,
-			"message":    message,
-			"timestamp":  time.Now().UnixMilli(),
+		Data: ErrorResponse{
+			OriginalAction: OriginalAction,
+			Message:        message,
 		},
 	}
 	c.SendMessage(errorMsg)
@@ -169,7 +178,7 @@ func (c *Client) IsHealthy() bool {
 }
 
 // 輔助函數
-func encodeMessage(message interface{}) []byte {
+func encodeMessage(message any) []byte {
 	if data, err := json.Marshal(message); err == nil {
 		return data
 	}

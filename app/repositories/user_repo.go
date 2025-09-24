@@ -118,7 +118,7 @@ func (ur *UserRepository) UpdateUserLastActiveTime(userID string, timestamp int6
 }
 
 // UpdateUser 更新用戶信息
-func (ur *UserRepository) UpdateUser(userID string, updates map[string]interface{}) error {
+func (ur *UserRepository) UpdateUser(userID string, updates map[string]any) error {
 	ctx := context.Background()
 
 	userObjectID, err := primitive.ObjectIDFromHex(userID)

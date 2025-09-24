@@ -163,7 +163,7 @@ func (sr *ServerRepository) GetServerByID(serverID string) (*models.Server, erro
 }
 
 // UpdateServer 更新伺服器信息
-func (sr *ServerRepository) UpdateServer(serverID string, updates map[string]interface{}) error {
+func (sr *ServerRepository) UpdateServer(serverID string, updates map[string]any) error {
 	ctx := context.Background()
 	serverObjectID, err := primitive.ObjectIDFromHex(serverID)
 	if err != nil {
@@ -184,7 +184,7 @@ func (sr *ServerRepository) DeleteServer(serverID string) error {
 
 // UpdateMemberCount 更新成員數量快取
 func (sr *ServerRepository) UpdateMemberCount(serverID string, count int) error {
-	updates := map[string]interface{}{
+	updates := map[string]any{
 		"member_count": count,
 	}
 	return sr.UpdateServer(serverID, updates)

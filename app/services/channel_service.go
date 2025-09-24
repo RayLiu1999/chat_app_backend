@@ -191,7 +191,7 @@ func (cs *ChannelService) CreateChannel(userID string, channel *models.Channel) 
 }
 
 // UpdateChannel 更新頻道信息
-func (cs *ChannelService) UpdateChannel(userID string, channelID string, updates map[string]interface{}) (*models.ChannelResponse, *models.MessageOptions) {
+func (cs *ChannelService) UpdateChannel(userID string, channelID string, updates map[string]any) (*models.ChannelResponse, *models.MessageOptions) {
 	// 獲取頻道信息以檢查權限
 	channel, err := cs.channelRepo.GetChannelByID(channelID)
 	if err != nil {

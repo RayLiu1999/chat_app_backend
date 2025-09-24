@@ -51,7 +51,7 @@ func (cr *ChatRepository) GetMessagesByRoomID(roomID string, limit int64) ([]mod
 		return nil, err
 	}
 
-	filter := map[string]interface{}{
+	filter := map[string]any{
 		"room_id": roomObjectID,
 	}
 
@@ -79,7 +79,7 @@ func (cr *ChatRepository) GetDMRoomListByUserID(userID string, includeHidden boo
 		return nil, err
 	}
 
-	filter := map[string]interface{}{
+	filter := map[string]any{
 		"user_id": userObjectID,
 	}
 
@@ -115,13 +115,13 @@ func (cr *ChatRepository) UpdateDMRoom(userID string, chatWithUserID string, IsH
 		return err
 	}
 
-	filter := map[string]interface{}{
+	filter := map[string]any{
 		"user_id":           userObjectID,
 		"chat_with_user_id": chatWithUserObjectID,
 	}
 
-	update := map[string]interface{}{
-		"$set": map[string]interface{}{
+	update := map[string]any{
+		"$set": map[string]any{
 			"is_hidden":  IsHidden,
 			"updated_at": time.Now(),
 		},

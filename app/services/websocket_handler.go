@@ -86,7 +86,7 @@ func (wsh *WebSocketHandler) handleDMRoomCreation(roomID, userID string) {
 
 	ctx := context.Background()
 	var dmRoomList []models.DMRoom
-	err = wsh.odm.Find(ctx, map[string]interface{}{"room_id": roomObjectID}, &dmRoomList)
+	err = wsh.odm.Find(ctx, map[string]any{"room_id": roomObjectID}, &dmRoomList)
 	if err != nil {
 		utils.PrettyPrintf("無法找到私聊房間：%v", err)
 		return
@@ -239,6 +239,10 @@ func (wsh *WebSocketHandler) handleClientMessage(client *Client, msg WsMessage[j
 
 // handleJoinRoom 處理加入房間請求
 func (wsh *WebSocketHandler) handleJoinRoom(client *Client, data json.RawMessage) {
+	// 用於錯誤回應的原始動作
+	action := "join_room"
+
+	// 解析請求數據
 	var requestData struct {
 		RoomID   string          `json:"room_id"`
 		RoomType models.RoomType `json:"room_type"`
@@ -246,19 +250,19 @@ func (wsh *WebSocketHandler) handleJoinRoom(client *Client, data json.RawMessage
 	err := json.Unmarshal(data, &requestData)
 	if err != nil {
 		utils.PrettyPrintf("無法解析加入房間數據：%v", err)
-		client.SendError("invalid_data", "無法解析加入房間數據")
+		client.SendError(action, "無法解析加入房間數據")
 		return
 	}
 
 	allowed, err := wsh.roomManager.checkUserAllowedJoinRoom(client.UserID, requestData.RoomID, requestData.RoomType)
 	if err != nil {
 		// 使用統一的 error action
-		client.SendError("permission_check_failed", "檢查用戶權限失敗")
+		client.SendError(action, "檢查用戶權限失敗")
 		return
 	}
 	if !allowed {
 		// 使用統一的 error action
-		client.SendError("permission_denied", "用戶沒有權限加入此房間")
+		client.SendError(action, "用戶沒有權限加入此房間")
 		return
 	}
 
@@ -277,6 +281,10 @@ func (wsh *WebSocketHandler) handleJoinRoom(client *Client, data json.RawMessage
 
 // handleLeaveRoom 處理離開房間請求
 func (wsh *WebSocketHandler) handleLeaveRoom(client *Client, data json.RawMessage) {
+	// 用於錯誤回應的原始動作
+	action := "leave_room"
+
+	// 解析請求數據
 	var requestData struct {
 		RoomID   string          `json:"room_id"`
 		RoomType models.RoomType `json:"room_type"`
@@ -284,7 +292,7 @@ func (wsh *WebSocketHandler) handleLeaveRoom(client *Client, data json.RawMessag
 	err := json.Unmarshal(data, &requestData)
 	if err != nil {
 		utils.PrettyPrintf("無法解析離開房間數據：%v", err)
-		client.SendError("invalid_data", "無法解析離開房間數據")
+		client.SendError(action, "無法解析離開房間數據")
 		return
 	}
 
@@ -300,6 +308,10 @@ func (wsh *WebSocketHandler) handleLeaveRoom(client *Client, data json.RawMessag
 
 // handleSendMessage 處理發送消息請求
 func (wsh *WebSocketHandler) handleSendMessage(client *Client, data json.RawMessage) {
+	// 用於錯誤回應的原始動作
+	action := "send_message"
+
+	// 解析請求數據
 	var requestData struct {
 		RoomID   string          `json:"room_id"`
 		RoomType models.RoomType `json:"room_type"`
@@ -308,7 +320,7 @@ func (wsh *WebSocketHandler) handleSendMessage(client *Client, data json.RawMess
 	err := json.Unmarshal(data, &requestData)
 	if err != nil {
 		utils.PrettyPrintf("無法解析發送訊息數據：%v", err)
-		client.SendError("invalid_data", "無法解析發送訊息數據")
+		client.SendError(action, "無法解析發送訊息數據")
 		return
 	}
 
@@ -320,14 +332,13 @@ func (wsh *WebSocketHandler) handleSendMessage(client *Client, data json.RawMess
 		wsh.handleDMRoomCreation(requestData.RoomID, client.UserID)
 	}
 
-	message := &WsMessage[MessageResponse]{
-		Data: MessageResponse{
-			RoomID:    requestData.RoomID,
-			RoomType:  requestData.RoomType,
-			SenderID:  client.UserID,
-			Content:   requestData.Content,
-			Timestamp: time.Now().UnixMilli(),
-		},
+	// 建立消息對象
+	message := &MessageResponse{
+		RoomID:    requestData.RoomID,
+		RoomType:  requestData.RoomType,
+		SenderID:  client.UserID,
+		Content:   requestData.Content,
+		Timestamp: time.Now().UnixMilli(),
 	}
 
 	// 使用MessageHandler處理消息
@@ -336,15 +347,15 @@ func (wsh *WebSocketHandler) handleSendMessage(client *Client, data json.RawMess
 
 // handlePing 處理ping請求
 func (wsh *WebSocketHandler) handlePing(client *Client) {
-	pongMsg := &WsMessage[map[string]interface{}]{
+	pongMsg := &WsMessage[PingResponse]{
 		Action: "pong",
-		Data: map[string]interface{}{
-			"message":   "pong",
-			"timestamp": time.Now().UnixMilli(),
+		Data: PingResponse{
+			Timestamp: time.Now().UnixMilli(),
 		},
 	}
 
 	if err := client.SendMessage(pongMsg); err != nil {
+		client.SendError("ping", "無法發送 pong 訊息")
 		utils.PrettyPrintf("無法向客戶端 %s 發送 pong：%v", client.UserID, err)
 	}
 }

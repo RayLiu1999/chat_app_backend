@@ -406,7 +406,7 @@ func (us *UserService) GetUserProfile(userID string) (*models.UserProfileRespons
 }
 
 // UpdateUserProfile 更新用戶基本資料
-func (us *UserService) UpdateUserProfile(userID string, updates map[string]interface{}) error {
+func (us *UserService) UpdateUserProfile(userID string, updates map[string]any) error {
 	// 過濾允許更新的欄位
 	allowedFields := map[string]bool{
 		"username": true,
@@ -415,7 +415,7 @@ func (us *UserService) UpdateUserProfile(userID string, updates map[string]inter
 		"bio":      true,
 	}
 
-	filteredUpdates := make(map[string]interface{})
+	filteredUpdates := make(map[string]any)
 	for field, value := range updates {
 		if allowedFields[field] {
 			filteredUpdates[field] = value
@@ -470,7 +470,7 @@ func (us *UserService) UploadUserImage(userID string, file multipart.File, heade
 	}
 
 	// 更新用戶資料庫記錄（儲存檔案ID）
-	updates := map[string]interface{}{
+	updates := map[string]any{
 		fieldName:    uploadResult.ID,
 		"updated_at": time.Now(),
 	}
@@ -507,7 +507,7 @@ func (us *UserService) DeleteUserAvatar(userID string) error {
 	}
 
 	// 更新資料庫記錄，清空圖片ID
-	updates := map[string]interface{}{
+	updates := map[string]any{
 		"picture_id": nil,
 		"updated_at": time.Now(),
 	}
@@ -531,7 +531,7 @@ func (us *UserService) DeleteUserBanner(userID string) error {
 	}
 
 	// 更新資料庫記錄，清空圖片ID
-	updates := map[string]interface{}{
+	updates := map[string]any{
 		"banner_id":  nil,
 		"updated_at": time.Now(),
 	}
@@ -546,7 +546,7 @@ func (us *UserService) UpdateUserPassword(userID string, newPassword string) err
 		return err
 	}
 
-	updates := map[string]interface{}{
+	updates := map[string]any{
 		"password":   string(hashedPassword),
 		"updated_at": time.Now(),
 	}
@@ -568,7 +568,7 @@ func (us *UserService) GetTwoFactorStatus(userID string) (*models.TwoFactorStatu
 
 // UpdateTwoFactorStatus 啟用/停用兩步驟驗證
 func (us *UserService) UpdateTwoFactorStatus(userID string, enabled bool) error {
-	updates := map[string]interface{}{
+	updates := map[string]any{
 		"two_factor_enabled": enabled,
 		"updated_at":         time.Now(),
 	}
@@ -578,7 +578,7 @@ func (us *UserService) UpdateTwoFactorStatus(userID string, enabled bool) error 
 
 // DeactivateAccount 停用帳號
 func (us *UserService) DeactivateAccount(userID string) error {
-	updates := map[string]interface{}{
+	updates := map[string]any{
 		"is_active":  false,
 		"updated_at": time.Now(),
 	}
