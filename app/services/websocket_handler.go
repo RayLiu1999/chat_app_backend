@@ -18,17 +18,19 @@ type WebSocketHandler struct {
 	clientManager  *ClientManager
 	roomManager    *RoomManager
 	messageHandler *MessageHandler
-	userService    UserServiceInterface
+	userService    UserService
+	cache          providers.CacheProvider
 }
 
 // NewWebSocketHandler 創建新的 WebSocket 處理器
-func NewWebSocketHandler(odm *providers.ODM, clientManager *ClientManager, roomManager *RoomManager, messageHandler *MessageHandler, userService UserServiceInterface) *WebSocketHandler {
+func NewWebSocketHandler(odm *providers.ODM, clientManager *ClientManager, roomManager *RoomManager, messageHandler *MessageHandler, userService UserService, cache providers.CacheProvider) *WebSocketHandler {
 	return &WebSocketHandler{
 		odm:            odm,
 		clientManager:  clientManager,
 		roomManager:    roomManager,
 		messageHandler: messageHandler,
 		userService:    userService,
+		cache:          cache,
 	}
 }
 
@@ -48,26 +50,36 @@ func (wsh *WebSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) 
 		return nil
 	})
 
-	// 註冊客戶端
+	// --- 連線建立時的副作用 ---
+	// 1. 註冊客戶端到記憶體
 	wsh.clientManager.Register(client)
 
-	// 設置用戶為在線狀態
+	// 2. 更新資料庫狀態
 	if err := wsh.userService.SetUserOnline(userID); err != nil {
 		utils.PrettyPrintf("無法將用戶 %s 設定為在線：%v", userID, err)
 	}
+
+	// 3. 更新 Redis 快取狀態(未來拓展用)
+	wsh.cache.Set(utils.UserStatusCacheKey(userID), "online", 24*time.Hour)
 
 	// 啟動讀寫協程
 	go wsh.clientWritePump(client)
 	go wsh.clientReadPump(client)
 
-	// 等待客戶端 context 結束
+	// 等待客戶端 context 結束 (連線關閉)
 	<-client.Context.Done()
 
-	// 清理工作
+	// --- 連線關閉時的清理工作 ---
+	// 1. 從記憶體中註銷客戶端
 	wsh.clientManager.Unregister(client)
+
+	// 2. 更新資料庫狀態
 	if err := wsh.userService.SetUserOffline(userID); err != nil {
 		utils.PrettyPrintf("無法將用戶 %s 設定為離線：%v", userID, err)
 	}
+
+	// 3. 更新 Redis 快取狀態(未來拓展用)
+	wsh.cache.Set(utils.UserStatusCacheKey(userID), "offline", 24*time.Hour)
 }
 
 // handleDMRoomCreation 處理私聊房間創建邏輯
@@ -164,18 +176,44 @@ func (wsh *WebSocketHandler) clientReadPump(client *Client) {
 				return
 			}
 
-			// 更新最後活動時間
+			// 更新最後活動時間 (in-memory)
 			client.UpdateLastSeen()
 
-			// 更新用戶活動時間
-			if err := wsh.userService.UpdateUserActivity(client.UserID); err != nil {
-				utils.PrettyPrintf("無法更新用戶 %s 的活動：%v", client.UserID, err)
-			}
+			// 使用 Redis 節流閥更新資料庫中的最後活動時間(未來拓展用)
+			wsh.updateActivityWithThrottle(client.UserID)
 
 			// 處理訊息
 			wsh.handleClientMessage(client, msg)
 		}
 	}
+}
+
+// updateActivityWithThrottle 使用 Redis 節流閥來更新資料庫中的用戶活動時間
+func (wsh *WebSocketHandler) updateActivityWithThrottle(userID string) {
+	throttleKey := utils.UserActivityThrottleCacheKey(userID)
+
+	// 1. 檢查節流閥是否存在
+	val, err := wsh.cache.Get(throttleKey)
+	if err != nil {
+		// Log a cache error if necessary, but proceed
+	}
+
+	// 2. 如果 key 存在，表示在冷卻時間內，直接返回
+	if val != "" {
+		return
+	}
+
+	// 3. 如果 key 不存在，執行更新並設置節流閥
+	go func() {
+		// 3a. 更新資料庫
+		if err := wsh.userService.UpdateUserActivity(userID); err != nil {
+			utils.PrettyPrintf("無法更新用戶 %s 的活動：%v", userID, err)
+			return // 如果更新失敗，則不設置節流閥，以便下次重試
+		}
+
+		// 3b. 設置節流閥，冷卻時間 3 分鐘
+		wsh.cache.Set(throttleKey, "1", 3*time.Minute)
+	}()
 }
 
 // clientWritePump 處理客戶端寫入

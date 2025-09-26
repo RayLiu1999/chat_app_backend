@@ -17,7 +17,6 @@ type friendService struct {
 	odm               *providers.ODM
 	friendRepo        repositories.FriendRepository
 	userRepo          repositories.UserRepository
-	userService       UserService       // 添加 UserService 來查詢在線狀態
 	fileUploadService FileUploadService // 添加 FileUploadService 依賴
 	clientManager     *ClientManager
 }
@@ -27,7 +26,6 @@ func NewFriendService(
 	odm *providers.ODM,
 	friendRepo repositories.FriendRepository,
 	userRepo repositories.UserRepository,
-	userService UserService,
 	fileUploadService FileUploadService,
 	clientManager *ClientManager,
 ) *friendService {
@@ -36,7 +34,6 @@ func NewFriendService(
 		odm:               odm,
 		friendRepo:        friendRepo,
 		userRepo:          userRepo,
-		userService:       userService,
 		fileUploadService: fileUploadService,
 		clientManager:     clientManager,
 	}
@@ -96,29 +93,25 @@ func (fs *friendService) GetFriendList(userID string) ([]models.FriendResponse, 
 	}
 
 	// 處理好友ID和狀態
-	var friendIds []primitive.ObjectID
+	var friendIds []string
 	friendsStatusMap := make(map[string]string)
 
 	for _, friend := range friends {
-		var friendId primitive.ObjectID
+		var friendId string
 
 		// 確定哪個ID是好友的ID
 		if friend.UserID == userObjectID {
-			friendId = friend.FriendID
+			friendId = friend.FriendID.Hex()
 		} else {
-			friendId = friend.UserID
+			friendId = friend.UserID.Hex()
 		}
 
 		friendIds = append(friendIds, friendId)
-		friendsStatusMap[friendId.Hex()] = friend.Status
+		friendsStatusMap[friendId] = friend.Status
 	}
 
-	// 使用QueryBuilder查詢用戶資訊
-	userQb := providers.NewQueryBuilder()
-	userQb.WhereIn("_id", friendIds)
-
 	var users []models.User
-	err = fs.odm.Find(context.Background(), userQb.GetFilter(), &users)
+	users, err = fs.userRepo.GetUserListByIds(friendIds)
 	if err != nil {
 		return nil, &models.MessageOptions{
 			Code:    models.ErrInternalServer,

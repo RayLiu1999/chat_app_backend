@@ -125,7 +125,6 @@ func initServices(
 		providers.ODM,
 		repos.FriendRepo,
 		repos.UserRepo,
-		userService,
 		fileUploadService,
 		clientManager,
 	)

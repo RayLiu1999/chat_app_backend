@@ -15,17 +15,17 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// ChatService 管理所有的聊天功能
-type ChatService struct {
+// chatService 管理所有的聊天功能
+type chatService struct {
 	config            *config.Config
-	redisClient       *redis.Client
-	chatRepo          repositories.ChatRepositoryInterface
-	serverRepo        repositories.ServerRepositoryInterface
-	serverMemberRepo  repositories.ServerMemberRepositoryInterface
-	userRepo          repositories.UserRepositoryInterface
+	cache             providers.CacheProvider
+	chatRepo          repositories.ChatRepository
+	serverRepo        repositories.ServerRepository
+	serverMemberRepo  repositories.ServerMemberRepository
+	userRepo          repositories.UserRepository
 	odm               *providers.ODM
-	userService       UserServiceInterface
-	fileUploadService FileUploadServiceInterface // 添加 FileUploadService 依賴
+	userService       UserService
+	fileUploadService FileUploadService // 添加 FileUploadService 依賴
 
 	// 新增的模組化組件
 	clientManager    *ClientManager
@@ -38,22 +38,23 @@ type ChatService struct {
 func NewChatService(cfg *config.Config,
 	odm *providers.ODM,
 	redisClient *redis.Client,
-	chatRepo repositories.ChatRepositoryInterface,
-	serverRepo repositories.ServerRepositoryInterface,
-	serverMemberRepo repositories.ServerMemberRepositoryInterface,
-	userRepo repositories.UserRepositoryInterface,
-	userService UserServiceInterface,
-	fileUploadService FileUploadServiceInterface) *ChatService {
+	cache providers.CacheProvider,
+	chatRepo repositories.ChatRepository,
+	serverRepo repositories.ServerRepository,
+	serverMemberRepo repositories.ServerMemberRepository,
+	userRepo repositories.UserRepository,
+	userService UserService,
+	fileUploadService FileUploadService) ChatService {
 
 	// 創建模組化組件
-	clientManager := NewClientManager(redisClient)
+	clientManager := NewClientManager()
 	roomManager := NewRoomManager(odm, redisClient, serverMemberRepo)
 	messageHandler := NewMessageHandler(odm, roomManager)
-	websocketHandler := NewWebSocketHandler(odm, clientManager, roomManager, messageHandler, userService)
+	websocketHandler := NewWebSocketHandler(odm, clientManager, roomManager, messageHandler, userService, cache)
 
-	cs := &ChatService{
+	cs := &chatService{
 		config:            cfg,
-		redisClient:       redisClient,
+		cache:             cache,
 		chatRepo:          chatRepo,
 		serverRepo:        serverRepo,
 		serverMemberRepo:  serverMemberRepo,
@@ -71,7 +72,7 @@ func NewChatService(cfg *config.Config,
 }
 
 // getUserPictureURL 獲取用戶頭像 URL（從 ObjectID 解析）
-func (cs *ChatService) getUserPictureURL(user *models.User) string {
+func (cs *chatService) getUserPictureURL(user *models.User) string {
 	if user.PictureID.IsZero() || cs.fileUploadService == nil {
 		return ""
 	}
@@ -84,23 +85,23 @@ func (cs *ChatService) getUserPictureURL(user *models.User) string {
 }
 
 // HandleWebSocket 處理 WebSocket 連線
-func (cs *ChatService) HandleWebSocket(ws *websocket.Conn, userID string) {
+func (cs *chatService) HandleWebSocket(ws *websocket.Conn, userID string) {
 	cs.websocketHandler.HandleWebSocket(ws, userID)
 }
 
 // GetClientManager 獲取客戶端管理器
-func (cs *ChatService) GetClientManager() *ClientManager {
+func (cs *chatService) GetClientManager() *ClientManager {
 	return cs.clientManager
 }
 
 // UpdateUserService 更新 UserService 引用
-func (cs *ChatService) UpdateUserService(userService UserServiceInterface) {
+func (cs *chatService) UpdateUserService(userService UserService) {
 	cs.userService = userService
 	cs.websocketHandler.userService = userService
 }
 
 // 取得聊天記錄response
-func (cs *ChatService) GetDMRoomResponseList(userID string, includeHidden bool) ([]models.DMRoomResponse, *models.MessageOptions) {
+func (cs *chatService) GetDMRoomResponseList(userID string, includeHidden bool) ([]models.DMRoomResponse, *models.MessageOptions) {
 	chatList, err := cs.chatRepo.GetDMRoomListByUserID(userID, includeHidden)
 	if err != nil {
 		return nil, &models.MessageOptions{
@@ -157,7 +158,7 @@ func (cs *ChatService) GetDMRoomResponseList(userID string, includeHidden bool) 
 }
 
 // UpdateDMRoom 更新聊天房間狀態
-func (cs *ChatService) UpdateDMRoom(userID string, roomID string, isHidden bool) *models.MessageOptions {
+func (cs *chatService) UpdateDMRoom(userID string, roomID string, isHidden bool) *models.MessageOptions {
 	// 使用ODM直接操作
 	ctx := context.Background()
 
@@ -210,7 +211,7 @@ func (cs *ChatService) UpdateDMRoom(userID string, roomID string, isHidden bool)
 }
 
 // CreateDMRoom 創建私聊房間
-func (cs *ChatService) CreateDMRoom(userID string, chatWithUserID string) (*models.DMRoomResponse, *models.MessageOptions) {
+func (cs *chatService) CreateDMRoom(userID string, chatWithUserID string) (*models.DMRoomResponse, *models.MessageOptions) {
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return nil, &models.MessageOptions{
@@ -369,7 +370,7 @@ func (cs *ChatService) CreateDMRoom(userID string, chatWithUserID string) (*mode
 }
 
 // GetDMMessages 獲取私聊訊息
-func (cs *ChatService) GetDMMessages(userID string, roomID string, before string, after string, limit string) ([]models.MessageResponse, *models.MessageOptions) {
+func (cs *chatService) GetDMMessages(userID string, roomID string, before string, after string, limit string) ([]models.MessageResponse, *models.MessageOptions) {
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return nil, &models.MessageOptions{
@@ -465,7 +466,7 @@ func (cs *ChatService) GetDMMessages(userID string, roomID string, before string
 }
 
 // GetChannelMessages 獲取頻道訊息
-func (cs *ChatService) GetChannelMessages(userID string, channelID string, before string, after string, limit string) ([]models.MessageResponse, *models.MessageOptions) {
+func (cs *chatService) GetChannelMessages(userID string, channelID string, before string, after string, limit string) ([]models.MessageResponse, *models.MessageOptions) {
 	channelObjectID, err := primitive.ObjectIDFromHex(channelID)
 	if err != nil {
 		return nil, &models.MessageOptions{
@@ -574,7 +575,7 @@ func (cs *ChatService) GetChannelMessages(userID string, channelID string, befor
 }
 
 // checkUserServerMembership 檢查用戶是否為伺服器成員
-func (cs *ChatService) checkUserServerMembership(userID, serverID string) (bool, error) {
+func (cs *chatService) checkUserServerMembership(userID, serverID string) (bool, error) {
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return false, err
