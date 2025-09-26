@@ -15,10 +15,10 @@ import (
 type FriendController struct {
 	config        *config.Config
 	mongoConnect  *mongo.Database
-	friendService services.FriendServiceInterface
+	friendService services.FriendService
 }
 
-func NewFriendController(cfg *config.Config, mongodb *mongo.Database, friendService services.FriendServiceInterface) *FriendController {
+func NewFriendController(cfg *config.Config, mongodb *mongo.Database, friendService services.FriendService) *FriendController {
 	return &FriendController{
 		config:        cfg,
 		mongoConnect:  mongodb,

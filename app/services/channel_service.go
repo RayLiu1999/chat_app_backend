@@ -10,24 +10,24 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-type ChannelService struct {
+type channelService struct {
 	config           *config.Config
 	odm              *providers.ODM
-	channelRepo      repositories.ChannelRepositoryInterface
-	serverRepo       repositories.ServerRepositoryInterface
-	serverMemberRepo repositories.ServerMemberRepositoryInterface
-	userRepo         repositories.UserRepositoryInterface
-	chatRepo         repositories.ChatRepositoryInterface
+	channelRepo      repositories.ChannelRepository
+	serverRepo       repositories.ServerRepository
+	serverMemberRepo repositories.ServerMemberRepository
+	userRepo         repositories.UserRepository
+	chatRepo         repositories.ChatRepository
 }
 
 func NewChannelService(cfg *config.Config,
 	odm *providers.ODM,
-	channelRepo repositories.ChannelRepositoryInterface,
-	serverRepo repositories.ServerRepositoryInterface,
-	serverMemberRepo repositories.ServerMemberRepositoryInterface,
-	userRepo repositories.UserRepositoryInterface,
-	chatRepo repositories.ChatRepositoryInterface) ChannelServiceInterface {
-	return &ChannelService{
+	channelRepo repositories.ChannelRepository,
+	serverRepo repositories.ServerRepository,
+	serverMemberRepo repositories.ServerMemberRepository,
+	userRepo repositories.UserRepository,
+	chatRepo repositories.ChatRepository) *channelService {
+	return &channelService{
 		config:           cfg,
 		odm:              odm,
 		channelRepo:      channelRepo,
@@ -39,7 +39,7 @@ func NewChannelService(cfg *config.Config,
 }
 
 // GetChannelsByServerID 根據伺服器ID獲取頻道列表
-func (cs *ChannelService) GetChannelsByServerID(userID string, serverID string) ([]models.ChannelResponse, *models.MessageOptions) {
+func (cs *channelService) GetChannelsByServerID(userID string, serverID string) ([]models.ChannelResponse, *models.MessageOptions) {
 	// 檢查用戶是否有權限訪問該伺服器
 	serverMembers, err := cs.serverMemberRepo.GetUserServers(userID)
 	if err != nil {
@@ -90,7 +90,7 @@ func (cs *ChannelService) GetChannelsByServerID(userID string, serverID string) 
 }
 
 // GetChannelByID 根據頻道ID獲取頻道詳細信息
-func (cs *ChannelService) GetChannelByID(userID string, channelID string) (*models.ChannelResponse, *models.MessageOptions) {
+func (cs *channelService) GetChannelByID(userID string, channelID string) (*models.ChannelResponse, *models.MessageOptions) {
 	// 獲取頻道信息
 	channel, err := cs.channelRepo.GetChannelByID(channelID)
 	if err != nil {
@@ -138,7 +138,7 @@ func (cs *ChannelService) GetChannelByID(userID string, channelID string) (*mode
 }
 
 // CreateChannel 創建新頻道
-func (cs *ChannelService) CreateChannel(userID string, channel *models.Channel) (*models.ChannelResponse, *models.MessageOptions) {
+func (cs *channelService) CreateChannel(userID string, channel *models.Channel) (*models.ChannelResponse, *models.MessageOptions) {
 	// 檢查用戶是否有權限創建頻道（需要是伺服器成員）
 	serverMembers, err := cs.serverMemberRepo.GetUserServers(userID)
 	if err != nil {
@@ -191,7 +191,7 @@ func (cs *ChannelService) CreateChannel(userID string, channel *models.Channel) 
 }
 
 // UpdateChannel 更新頻道信息
-func (cs *ChannelService) UpdateChannel(userID string, channelID string, updates map[string]any) (*models.ChannelResponse, *models.MessageOptions) {
+func (cs *channelService) UpdateChannel(userID string, channelID string, updates map[string]any) (*models.ChannelResponse, *models.MessageOptions) {
 	// 獲取頻道信息以檢查權限
 	channel, err := cs.channelRepo.GetChannelByID(channelID)
 	if err != nil {
@@ -259,7 +259,7 @@ func (cs *ChannelService) UpdateChannel(userID string, channelID string, updates
 }
 
 // DeleteChannel 刪除頻道
-func (cs *ChannelService) DeleteChannel(userID string, channelID string) *models.MessageOptions {
+func (cs *channelService) DeleteChannel(userID string, channelID string) *models.MessageOptions {
 	// 獲取頻道信息以檢查權限
 	channel, err := cs.channelRepo.GetChannelByID(channelID)
 	if err != nil {

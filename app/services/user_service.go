@@ -16,26 +16,24 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-type UserService struct {
+type userService struct {
 	config            *config.Config
-	userRepo          repositories.UserRepositoryInterface
+	userRepo          repositories.UserRepository
 	odm               *providers.ODM
-	clientManager     *ClientManager             // 添加 ClientManager 依賴
-	fileUploadService FileUploadServiceInterface // 添加 FileUploadService 依賴
+	fileUploadService FileUploadService // 添加 FileUploadService 依賴
 }
 
-func NewUserService(cfg *config.Config, odm *providers.ODM, userRepo repositories.UserRepositoryInterface, clientManager *ClientManager, fileUploadService FileUploadServiceInterface) *UserService {
-	return &UserService{
+func NewUserService(cfg *config.Config, odm *providers.ODM, userRepo repositories.UserRepository, fileUploadService FileUploadService) *userService {
+	return &userService{
 		config:            cfg,
 		userRepo:          userRepo,
 		odm:               odm,
-		clientManager:     clientManager,
 		fileUploadService: fileUploadService,
 	}
 }
 
 // getUserPictureURL 獲取用戶頭像 URL（從 ObjectID 解析）
-func (us *UserService) getUserPictureURL(user *models.User) string {
+func (us *userService) getUserPictureURL(user *models.User) string {
 	if user.PictureID.IsZero() || us.fileUploadService == nil {
 		return ""
 	}
@@ -48,7 +46,7 @@ func (us *UserService) getUserPictureURL(user *models.User) string {
 }
 
 // getUserBannerURL 獲取用戶橫幅 URL（從 ObjectID 解析）
-func (us *UserService) getUserBannerURL(user *models.User) string {
+func (us *userService) getUserBannerURL(user *models.User) string {
 	if user.BannerID.IsZero() || us.fileUploadService == nil {
 		return ""
 	}
@@ -61,7 +59,7 @@ func (us *UserService) getUserBannerURL(user *models.User) string {
 }
 
 // 註冊新用戶
-func (us *UserService) RegisterUser(user models.User) *models.MessageOptions {
+func (us *userService) RegisterUser(user models.User) *models.MessageOptions {
 	// 檢查用戶名是否已存在
 	exists, err := us.userRepo.CheckUsernameExists(user.Username)
 	if err != nil {
@@ -123,7 +121,7 @@ func (us *UserService) RegisterUser(user models.User) *models.MessageOptions {
 }
 
 // 根據ID獲取用戶信息
-func (us *UserService) GetUserResponseById(userID string) (*models.UserResponse, error) {
+func (us *userService) GetUserResponseById(userID string) (*models.UserResponse, error) {
 	user, err := us.userRepo.GetUserById(userID)
 	if err != nil {
 		return nil, err
@@ -143,7 +141,7 @@ func (us *UserService) GetUserResponseById(userID string) (*models.UserResponse,
 }
 
 // Login 處理用戶登入邏輯
-func (us *UserService) Login(loginUser models.User) (*models.LoginResponse, *models.MessageOptions) {
+func (us *userService) Login(loginUser models.User) (*models.LoginResponse, *models.MessageOptions) {
 	// 刪除過期或被註銷的 refresh token
 	err := us.ClearExpiredRefreshTokens()
 	if err != nil {
@@ -230,7 +228,7 @@ func (us *UserService) Login(loginUser models.User) (*models.LoginResponse, *mod
 }
 
 // 登出
-func (us *UserService) Logout(c *gin.Context) *models.MessageOptions {
+func (us *userService) Logout(c *gin.Context) *models.MessageOptions {
 	// 註銷 refresh token
 	_, userObjectID, err := utils.GetUserIDFromHeader(c)
 	if err != nil {
@@ -256,7 +254,7 @@ func (us *UserService) Logout(c *gin.Context) *models.MessageOptions {
 }
 
 // RefreshToken 刷新令牌
-func (us *UserService) RefreshToken(refreshToken string) (*models.RefreshTokenResponse, *models.MessageOptions) {
+func (us *userService) RefreshToken(refreshToken string) (*models.RefreshTokenResponse, *models.MessageOptions) {
 	// 查詢 refresh token
 	var refreshTokenDoc models.RefreshToken
 	err := us.odm.FindOne(context.Background(), bson.M{"token": refreshToken}, &refreshTokenDoc)
@@ -318,7 +316,7 @@ func (us *UserService) RefreshToken(refreshToken string) (*models.RefreshTokenRe
 }
 
 // 清除過期或被註銷的 refresh token
-func (us *UserService) ClearExpiredRefreshTokens() error {
+func (us *userService) ClearExpiredRefreshTokens() error {
 	filter := bson.M{"$or": []bson.M{
 		{"expires_at": bson.M{"$lt": time.Now().Unix()}},
 		{"revoked": true},
@@ -328,24 +326,24 @@ func (us *UserService) ClearExpiredRefreshTokens() error {
 }
 
 // SetUserOnline 設置用戶為在線狀態
-func (us *UserService) SetUserOnline(userID string) error {
+func (us *userService) SetUserOnline(userID string) error {
 	return us.userRepo.UpdateUserOnlineStatus(userID, true)
 }
 
 // SetUserOffline 設置用戶為離線狀態
-func (us *UserService) SetUserOffline(userID string) error {
+func (us *userService) SetUserOffline(userID string) error {
 	return us.userRepo.UpdateUserOnlineStatus(userID, false)
 }
 
 // UpdateUserActivity 更新用戶活動時間（保持在線狀態）
-func (us *UserService) UpdateUserActivity(userID string) error {
+func (us *userService) UpdateUserActivity(userID string) error {
 	timestamp := time.Now().Unix()
 	return us.userRepo.UpdateUserLastActiveTime(userID, timestamp)
 }
 
 // CheckAndSetOfflineUsers 檢查並設置離線用戶（定期任務用）
 // 現在這個方法主要用於數據庫狀態同步，實際在線狀態以 WebSocket 為準
-func (us *UserService) CheckAndSetOfflineUsers(offlineThresholdMinutes int) error {
+func (us *userService) CheckAndSetOfflineUsers(offlineThresholdMinutes int) error {
 	// 計算離線閾值時間戳
 	thresholdTimestamp := time.Now().Add(-time.Duration(offlineThresholdMinutes) * time.Minute).Unix()
 
@@ -366,7 +364,7 @@ func (us *UserService) CheckAndSetOfflineUsers(offlineThresholdMinutes int) erro
 }
 
 // GetUserProfile 獲取用戶個人資料
-func (us *UserService) GetUserProfile(userID string) (*models.UserProfileResponse, error) {
+func (us *userService) GetUserProfile(userID string) (*models.UserProfileResponse, error) {
 	user, err := us.userRepo.GetUserById(userID)
 	if err != nil {
 		return nil, err
@@ -400,7 +398,7 @@ func (us *UserService) GetUserProfile(userID string) (*models.UserProfileRespons
 }
 
 // UpdateUserProfile 更新用戶基本資料
-func (us *UserService) UpdateUserProfile(userID string, updates map[string]any) error {
+func (us *userService) UpdateUserProfile(userID string, updates map[string]any) error {
 	// 過濾允許更新的欄位
 	allowedFields := map[string]bool{
 		"username": true,
@@ -427,7 +425,7 @@ func (us *UserService) UpdateUserProfile(userID string, updates map[string]any) 
 }
 
 // UploadUserImage 上傳用戶頭像或橫幅
-func (us *UserService) UploadUserImage(userID string, file multipart.File, header *multipart.FileHeader, imageType string) (*models.UserImageResponse, error) {
+func (us *userService) UploadUserImage(userID string, file multipart.File, header *multipart.FileHeader, imageType string) (*models.UserImageResponse, error) {
 	if us.fileUploadService == nil {
 		return nil, fmt.Errorf("檔案上傳服務未初始化")
 	}
@@ -485,7 +483,7 @@ func (us *UserService) UploadUserImage(userID string, file multipart.File, heade
 }
 
 // DeleteUserAvatar 刪除用戶頭像
-func (us *UserService) DeleteUserAvatar(userID string) error {
+func (us *userService) DeleteUserAvatar(userID string) error {
 	// 獲取用戶當前資料，以便刪除舊的頭像檔案
 	user, err := us.userRepo.GetUserById(userID)
 	if err != nil {
@@ -509,7 +507,7 @@ func (us *UserService) DeleteUserAvatar(userID string) error {
 }
 
 // DeleteUserBanner 刪除用戶橫幅
-func (us *UserService) DeleteUserBanner(userID string) error {
+func (us *userService) DeleteUserBanner(userID string) error {
 	// 獲取用戶當前資料，以便刪除舊的橫幅檔案
 	user, err := us.userRepo.GetUserById(userID)
 	if err != nil {
@@ -533,7 +531,7 @@ func (us *UserService) DeleteUserBanner(userID string) error {
 }
 
 // UpdateUserPassword 更新用戶密碼
-func (us *UserService) UpdateUserPassword(userID string, newPassword string) error {
+func (us *userService) UpdateUserPassword(userID string, newPassword string) error {
 	// 對新密碼進行雜湊
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {
@@ -549,7 +547,7 @@ func (us *UserService) UpdateUserPassword(userID string, newPassword string) err
 }
 
 // GetTwoFactorStatus 獲取兩步驟驗證狀態
-func (us *UserService) GetTwoFactorStatus(userID string) (*models.TwoFactorStatusResponse, error) {
+func (us *userService) GetTwoFactorStatus(userID string) (*models.TwoFactorStatusResponse, error) {
 	user, err := us.userRepo.GetUserById(userID)
 	if err != nil {
 		return nil, err
@@ -561,7 +559,7 @@ func (us *UserService) GetTwoFactorStatus(userID string) (*models.TwoFactorStatu
 }
 
 // UpdateTwoFactorStatus 啟用/停用兩步驟驗證
-func (us *UserService) UpdateTwoFactorStatus(userID string, enabled bool) error {
+func (us *userService) UpdateTwoFactorStatus(userID string, enabled bool) error {
 	updates := map[string]any{
 		"two_factor_enabled": enabled,
 		"updated_at":         time.Now(),
@@ -571,7 +569,7 @@ func (us *UserService) UpdateTwoFactorStatus(userID string, enabled bool) error 
 }
 
 // DeactivateAccount 停用帳號
-func (us *UserService) DeactivateAccount(userID string) error {
+func (us *userService) DeactivateAccount(userID string) error {
 	updates := map[string]any{
 		"is_active":  false,
 		"updated_at": time.Now(),
@@ -581,7 +579,7 @@ func (us *UserService) DeactivateAccount(userID string) error {
 }
 
 // DeleteAccount 刪除帳號
-func (us *UserService) DeleteAccount(userID string) error {
+func (us *userService) DeleteAccount(userID string) error {
 	// 這裡應該包含更複雜的邏輯，如刪除相關的伺服器、訊息等
 	// 暫時只刪除用戶記錄
 	return us.userRepo.DeleteUser(userID)

@@ -15,10 +15,10 @@ import (
 type ChannelController struct {
 	config         *config.Config
 	mongoConnect   *mongo.Database
-	channelService services.ChannelServiceInterface
+	channelService services.ChannelService
 }
 
-func NewChannelController(cfg *config.Config, mongodb *mongo.Database, channelService services.ChannelServiceInterface) *ChannelController {
+func NewChannelController(cfg *config.Config, mongodb *mongo.Database, channelService services.ChannelService) *ChannelController {
 	return &ChannelController{
 		config:         cfg,
 		mongoConnect:   mongodb,

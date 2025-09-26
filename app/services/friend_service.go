@@ -12,26 +12,26 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-type FriendService struct {
+type friendService struct {
 	config            *config.Config
 	odm               *providers.ODM
-	friendRepo        repositories.FriendRepositoryInterface
-	userRepo          repositories.UserRepositoryInterface
-	userService       UserServiceInterface       // 添加 UserService 來查詢在線狀態
-	fileUploadService FileUploadServiceInterface // 添加 FileUploadService 依賴
+	friendRepo        repositories.FriendRepository
+	userRepo          repositories.UserRepository
+	userService       UserService       // 添加 UserService 來查詢在線狀態
+	fileUploadService FileUploadService // 添加 FileUploadService 依賴
 	clientManager     *ClientManager
 }
 
 func NewFriendService(
 	cfg *config.Config,
 	odm *providers.ODM,
-	friendRepo repositories.FriendRepositoryInterface,
-	userRepo repositories.UserRepositoryInterface,
-	userService UserServiceInterface,
-	fileUploadService FileUploadServiceInterface,
+	friendRepo repositories.FriendRepository,
+	userRepo repositories.UserRepository,
+	userService UserService,
+	fileUploadService FileUploadService,
 	clientManager *ClientManager,
-) *FriendService {
-	return &FriendService{
+) *friendService {
+	return &friendService{
 		config:            cfg,
 		odm:               odm,
 		friendRepo:        friendRepo,
@@ -43,7 +43,7 @@ func NewFriendService(
 }
 
 // getUserPictureURL 獲取用戶頭像 URL（從 ObjectID 解析）
-func (fs *FriendService) getUserPictureURL(user *models.User) string {
+func (fs *friendService) getUserPictureURL(user *models.User) string {
 	if user.PictureID.IsZero() || fs.fileUploadService == nil {
 		return ""
 	}
@@ -63,7 +63,7 @@ const (
 )
 
 // GetFriendList 獲取好友列表
-func (fs *FriendService) GetFriendList(userID string) ([]models.FriendResponse, *models.MessageOptions) {
+func (fs *friendService) GetFriendList(userID string) ([]models.FriendResponse, *models.MessageOptions) {
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return nil, &models.MessageOptions{
@@ -150,7 +150,7 @@ func (fs *FriendService) GetFriendList(userID string) ([]models.FriendResponse, 
 }
 
 // AddFriendRequest 發送好友請求
-func (fs *FriendService) AddFriendRequest(userID string, username string) *models.MessageOptions {
+func (fs *friendService) AddFriendRequest(userID string, username string) *models.MessageOptions {
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return &models.MessageOptions{Code: models.ErrInvalidParams, Message: "無效的用戶ID", Details: err.Error()}
@@ -198,7 +198,7 @@ func (fs *FriendService) AddFriendRequest(userID string, username string) *model
 }
 
 // GetPendingRequests 獲取待處理好友請求
-func (fs *FriendService) GetPendingRequests(userID string) (*models.PendingRequestsResponse, *models.MessageOptions) {
+func (fs *friendService) GetPendingRequests(userID string) (*models.PendingRequestsResponse, *models.MessageOptions) {
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return nil, &models.MessageOptions{
@@ -287,7 +287,7 @@ func (fs *FriendService) GetPendingRequests(userID string) (*models.PendingReque
 }
 
 // GetBlockedUsers 獲取封鎖用戶列表
-func (fs *FriendService) GetBlockedUsers(userID string) ([]models.BlockedUserResponse, *models.MessageOptions) {
+func (fs *friendService) GetBlockedUsers(userID string) ([]models.BlockedUserResponse, *models.MessageOptions) {
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return nil, &models.MessageOptions{
@@ -332,7 +332,7 @@ func (fs *FriendService) GetBlockedUsers(userID string) ([]models.BlockedUserRes
 }
 
 // AcceptFriendRequest 接受好友請求
-func (fs *FriendService) AcceptFriendRequest(userID string, requestID string) *models.MessageOptions {
+func (fs *friendService) AcceptFriendRequest(userID string, requestID string) *models.MessageOptions {
 	requestObjectID, err := primitive.ObjectIDFromHex(requestID)
 	if err != nil {
 		return &models.MessageOptions{
@@ -384,7 +384,7 @@ func (fs *FriendService) AcceptFriendRequest(userID string, requestID string) *m
 }
 
 // DeclineFriendRequest 拒絕好友請求
-func (fs *FriendService) DeclineFriendRequest(userID string, requestID string) *models.MessageOptions {
+func (fs *friendService) DeclineFriendRequest(userID string, requestID string) *models.MessageOptions {
 	requestObjectID, err := primitive.ObjectIDFromHex(requestID)
 	if err != nil {
 		return &models.MessageOptions{
@@ -432,7 +432,7 @@ func (fs *FriendService) DeclineFriendRequest(userID string, requestID string) *
 }
 
 // CancelFriendRequest 取消好友請求
-func (fs *FriendService) CancelFriendRequest(userID string, requestID string) *models.MessageOptions {
+func (fs *friendService) CancelFriendRequest(userID string, requestID string) *models.MessageOptions {
 	requestObjectID, err := primitive.ObjectIDFromHex(requestID)
 	if err != nil {
 		return &models.MessageOptions{
@@ -480,7 +480,7 @@ func (fs *FriendService) CancelFriendRequest(userID string, requestID string) *m
 }
 
 // BlockUser 封鎖用戶
-func (fs *FriendService) BlockUser(userID string, targetUserID string) *models.MessageOptions {
+func (fs *friendService) BlockUser(userID string, targetUserID string) *models.MessageOptions {
 	// targetUserID不能為自己
 	if userID == targetUserID {
 		return &models.MessageOptions{
@@ -562,7 +562,7 @@ func (fs *FriendService) BlockUser(userID string, targetUserID string) *models.M
 }
 
 // UnblockUser 解除封鎖用戶
-func (fs *FriendService) UnblockUser(userID string, targetUserID string) *models.MessageOptions {
+func (fs *friendService) UnblockUser(userID string, targetUserID string) *models.MessageOptions {
 	// targetUserID不能為自己
 	if userID == targetUserID {
 		return &models.MessageOptions{
@@ -620,7 +620,7 @@ func (fs *FriendService) UnblockUser(userID string, targetUserID string) *models
 }
 
 // RemoveFriend 刪除好友
-func (fs *FriendService) RemoveFriend(userID string, friendID string) *models.MessageOptions {
+func (fs *friendService) RemoveFriend(userID string, friendID string) *models.MessageOptions {
 	// 檢查userID和friendID是否相同
 	if userID == friendID {
 		return &models.MessageOptions{

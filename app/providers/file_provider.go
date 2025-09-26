@@ -15,20 +15,20 @@ import (
 // BaseUploadPath 上傳檔案的基礎路徑
 const BaseUploadPath = "uploads/"
 
-// FileProvider 本地檔案系統提供者
-type FileProvider struct {
+// fileProvider 本地檔案系統提供者
+type fileProvider struct {
 	cfg *config.Config
 }
 
 // NewFileProvider 創建新的本地檔案提供者
-func NewFileProvider(cfg *config.Config) FileProviderInterface {
-	return &FileProvider{
+func NewFileProvider(cfg *config.Config) *fileProvider {
+	return &fileProvider{
 		cfg: cfg,
 	}
 }
 
 // SaveFile 儲存檔案到本地檔案系統
-func (fp *FileProvider) SaveFile(file multipart.File, filename string) (string, error) {
+func (fp *fileProvider) SaveFile(file multipart.File, filename string) (string, error) {
 	// 確保目錄存在
 	dir := filepath.Dir(filepath.Join(BaseUploadPath, filename))
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -59,7 +59,7 @@ func (fp *FileProvider) SaveFile(file multipart.File, filename string) (string, 
 }
 
 // DeleteFile 刪除檔案
-func (fp *FileProvider) DeleteFile(filepath string) error {
+func (fp *fileProvider) DeleteFile(filepath string) error {
 	// 確保檔案路徑在允許的基礎路徑內（防止路徑遍歷攻擊）
 	if !strings.HasPrefix(filepath, BaseUploadPath) {
 		return fmt.Errorf("檔案路徑不在允許範圍內")
@@ -76,7 +76,7 @@ func (fp *FileProvider) DeleteFile(filepath string) error {
 }
 
 // GetFileInfo 取得檔案資訊
-func (fp *FileProvider) GetFileInfo(filepath string) (os.FileInfo, error) {
+func (fp *fileProvider) GetFileInfo(filepath string) (os.FileInfo, error) {
 	// 確保檔案路徑在允許的基礎路徑內
 	if !strings.HasPrefix(filepath, BaseUploadPath) {
 		return nil, fmt.Errorf("檔案路徑不在允許範圍內")
@@ -94,7 +94,7 @@ func (fp *FileProvider) GetFileInfo(filepath string) (os.FileInfo, error) {
 }
 
 // GetFileURL 生成檔案的URL
-func (fp *FileProvider) GetFileURL(filePath string) string {
+func (fp *fileProvider) GetFileURL(filePath string) string {
 	baseURL := fp.cfg.Server.BaseURL
 	if (baseURL == "" || baseURL == "http://localhost") && fp.cfg.Server.Port != "" {
 		baseURL = fmt.Sprintf("http://localhost:%s", fp.cfg.Server.Port)

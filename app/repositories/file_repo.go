@@ -11,25 +11,25 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-type FileRepository struct {
+type fileRepository struct {
 	config *config.Config
 	odm    *providers.ODM
 }
 
-func NewFileRepository(cfg *config.Config, odm *providers.ODM) FileRepositoryInterface {
-	return &FileRepository{
+func NewFileRepository(cfg *config.Config, odm *providers.ODM) FileRepository {
+	return &fileRepository{
 		config: cfg,
 		odm:    odm,
 	}
 }
 
 // CreateFile 創建檔案記錄
-func (fr *FileRepository) CreateFile(file *models.UploadedFile) error {
+func (fr *fileRepository) CreateFile(file *models.UploadedFile) error {
 	return fr.odm.Create(context.Background(), file)
 }
 
 // GetFileByID 根據檔案ID獲取檔案
-func (fr *FileRepository) GetFileByID(fileID string) (*models.UploadedFile, error) {
+func (fr *fileRepository) GetFileByID(fileID string) (*models.UploadedFile, error) {
 	var file models.UploadedFile
 	err := fr.odm.FindByID(context.Background(), fileID, &file)
 	if err != nil {
@@ -39,7 +39,7 @@ func (fr *FileRepository) GetFileByID(fileID string) (*models.UploadedFile, erro
 }
 
 // GetFileByPath 根據檔案路徑獲取檔案
-func (fr *FileRepository) GetFileByPath(filePath string) (*models.UploadedFile, error) {
+func (fr *fileRepository) GetFileByPath(filePath string) (*models.UploadedFile, error) {
 	qb := providers.NewQueryBuilder()
 	qb.Where("file_path", filePath)
 
@@ -52,7 +52,7 @@ func (fr *FileRepository) GetFileByPath(filePath string) (*models.UploadedFile, 
 }
 
 // GetFilesByUserID 根據用戶ID獲取檔案列表
-func (fr *FileRepository) GetFilesByUserID(userID string) ([]models.UploadedFile, error) {
+func (fr *fileRepository) GetFilesByUserID(userID string) ([]models.UploadedFile, error) {
 	userObjID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return nil, err
@@ -72,7 +72,7 @@ func (fr *FileRepository) GetFilesByUserID(userID string) ([]models.UploadedFile
 }
 
 // UpdateFileStatus 更新檔案狀態
-func (fr *FileRepository) UpdateFileStatus(fileID string, status string) error {
+func (fr *fileRepository) UpdateFileStatus(fileID string, status string) error {
 	var file models.UploadedFile
 	err := fr.odm.FindByID(context.Background(), fileID, &file)
 	if err != nil {
@@ -84,13 +84,13 @@ func (fr *FileRepository) UpdateFileStatus(fileID string, status string) error {
 }
 
 // DeleteFileByID 根據檔案ID刪除檔案記錄
-func (fr *FileRepository) DeleteFileByID(fileID string) error {
+func (fr *fileRepository) DeleteFileByID(fileID string) error {
 	var file models.UploadedFile
 	return fr.odm.DeleteByID(context.Background(), fileID, &file)
 }
 
 // DeleteFileByPath 根據檔案路徑刪除檔案記錄
-func (fr *FileRepository) DeleteFileByPath(filePath string) error {
+func (fr *fileRepository) DeleteFileByPath(filePath string) error {
 	qb := providers.NewQueryBuilder()
 	qb.Where("file_path", filePath)
 
@@ -104,7 +104,7 @@ func (fr *FileRepository) DeleteFileByPath(filePath string) error {
 }
 
 // GetExpiredFiles 獲取過期檔案列表
-func (fr *FileRepository) GetExpiredFiles() ([]models.UploadedFile, error) {
+func (fr *fileRepository) GetExpiredFiles() ([]models.UploadedFile, error) {
 	now := time.Now()
 
 	qb := providers.NewQueryBuilder()
@@ -121,7 +121,7 @@ func (fr *FileRepository) GetExpiredFiles() ([]models.UploadedFile, error) {
 }
 
 // CleanupExpiredFiles 清理過期檔案記錄
-func (fr *FileRepository) CleanupExpiredFiles() error {
+func (fr *fileRepository) CleanupExpiredFiles() error {
 	now := time.Now()
 
 	qb := providers.NewQueryBuilder()

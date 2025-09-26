@@ -5,8 +5,8 @@ import (
 	"os"
 )
 
-// FileProviderInterface - 負責底層文件操作
-type FileProviderInterface interface {
+// FileProvider - 負責底層文件操作
+type FileProvider interface {
 	SaveFile(file multipart.File, filename string) (string, error)
 	DeleteFile(filepath string) error
 	GetFileInfo(filepath string) (os.FileInfo, error)

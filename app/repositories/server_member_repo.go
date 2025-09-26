@@ -11,18 +11,18 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-type ServerMemberRepository struct {
+type serverMemberRepository struct {
 	odm *providers.ODM
 }
 
-func NewServerMemberRepository(odm *providers.ODM) *ServerMemberRepository {
-	return &ServerMemberRepository{
+func NewServerMemberRepository(odm *providers.ODM) *serverMemberRepository {
+	return &serverMemberRepository{
 		odm: odm,
 	}
 }
 
 // AddMemberToServer 將用戶添加到伺服器
-func (smr *ServerMemberRepository) AddMemberToServer(serverID, userID string, role string) error {
+func (smr *serverMemberRepository) AddMemberToServer(serverID, userID string, role string) error {
 	serverObjectID, err := primitive.ObjectIDFromHex(serverID)
 	if err != nil {
 		return fmt.Errorf("無效的伺服器ID: %v", err)
@@ -55,7 +55,7 @@ func (smr *ServerMemberRepository) AddMemberToServer(serverID, userID string, ro
 }
 
 // RemoveMemberFromServer 從伺服器移除用戶
-func (smr *ServerMemberRepository) RemoveMemberFromServer(serverID, userID string) error {
+func (smr *serverMemberRepository) RemoveMemberFromServer(serverID, userID string) error {
 	serverObjectID, err := primitive.ObjectIDFromHex(serverID)
 	if err != nil {
 		return fmt.Errorf("無效的伺服器ID: %v", err)
@@ -76,7 +76,7 @@ func (smr *ServerMemberRepository) RemoveMemberFromServer(serverID, userID strin
 }
 
 // GetServerMembers 獲取伺服器所有成員
-func (smr *ServerMemberRepository) GetServerMembers(serverID string, page, limit int) ([]models.ServerMember, int64, error) {
+func (smr *serverMemberRepository) GetServerMembers(serverID string, page, limit int) ([]models.ServerMember, int64, error) {
 	serverObjectID, err := primitive.ObjectIDFromHex(serverID)
 	if err != nil {
 		return nil, 0, fmt.Errorf("無效的伺服器ID: %v", err)
@@ -118,7 +118,7 @@ func (smr *ServerMemberRepository) GetServerMembers(serverID string, page, limit
 }
 
 // GetUserServers 獲取用戶加入的所有伺服器
-func (smr *ServerMemberRepository) GetUserServers(userID string) ([]models.ServerMember, error) {
+func (smr *serverMemberRepository) GetUserServers(userID string) ([]models.ServerMember, error) {
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return nil, fmt.Errorf("無效的用戶ID: %v", err)
@@ -137,7 +137,7 @@ func (smr *ServerMemberRepository) GetUserServers(userID string) ([]models.Serve
 }
 
 // IsMemberOfServer 檢查用戶是否為伺服器成員
-func (smr *ServerMemberRepository) IsMemberOfServer(serverID, userID string) (bool, error) {
+func (smr *serverMemberRepository) IsMemberOfServer(serverID, userID string) (bool, error) {
 	serverObjectID, err := primitive.ObjectIDFromHex(serverID)
 	if err != nil {
 		return false, fmt.Errorf("無效的伺服器ID: %v", err)
@@ -158,7 +158,7 @@ func (smr *ServerMemberRepository) IsMemberOfServer(serverID, userID string) (bo
 }
 
 // UpdateMemberRole 更新成員角色
-func (smr *ServerMemberRepository) UpdateMemberRole(serverID, userID, newRole string) error {
+func (smr *serverMemberRepository) UpdateMemberRole(serverID, userID, newRole string) error {
 	serverObjectID, err := primitive.ObjectIDFromHex(serverID)
 	if err != nil {
 		return fmt.Errorf("無效的伺服器ID: %v", err)
@@ -186,7 +186,7 @@ func (smr *ServerMemberRepository) UpdateMemberRole(serverID, userID, newRole st
 }
 
 // GetMemberCount 獲取伺服器成員數量
-func (smr *ServerMemberRepository) GetMemberCount(serverID string) (int64, error) {
+func (smr *serverMemberRepository) GetMemberCount(serverID string) (int64, error) {
 	serverObjectID, err := primitive.ObjectIDFromHex(serverID)
 	if err != nil {
 		return 0, fmt.Errorf("無效的伺服器ID: %v", err)

@@ -8,9 +8,9 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// UserServiceInterface 定義了用戶服務的接口
+// UserService 定義了用戶服務的接口
 // 所有與用戶相關的業務邏輯方法都應該在這裡聲明
-type UserServiceInterface interface {
+type UserService interface {
 	// GetUserById 根據ID獲取用戶信息ch
 	GetUserResponseById(userID string) (*models.UserResponse, error)
 
@@ -76,9 +76,9 @@ type UserServiceInterface interface {
 	// ... 其他方法 ...
 }
 
-// ChatServiceInterface 定義了聊天服務的接口
+// ChatService 定義了聊天服務的接口
 // 所有與聊天相關的業務邏輯方法都應該在這裡声明
-type ChatServiceInterface interface {
+type ChatService interface {
 	// HandleWebSocket 處理 WebSocket 連接
 	HandleWebSocket(ws *websocket.Conn, userID string)
 
@@ -101,9 +101,9 @@ type ChatServiceInterface interface {
 	// ... 其他方法 ...
 }
 
-// ServerServiceInterface 定義了伺服器服務的接口
+// ServerService 定義了伺服器服務的接口
 // 所有與伺服器相關的業務邏輯方法都應該在這裡声明
-type ServerServiceInterface interface {
+type ServerService interface {
 	// CreateServer 新建伺服器
 	CreateServer(userID string, name string, file multipart.File, header *multipart.FileHeader) (*models.ServerResponse, *models.MessageOptions)
 
@@ -138,7 +138,7 @@ type ServerServiceInterface interface {
 	// ... 其他方法 ...
 }
 
-type FriendServiceInterface interface {
+type FriendService interface {
 	// GetFriendList 獲取好友列表
 	GetFriendList(userID string) ([]models.FriendResponse, *models.MessageOptions)
 
@@ -170,7 +170,7 @@ type FriendServiceInterface interface {
 	RemoveFriend(userID string, friendID string) *models.MessageOptions
 }
 
-type ChannelServiceInterface interface {
+type ChannelService interface {
 	// GetChannelsByServerID 根據伺服器ID獲取頻道列表
 	GetChannelsByServerID(userID string, serverID string) ([]models.ChannelResponse, *models.MessageOptions)
 
@@ -188,7 +188,7 @@ type ChannelServiceInterface interface {
 }
 
 // FileUploadService - 負責業務邏輯和安全驗證
-type FileUploadServiceInterface interface {
+type FileUploadService interface {
 	// 業務方法
 	UploadFile(file multipart.File, header *multipart.FileHeader, userID string) (*models.FileResult, *models.MessageOptions)
 	UploadAvatar(file multipart.File, header *multipart.FileHeader, userID string) (*models.FileResult, *models.MessageOptions)

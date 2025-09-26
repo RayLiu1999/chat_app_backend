@@ -14,11 +14,11 @@ import (
 type UserController struct {
 	config        *config.Config
 	mongoConnect  *mongo.Database
-	userService   services.UserServiceInterface
+	userService   services.UserService
 	clientManager *services.ClientManager
 }
 
-func NewUserController(cfg *config.Config, mongodb *mongo.Database, userService services.UserServiceInterface, clientManager *services.ClientManager) *UserController {
+func NewUserController(cfg *config.Config, mongodb *mongo.Database, userService services.UserService, clientManager *services.ClientManager) *UserController {
 	return &UserController{
 		config:        cfg,
 		mongoConnect:  mongodb,

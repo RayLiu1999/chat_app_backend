@@ -8,11 +8,11 @@ import (
 
 // BackgroundTasks 管理後台任務
 type BackgroundTasks struct {
-	userService UserServiceInterface
+	userService UserService
 }
 
 // NewBackgroundTasks 創建後台任務管理器
-func NewBackgroundTasks(userService UserServiceInterface) *BackgroundTasks {
+func NewBackgroundTasks(userService UserService) *BackgroundTasks {
 	return &BackgroundTasks{
 		userService: userService,
 	}

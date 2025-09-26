@@ -8,25 +8,22 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/redis/go-redis/v9"
 )
 
 // ClientManager 管理客戶端的註冊和註銷
 type ClientManager struct {
 	clients         map[*Client]bool
 	clientsByUserID map[string]*Client
-	redisClient     *redis.Client
 	mutex           sync.RWMutex
 	register        chan *Client
 	unregister      chan *Client
 }
 
 // NewClientManager 創建新的客戶端管理器
-func NewClientManager(redisClient *redis.Client) *ClientManager {
+func NewClientManager() *ClientManager {
 	cm := &ClientManager{
 		clients:         make(map[*Client]bool, 1000),
 		clientsByUserID: make(map[string]*Client, 1000),
-		redisClient:     redisClient,
 		register:        make(chan *Client, 1000),
 		unregister:      make(chan *Client, 1000),
 	}
@@ -86,7 +83,6 @@ func (cm *ClientManager) handleRegister() {
 	for client := range cm.register {
 		utils.PrettyPrintf("正在處理用戶 %s 的註冊事件", client.UserID)
 		cm.registerClient(client)
-		cm.updateClientStatus(client, "online")
 		utils.PrettyPrintf("用戶 %s 的註冊事件已完成", client.UserID)
 	}
 }
@@ -96,7 +92,6 @@ func (cm *ClientManager) handleUnregister() {
 	for client := range cm.unregister {
 		utils.PrettyPrintf("正在處理用戶 %s 的註銷事件", client.UserID)
 		cm.unregisterClient(client)
-		cm.updateClientStatus(client, "offline")
 		utils.PrettyPrintf("用戶 %s 的註銷事件已完成", client.UserID)
 	}
 }
@@ -134,22 +129,12 @@ func (cm *ClientManager) unregisterClient(client *Client) {
 	delete(cm.clients, client)
 	delete(cm.clientsByUserID, client.UserID)
 
-	// 清理用戶相關的 Redis 數據
-	// cm.redisClient.Del(context.Background(), "user:"+client.UserID+":rooms")
-
 	// 關閉 WebSocket 連線
 	if client.Conn != nil {
 		client.Conn.Close()
 	}
 
 	utils.PrettyPrintf("客戶端 %s 已註銷，當前連線數: %d", client.UserID, len(cm.clients))
-}
-
-// updateClientStatus 更新客戶端狀態
-func (cm *ClientManager) updateClientStatus(client *Client, status string) {
-	ctx := context.Background()
-	cm.redisClient.Set(ctx, "user:"+client.UserID+":status", status, 24*time.Hour)
-	utils.PrettyPrintf("更新用戶 %s 的狀態：%s", client.UserID, status)
 }
 
 // CheckClientsHealth 檢查所有客戶端的健康狀態
@@ -189,15 +174,5 @@ func (cm *ClientManager) StartHealthChecker(ctx context.Context) {
 // IsUserOnline 基於 WebSocket 連線檢查用戶是否在線
 func (cm *ClientManager) IsUserOnline(userID string) bool {
 	_, exists := cm.GetClient(userID)
-
-	// 如果沒有 WebSocket 連線，檢查 Redis 狀態
-	if !exists {
-		ctx := context.Background()
-		status, err := cm.redisClient.Get(ctx, "user:"+userID+":status").Result()
-		if err == nil && status == "online" {
-			return true
-		}
-	}
-
 	return exists
 }

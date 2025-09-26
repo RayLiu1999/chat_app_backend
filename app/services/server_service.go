@@ -13,33 +13,33 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-type ServerService struct {
+type serverService struct {
 	config              *config.Config
 	odm                 *providers.ODM
-	serverRepo          repositories.ServerRepositoryInterface
-	serverMemberRepo    repositories.ServerMemberRepositoryInterface
-	userRepo            repositories.UserRepositoryInterface
-	channelRepo         repositories.ChannelRepositoryInterface
-	channelCategoryRepo repositories.ChannelCategoryRepositoryInterface
-	chatRepo            repositories.ChatRepositoryInterface
-	fileUploadService   FileUploadServiceInterface
-	userService         UserServiceInterface
+	serverRepo          repositories.ServerRepository
+	serverMemberRepo    repositories.ServerMemberRepository
+	userRepo            repositories.UserRepository
+	channelRepo         repositories.ChannelRepository
+	channelCategoryRepo repositories.ChannelCategoryRepository
+	chatRepo            repositories.ChatRepository
+	fileUploadService   FileUploadService
+	userService         UserService
 	clientManager       *ClientManager
 }
 
 func NewServerService(cfg *config.Config,
 	odm *providers.ODM,
-	serverRepo repositories.ServerRepositoryInterface,
-	serverMemberRepo repositories.ServerMemberRepositoryInterface,
-	userRepo repositories.UserRepositoryInterface,
-	channelRepo repositories.ChannelRepositoryInterface,
-	channelCategoryRepo repositories.ChannelCategoryRepositoryInterface,
-	chatRepo repositories.ChatRepositoryInterface,
-	fileUploadService FileUploadServiceInterface,
-	userService UserServiceInterface,
+	serverRepo repositories.ServerRepository,
+	serverMemberRepo repositories.ServerMemberRepository,
+	userRepo repositories.UserRepository,
+	channelRepo repositories.ChannelRepository,
+	channelCategoryRepo repositories.ChannelCategoryRepository,
+	chatRepo repositories.ChatRepository,
+	fileUploadService FileUploadService,
+	userService UserService,
 	clientManager *ClientManager,
-) *ServerService {
-	return &ServerService{
+) *serverService {
+	return &serverService{
 		config:              cfg,
 		serverRepo:          serverRepo,
 		serverMemberRepo:    serverMemberRepo,
@@ -55,12 +55,12 @@ func NewServerService(cfg *config.Config,
 }
 
 // UpdateUserService 更新 UserService 引用
-func (ss *ServerService) UpdateUserService(userService UserServiceInterface) {
+func (ss *serverService) UpdateUserService(userService UserService) {
 	ss.userService = userService
 }
 
 // getUserPictureURL 獲取用戶頭像 URL（從 ObjectID 解析）
-func (ss *ServerService) getUserPictureURL(user *models.User) string {
+func (ss *serverService) getUserPictureURL(user *models.User) string {
 	if user.PictureID.IsZero() || ss.fileUploadService == nil {
 		return ""
 	}
@@ -73,7 +73,7 @@ func (ss *ServerService) getUserPictureURL(user *models.User) string {
 }
 
 // GetServerListResponse 獲取用戶的伺服器列表回應格式
-func (ss *ServerService) GetServerListResponse(userID string) ([]models.ServerResponse, *models.MessageOptions) {
+func (ss *serverService) GetServerListResponse(userID string) ([]models.ServerResponse, *models.MessageOptions) {
 	// 驗證用戶是否存在
 	_, err := ss.userRepo.GetUserById(userID)
 	if err != nil {
@@ -133,7 +133,7 @@ func (ss *ServerService) GetServerListResponse(userID string) ([]models.ServerRe
 }
 
 // CreateServer 創建伺服器
-func (ss *ServerService) CreateServer(userID string, name string, file multipart.File, header *multipart.FileHeader) (*models.ServerResponse, *models.MessageOptions) {
+func (ss *serverService) CreateServer(userID string, name string, file multipart.File, header *multipart.FileHeader) (*models.ServerResponse, *models.MessageOptions) {
 	// 驗證用戶是否存在
 	_, err := ss.userRepo.GetUserById(userID)
 	if err != nil {
@@ -229,7 +229,7 @@ func (ss *ServerService) CreateServer(userID string, name string, file multipart
 }
 
 // createDefaultChannels 為新創建的伺服器創建預設頻道和類別
-func (ss *ServerService) createDefaultChannels(serverID primitive.ObjectID) error {
+func (ss *serverService) createDefaultChannels(serverID primitive.ObjectID) error {
 	// 首先創建預設類別
 	err := ss.createDefaultCategories(serverID)
 	if err != nil {
@@ -272,7 +272,7 @@ func (ss *ServerService) createDefaultChannels(serverID primitive.ObjectID) erro
 }
 
 // createDefaultCategories 創建預設類別
-func (ss *ServerService) createDefaultCategories(serverID primitive.ObjectID) error {
+func (ss *serverService) createDefaultCategories(serverID primitive.ObjectID) error {
 	// 創建文字類別
 	textCategory := &models.ChannelCategory{
 		Name:         "文字頻道",
@@ -303,7 +303,7 @@ func (ss *ServerService) createDefaultCategories(serverID primitive.ObjectID) er
 }
 
 // getDefaultCategoriesByServerID 獲取伺服器的預設類別（文字和語音）
-func (ss *ServerService) getDefaultCategoriesByServerID(serverID string) (*models.ChannelCategory, *models.ChannelCategory, error) {
+func (ss *serverService) getDefaultCategoriesByServerID(serverID string) (*models.ChannelCategory, *models.ChannelCategory, error) {
 	categories, err := ss.channelCategoryRepo.GetChannelCategoriesByServerID(serverID)
 	if err != nil {
 		return nil, nil, err
@@ -328,7 +328,7 @@ func (ss *ServerService) getDefaultCategoriesByServerID(serverID string) (*model
 }
 
 // SearchPublicServers 搜尋公開伺服器
-func (ss *ServerService) SearchPublicServers(userID string, request models.ServerSearchRequest) (*models.ServerSearchResults, *models.MessageOptions) {
+func (ss *serverService) SearchPublicServers(userID string, request models.ServerSearchRequest) (*models.ServerSearchResults, *models.MessageOptions) {
 	// 驗證用戶是否存在
 	_, err := ss.userRepo.GetUserById(userID)
 	if err != nil {
@@ -402,7 +402,7 @@ func (ss *ServerService) SearchPublicServers(userID string, request models.Serve
 }
 
 // UpdateServer 更新伺服器信息
-func (ss *ServerService) UpdateServer(userID string, serverID string, updates map[string]any) (*models.ServerResponse, *models.MessageOptions) {
+func (ss *serverService) UpdateServer(userID string, serverID string, updates map[string]any) (*models.ServerResponse, *models.MessageOptions) {
 	// 驗證用戶是否存在
 	_, err := ss.userRepo.GetUserById(userID)
 	if err != nil {
@@ -469,7 +469,7 @@ func (ss *ServerService) UpdateServer(userID string, serverID string, updates ma
 }
 
 // DeleteServer 刪除伺服器
-func (ss *ServerService) DeleteServer(userID string, serverID string) *models.MessageOptions {
+func (ss *serverService) DeleteServer(userID string, serverID string) *models.MessageOptions {
 	// 驗證用戶是否存在
 	_, err := ss.userRepo.GetUserById(userID)
 	if err != nil {
@@ -534,7 +534,7 @@ func (ss *ServerService) DeleteServer(userID string, serverID string) *models.Me
 }
 
 // GetServerByID 根據ID獲取伺服器信息
-func (ss *ServerService) GetServerByID(userID string, serverID string) (*models.ServerResponse, *models.MessageOptions) {
+func (ss *serverService) GetServerByID(userID string, serverID string) (*models.ServerResponse, *models.MessageOptions) {
 	// 驗證用戶是否存在
 	_, err := ss.userRepo.GetUserById(userID)
 	if err != nil {
@@ -590,7 +590,7 @@ func (ss *ServerService) GetServerByID(userID string, serverID string) (*models.
 }
 
 // GetServerDetailByID 獲取伺服器詳細信息（包含成員和頻道列表）
-func (ss *ServerService) GetServerDetailByID(userID string, serverID string) (*models.ServerDetailResponse, *models.MessageOptions) {
+func (ss *serverService) GetServerDetailByID(userID string, serverID string) (*models.ServerDetailResponse, *models.MessageOptions) {
 	// 驗證用戶是否存在
 	_, err := ss.userRepo.GetUserById(userID)
 	if err != nil {
@@ -735,7 +735,7 @@ func (ss *ServerService) GetServerDetailByID(userID string, serverID string) (*m
 }
 
 // GetServerChannels 獲取伺服器的頻道列表
-func (ss *ServerService) GetServerChannels(serverID string) ([]models.Channel, *models.MessageOptions) {
+func (ss *serverService) GetServerChannels(serverID string) ([]models.Channel, *models.MessageOptions) {
 	channels, err := ss.channelRepo.GetChannelsByServerID(serverID)
 	if err != nil {
 		return nil, &models.MessageOptions{
@@ -748,7 +748,7 @@ func (ss *ServerService) GetServerChannels(serverID string) ([]models.Channel, *
 }
 
 // JoinServer 請求加入伺服器
-func (ss *ServerService) JoinServer(userID string, serverID string) *models.MessageOptions {
+func (ss *serverService) JoinServer(userID string, serverID string) *models.MessageOptions {
 	// 驗證用戶是否存在
 	_, err := ss.userRepo.GetUserById(userID)
 	if err != nil {
@@ -830,7 +830,7 @@ func (ss *ServerService) JoinServer(userID string, serverID string) *models.Mess
 }
 
 // LeaveServer 離開伺服器
-func (ss *ServerService) LeaveServer(userID string, serverID string) *models.MessageOptions {
+func (ss *serverService) LeaveServer(userID string, serverID string) *models.MessageOptions {
 	// 驗證用戶是否存在
 	_, err := ss.userRepo.GetUserById(userID)
 	if err != nil {
@@ -898,7 +898,7 @@ func (ss *ServerService) LeaveServer(userID string, serverID string) *models.Mes
 }
 
 // deleteServerChannelsAndCategories 刪除伺服器的所有頻道和類別
-func (ss *ServerService) deleteServerChannelsAndCategories(serverID string) error {
+func (ss *serverService) deleteServerChannelsAndCategories(serverID string) error {
 	// 獲取伺服器的所有頻道
 	channels, err := ss.channelRepo.GetChannelsByServerID(serverID)
 	if err != nil {

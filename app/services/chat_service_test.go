@@ -11,7 +11,7 @@ import (
 
 // TestChatService_GetUserPictureURL 測試獲取用戶頭像URL
 func TestChatService_GetUserPictureURL(t *testing.T) {
-	chatService := &ChatService{
+	chatService := &chatService{
 		fileUploadService: nil, // 模擬沒有檔案服務
 	}
 
@@ -38,7 +38,7 @@ func TestChatService_GetUserPictureURL(t *testing.T) {
 
 // TestChatService_CheckUserServerMembership 測試檢查用戶伺服器成員身份
 func TestChatService_CheckUserServerMembership(t *testing.T) {
-	chatService := &ChatService{}
+	chatService := &chatService{}
 
 	// 測試無效的用戶ID
 	t.Run("InvalidUserID", func(t *testing.T) {

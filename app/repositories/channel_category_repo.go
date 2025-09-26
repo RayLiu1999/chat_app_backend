@@ -10,18 +10,18 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-type ChannelCategoryRepository struct {
+type channelCategoryRepository struct {
 	odm *providers.ODM
 }
 
-func NewChannelCategoryRepository(odm *providers.ODM) *ChannelCategoryRepository {
-	return &ChannelCategoryRepository{
+func NewChannelCategoryRepository(odm *providers.ODM) *channelCategoryRepository {
+	return &channelCategoryRepository{
 		odm: odm,
 	}
 }
 
 // CreateChannelCategory 創建頻道類別
-func (r *ChannelCategoryRepository) CreateChannelCategory(category *models.ChannelCategory) error {
+func (r *channelCategoryRepository) CreateChannelCategory(category *models.ChannelCategory) error {
 	ctx := context.Background()
 	err := r.odm.Create(ctx, category)
 	if err != nil {
@@ -31,7 +31,7 @@ func (r *ChannelCategoryRepository) CreateChannelCategory(category *models.Chann
 }
 
 // GetChannelCategoriesByServerID 根據伺服器ID獲取頻道類別列表
-func (r *ChannelCategoryRepository) GetChannelCategoriesByServerID(serverID string) ([]models.ChannelCategory, error) {
+func (r *channelCategoryRepository) GetChannelCategoriesByServerID(serverID string) ([]models.ChannelCategory, error) {
 	serverObjectID, err := primitive.ObjectIDFromHex(serverID)
 	if err != nil {
 		return nil, fmt.Errorf("無效的伺服器ID: %v", err)
@@ -50,7 +50,7 @@ func (r *ChannelCategoryRepository) GetChannelCategoriesByServerID(serverID stri
 }
 
 // GetChannelCategoryByID 根據類別ID獲取頻道類別
-func (r *ChannelCategoryRepository) GetChannelCategoryByID(categoryID string) (*models.ChannelCategory, error) {
+func (r *channelCategoryRepository) GetChannelCategoryByID(categoryID string) (*models.ChannelCategory, error) {
 	ctx := context.Background()
 	var category models.ChannelCategory
 
@@ -63,7 +63,7 @@ func (r *ChannelCategoryRepository) GetChannelCategoryByID(categoryID string) (*
 }
 
 // UpdateChannelCategory 更新頻道類別
-func (r *ChannelCategoryRepository) UpdateChannelCategory(categoryID string, updates map[string]any) error {
+func (r *channelCategoryRepository) UpdateChannelCategory(categoryID string, updates map[string]any) error {
 	categoryObjectID, err := primitive.ObjectIDFromHex(categoryID)
 	if err != nil {
 		return fmt.Errorf("無效的類別ID: %v", err)
@@ -82,7 +82,7 @@ func (r *ChannelCategoryRepository) UpdateChannelCategory(categoryID string, upd
 }
 
 // DeleteChannelCategory 刪除頻道類別
-func (r *ChannelCategoryRepository) DeleteChannelCategory(categoryID string) error {
+func (r *channelCategoryRepository) DeleteChannelCategory(categoryID string) error {
 	ctx := context.Background()
 
 	err := r.odm.DeleteByID(ctx, categoryID, &models.ChannelCategory{})
@@ -94,7 +94,7 @@ func (r *ChannelCategoryRepository) DeleteChannelCategory(categoryID string) err
 }
 
 // CheckChannelCategoryExists 檢查頻道類別是否存在
-func (r *ChannelCategoryRepository) CheckChannelCategoryExists(categoryID string) (bool, error) {
+func (r *channelCategoryRepository) CheckChannelCategoryExists(categoryID string) (bool, error) {
 	ctx := context.Background()
 
 	exists, err := r.odm.ExistsByID(ctx, categoryID, &models.ChannelCategory{})

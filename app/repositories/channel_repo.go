@@ -9,20 +9,20 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-type ChannelRepository struct {
+type channelRepository struct {
 	config *config.Config
 	odm    *providers.ODM
 }
 
-func NewChannelRepository(cfg *config.Config, odm *providers.ODM) ChannelRepositoryInterface {
-	return &ChannelRepository{
+func NewChannelRepository(cfg *config.Config, odm *providers.ODM) ChannelRepository {
+	return &channelRepository{
 		config: cfg,
 		odm:    odm,
 	}
 }
 
 // GetChannelsByServerID 根據伺服器ID獲取頻道列表
-func (cr *ChannelRepository) GetChannelsByServerID(serverID string) ([]models.Channel, error) {
+func (cr *channelRepository) GetChannelsByServerID(serverID string) ([]models.Channel, error) {
 	serverObjID, err := primitive.ObjectIDFromHex(serverID)
 	if err != nil {
 		return nil, err
@@ -41,7 +41,7 @@ func (cr *ChannelRepository) GetChannelsByServerID(serverID string) ([]models.Ch
 }
 
 // GetChannelByID 根據頻道ID獲取頻道
-func (cr *ChannelRepository) GetChannelByID(channelID string) (*models.Channel, error) {
+func (cr *channelRepository) GetChannelByID(channelID string) (*models.Channel, error) {
 	var channel models.Channel
 	err := cr.odm.FindByID(context.Background(), channelID, &channel)
 	if err != nil {
@@ -51,12 +51,12 @@ func (cr *ChannelRepository) GetChannelByID(channelID string) (*models.Channel, 
 }
 
 // CreateChannel 創建新頻道
-func (cr *ChannelRepository) CreateChannel(channel *models.Channel) error {
+func (cr *channelRepository) CreateChannel(channel *models.Channel) error {
 	return cr.odm.Create(context.Background(), channel)
 }
 
 // UpdateChannel 更新頻道
-func (cr *ChannelRepository) UpdateChannel(channelID string, updates map[string]any) error {
+func (cr *channelRepository) UpdateChannel(channelID string, updates map[string]any) error {
 	var channel models.Channel
 	err := cr.odm.FindByID(context.Background(), channelID, &channel)
 	if err != nil {
@@ -73,13 +73,13 @@ func (cr *ChannelRepository) UpdateChannel(channelID string, updates map[string]
 }
 
 // DeleteChannel 刪除頻道
-func (cr *ChannelRepository) DeleteChannel(channelID string) error {
+func (cr *channelRepository) DeleteChannel(channelID string) error {
 	var channel models.Channel
 	return cr.odm.DeleteByID(context.Background(), channelID, &channel)
 }
 
 // CheckChannelExists 檢查頻道是否存在
-func (cr *ChannelRepository) CheckChannelExists(channelID string) (bool, error) {
+func (cr *channelRepository) CheckChannelExists(channelID string) (bool, error) {
 	channelObjID, err := primitive.ObjectIDFromHex(channelID)
 	if err != nil {
 		return false, err

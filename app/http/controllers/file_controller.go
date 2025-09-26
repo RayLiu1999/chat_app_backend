@@ -13,10 +13,10 @@ import (
 type FileController struct {
 	config            *config.Config
 	mongoConnect      *mongo.Database
-	fileUploadService services.FileUploadServiceInterface
+	fileUploadService services.FileUploadService
 }
 
-func NewFileController(cfg *config.Config, mongodb *mongo.Database, fileUploadService services.FileUploadServiceInterface) *FileController {
+func NewFileController(cfg *config.Config, mongodb *mongo.Database, fileUploadService services.FileUploadService) *FileController {
 	return &FileController{
 		config:            cfg,
 		mongoConnect:      mongodb,

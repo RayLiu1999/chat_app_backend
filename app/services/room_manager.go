@@ -20,13 +20,13 @@ type RoomManager struct {
 	rooms map[string]*Room
 	// roomPubSubs      map[string]*redis.PubSub
 	redisClient      *redis.Client
-	serverMemberRepo repositories.ServerMemberRepositoryInterface
+	serverMemberRepo repositories.ServerMemberRepository
 	mutex            sync.RWMutex
 	// pubSubMutex      sync.RWMutex
 }
 
 // NewRoomManager 創建新的房間管理器
-func NewRoomManager(odm *providers.ODM, redisClient *redis.Client, serverMemberRepo repositories.ServerMemberRepositoryInterface) *RoomManager {
+func NewRoomManager(odm *providers.ODM, redisClient *redis.Client, serverMemberRepo repositories.ServerMemberRepository) *RoomManager {
 	return &RoomManager{
 		odm:   odm,
 		rooms: make(map[string]*Room, 1000),

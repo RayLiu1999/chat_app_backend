@@ -11,21 +11,21 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-type ServerRepository struct {
+type serverRepository struct {
 	config *config.Config
 	odm    *providers.ODM
 	// queryBuilder *providers.QueryBuilder // 如有需要可加
 }
 
-func NewServerRepository(cfg *config.Config, odm *providers.ODM) *ServerRepository {
-	return &ServerRepository{
+func NewServerRepository(cfg *config.Config, odm *providers.ODM) *serverRepository {
+	return &serverRepository{
 		config: cfg,
 		odm:    odm,
 		// queryBuilder: qb, // 如有需要
 	}
 }
 
-func (sr *ServerRepository) CreateServer(server *models.Server) (models.Server, error) {
+func (sr *serverRepository) CreateServer(server *models.Server) (models.Server, error) {
 	err := sr.odm.Create(context.Background(), server)
 	if err != nil {
 		return models.Server{}, err
@@ -34,7 +34,7 @@ func (sr *ServerRepository) CreateServer(server *models.Server) (models.Server, 
 }
 
 // SearchPublicServers 搜尋公開伺服器
-func (sr *ServerRepository) SearchPublicServers(request models.ServerSearchRequest) ([]models.Server, int64, error) {
+func (sr *serverRepository) SearchPublicServers(request models.ServerSearchRequest) ([]models.Server, int64, error) {
 	ctx := context.Background()
 
 	// 建構搜尋條件
@@ -105,7 +105,7 @@ func (sr *ServerRepository) SearchPublicServers(request models.ServerSearchReque
 }
 
 // GetServerWithOwnerInfo 獲取包含擁有者信息的伺服器
-func (sr *ServerRepository) GetServerWithOwnerInfo(serverID string) (*models.Server, *models.User, error) {
+func (sr *serverRepository) GetServerWithOwnerInfo(serverID string) (*models.Server, *models.User, error) {
 	ctx := context.Background()
 
 	// 獲取伺服器信息
@@ -126,7 +126,7 @@ func (sr *ServerRepository) GetServerWithOwnerInfo(serverID string) (*models.Ser
 }
 
 // CheckUserInServer 檢查用戶是否在伺服器中
-func (sr *ServerRepository) CheckUserInServer(userID, serverID string) (bool, error) {
+func (sr *serverRepository) CheckUserInServer(userID, serverID string) (bool, error) {
 	// 注意：這個方法現在應該使用 ServerMemberRepository.IsMemberOfServer
 	// 這裡只檢查是否為擁有者
 	ctx := context.Background()
@@ -150,7 +150,7 @@ func (sr *ServerRepository) CheckUserInServer(userID, serverID string) (bool, er
 }
 
 // GetServerByID 根據ID獲取伺服器
-func (sr *ServerRepository) GetServerByID(serverID string) (*models.Server, error) {
+func (sr *serverRepository) GetServerByID(serverID string) (*models.Server, error) {
 	ctx := context.Background()
 	var server models.Server
 
@@ -163,7 +163,7 @@ func (sr *ServerRepository) GetServerByID(serverID string) (*models.Server, erro
 }
 
 // UpdateServer 更新伺服器信息
-func (sr *ServerRepository) UpdateServer(serverID string, updates map[string]any) error {
+func (sr *serverRepository) UpdateServer(serverID string, updates map[string]any) error {
 	ctx := context.Background()
 	serverObjectID, err := primitive.ObjectIDFromHex(serverID)
 	if err != nil {
@@ -177,13 +177,13 @@ func (sr *ServerRepository) UpdateServer(serverID string, updates map[string]any
 }
 
 // DeleteServer 刪除伺服器
-func (sr *ServerRepository) DeleteServer(serverID string) error {
+func (sr *serverRepository) DeleteServer(serverID string) error {
 	ctx := context.Background()
 	return sr.odm.DeleteByID(ctx, serverID, &models.Server{})
 }
 
 // UpdateMemberCount 更新成員數量快取
-func (sr *ServerRepository) UpdateMemberCount(serverID string, count int) error {
+func (sr *serverRepository) UpdateMemberCount(serverID string, count int) error {
 	updates := map[string]any{
 		"member_count": count,
 	}

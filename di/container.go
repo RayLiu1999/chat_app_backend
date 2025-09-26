@@ -10,24 +10,24 @@ import (
 
 // Repository容器
 type RepositoryContainer struct {
-	UserRepo            repositories.UserRepositoryInterface
-	ChatRepo            repositories.ChatRepositoryInterface
-	ServerRepo          repositories.ServerRepositoryInterface
-	ServerMemberRepo    repositories.ServerMemberRepositoryInterface
-	FriendRepo          repositories.FriendRepositoryInterface
-	ChannelRepo         repositories.ChannelRepositoryInterface
-	ChannelCategoryRepo repositories.ChannelCategoryRepositoryInterface
-	FileRepo            repositories.FileRepositoryInterface
+	UserRepo            repositories.UserRepository
+	ChatRepo            repositories.ChatRepository
+	ServerRepo          repositories.ServerRepository
+	ServerMemberRepo    repositories.ServerMemberRepository
+	FriendRepo          repositories.FriendRepository
+	ChannelRepo         repositories.ChannelRepository
+	ChannelCategoryRepo repositories.ChannelCategoryRepository
+	FileRepo            repositories.FileRepository
 }
 
 // Service容器
 type ServiceContainer struct {
-	UserService       services.UserServiceInterface
-	ChatService       services.ChatServiceInterface
-	ServerService     services.ServerServiceInterface
-	FriendService     services.FriendServiceInterface
-	ChannelService    services.ChannelServiceInterface
-	FileUploadService services.FileUploadServiceInterface
+	UserService       services.UserService
+	ChatService       services.ChatService
+	ServerService     services.ServerService
+	FriendService     services.FriendService
+	ChannelService    services.ChannelService
+	FileUploadService services.FileUploadService
 	ClientManager     *services.ClientManager
 }
 
@@ -45,7 +45,8 @@ type ControllerContainer struct {
 // Providers容器
 type ProviderContainer struct {
 	ODM          *providers.ODM
-	FileProvider providers.FileProviderInterface
+	FileProvider providers.FileProvider
+	Cache        providers.CacheProvider
 }
 
 // 初始化Repositories
@@ -54,7 +55,7 @@ func initRepositories(
 	providers *ProviderContainer,
 ) *RepositoryContainer {
 	return &RepositoryContainer{
-		UserRepo:            repositories.NewUserRepository(cfg, providers.ODM),
+		UserRepo:            repositories.NewUserRepository(cfg, providers.ODM, providers.Cache),
 		ChatRepo:            repositories.NewChatRepository(cfg, providers.ODM),
 		ServerRepo:          repositories.NewServerRepository(cfg, providers.ODM),
 		ServerMemberRepo:    repositories.NewServerMemberRepository(providers.ODM),
@@ -73,7 +74,7 @@ func initServices(
 	redis *providers.RedisWrapper,
 ) *ServiceContainer {
 	// 1. 將 ClientManager 的初始化提前
-	clientManager := services.NewClientManager(redis.Client)
+	clientManager := services.NewClientManager()
 
 	// 2. 初始化檔案上傳服務
 	fileUploadService := services.NewFileUploadService(
@@ -88,7 +89,6 @@ func initServices(
 		cfg,
 		providers.ODM,
 		repos.UserRepo,
-		clientManager,
 		fileUploadService,
 	)
 
@@ -97,6 +97,7 @@ func initServices(
 		cfg,
 		providers.ODM,
 		redis.Client,
+		providers.Cache,
 		repos.ChatRepo,
 		repos.ServerRepo,
 		repos.ServerMemberRepo,
@@ -197,10 +198,12 @@ func initControllers(
 func initProviders(
 	cfg *config.Config,
 	mongodb *providers.MongoWrapper,
+	redis *providers.RedisWrapper,
 ) *ProviderContainer {
 	return &ProviderContainer{
 		ODM:          providers.NewODM(mongodb.DB),
 		FileProvider: providers.NewFileProvider(cfg),
+		Cache:        providers.NewRedisCacheProvider(redis.Client),
 	}
 }
 
@@ -218,7 +221,7 @@ func BuildDependencies(
 	mongodb *providers.MongoWrapper,
 	redis *providers.RedisWrapper,
 ) *ApplicationContainer {
-	providers := initProviders(cfg, mongodb)
+	providers := initProviders(cfg, mongodb, redis)
 	repos := initRepositories(cfg, providers)
 	services := initServices(cfg, providers, repos, redis)
 	controllers := initControllers(cfg, mongodb, services, repos)

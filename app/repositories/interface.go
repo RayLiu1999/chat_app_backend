@@ -4,7 +4,7 @@ import (
 	"chat_app_backend/app/models"
 )
 
-type ChatRepositoryInterface interface {
+type ChatRepository interface {
 	// SaveMessage 將聊天消息保存到數據庫
 	SaveMessage(message models.Message) (string, error)
 
@@ -24,7 +24,7 @@ type ChatRepositoryInterface interface {
 	DeleteMessagesByRoomID(roomID string) error
 }
 
-type ServerRepositoryInterface interface {
+type ServerRepository interface {
 	// CreateServer 新建測試用戶伺服器關聯
 	CreateServer(server *models.Server) (models.Server, error)
 
@@ -50,7 +50,7 @@ type ServerRepositoryInterface interface {
 	UpdateMemberCount(serverID string, count int) error
 }
 
-type ServerMemberRepositoryInterface interface {
+type ServerMemberRepository interface {
 	// AddMemberToServer 將用戶添加到伺服器
 	AddMemberToServer(serverID, userID string, role string) error
 
@@ -73,7 +73,7 @@ type ServerMemberRepositoryInterface interface {
 	GetMemberCount(serverID string) (int64, error)
 }
 
-type UserRepositoryInterface interface {
+type UserRepository interface {
 	// GetUserById 根據用戶ID獲取用戶
 	GetUserById(userID string) (*models.User, error)
 
@@ -102,12 +102,12 @@ type UserRepositoryInterface interface {
 	DeleteUser(userID string) error
 }
 
-type FriendRepositoryInterface interface {
+type FriendRepository interface {
 	// GetFriendById 根據用戶ID獲取用戶
 	GetFriendById(userID string) (*models.Friend, error)
 }
 
-type ChannelRepositoryInterface interface {
+type ChannelRepository interface {
 	// GetChannelsByServerID 根據伺服器ID獲取頻道列表
 	GetChannelsByServerID(serverID string) ([]models.Channel, error)
 
@@ -127,7 +127,7 @@ type ChannelRepositoryInterface interface {
 	CheckChannelExists(channelID string) (bool, error)
 }
 
-type FileRepositoryInterface interface {
+type FileRepository interface {
 	// CreateFile 創建檔案記錄
 	CreateFile(file *models.UploadedFile) error
 
@@ -156,7 +156,7 @@ type FileRepositoryInterface interface {
 	CleanupExpiredFiles() error
 }
 
-type ChannelCategoryRepositoryInterface interface {
+type ChannelCategoryRepository interface {
 	// CreateChannelCategory 創建頻道類別
 	CreateChannelCategory(category *models.ChannelCategory) error
 

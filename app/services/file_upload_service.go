@@ -18,17 +18,17 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// FileUploadServiceImpl 檔案上傳服務實現
-type FileUploadServiceImpl struct {
+// fileUploadService 檔案上傳服務實現
+type fileUploadService struct {
 	config       *config.Config
-	fileProvider providers.FileProviderInterface
+	fileProvider providers.FileProvider
 	odm          *providers.ODM
-	fileRepo     repositories.FileRepositoryInterface
+	fileRepo     repositories.FileRepository
 }
 
 // NewFileUploadService 創建新的檔案上傳服務
-func NewFileUploadService(cfg *config.Config, fileProvider providers.FileProviderInterface, odm *providers.ODM, fileRepo repositories.FileRepositoryInterface) FileUploadServiceInterface {
-	return &FileUploadServiceImpl{
+func NewFileUploadService(cfg *config.Config, fileProvider providers.FileProvider, odm *providers.ODM, fileRepo repositories.FileRepository) *fileUploadService {
+	return &fileUploadService{
 		config:       cfg,
 		fileProvider: fileProvider,
 		odm:          odm,
@@ -37,7 +37,7 @@ func NewFileUploadService(cfg *config.Config, fileProvider providers.FileProvide
 }
 
 // UploadFileWithConfig 統一檔案上傳函數，使用配置參數
-func (fs *FileUploadServiceImpl) UploadFileWithConfig(file multipart.File, header *multipart.FileHeader, userID string, config *models.FileUploadConfig) (*models.FileResult, *models.MessageOptions) {
+func (fs *fileUploadService) UploadFileWithConfig(file multipart.File, header *multipart.FileHeader, userID string, config *models.FileUploadConfig) (*models.FileResult, *models.MessageOptions) {
 	// 基本驗證
 	if msgOpt := fs.ValidateFile(header); msgOpt != nil {
 		return nil, msgOpt
@@ -148,7 +148,7 @@ func (fs *FileUploadServiceImpl) UploadFileWithConfig(file multipart.File, heade
 }
 
 // UploadFile 通用檔案上傳 - 使用統一函數
-func (fs *FileUploadServiceImpl) UploadFile(file multipart.File, header *multipart.FileHeader, userID string) (*models.FileResult, *models.MessageOptions) {
+func (fs *fileUploadService) UploadFile(file multipart.File, header *multipart.FileHeader, userID string) (*models.FileResult, *models.MessageOptions) {
 	config := models.GetGeneralUploadConfig()
 	result, msgOpt := fs.UploadFileWithConfig(file, header, userID, config)
 	if msgOpt != nil {
@@ -158,7 +158,7 @@ func (fs *FileUploadServiceImpl) UploadFile(file multipart.File, header *multipa
 }
 
 // UploadAvatar 頭像上傳 - 使用統一函數
-func (fs *FileUploadServiceImpl) UploadAvatar(file multipart.File, header *multipart.FileHeader, userID string) (*models.FileResult, *models.MessageOptions) {
+func (fs *fileUploadService) UploadAvatar(file multipart.File, header *multipart.FileHeader, userID string) (*models.FileResult, *models.MessageOptions) {
 	config := models.GetAvatarUploadConfig()
 	result, msgOpt := fs.UploadFileWithConfig(file, header, userID, config)
 	if msgOpt != nil {
@@ -168,7 +168,7 @@ func (fs *FileUploadServiceImpl) UploadAvatar(file multipart.File, header *multi
 }
 
 // UploadDocument 文件上傳 - 使用統一函數
-func (fs *FileUploadServiceImpl) UploadDocument(file multipart.File, header *multipart.FileHeader, userID string) (*models.FileResult, *models.MessageOptions) {
+func (fs *fileUploadService) UploadDocument(file multipart.File, header *multipart.FileHeader, userID string) (*models.FileResult, *models.MessageOptions) {
 	config := models.GetDocumentUploadConfig()
 	result, msgOpt := fs.UploadFileWithConfig(file, header, userID, config)
 	if msgOpt != nil {
@@ -178,7 +178,7 @@ func (fs *FileUploadServiceImpl) UploadDocument(file multipart.File, header *mul
 }
 
 // ValidateFile 基本檔案驗證
-func (fs *FileUploadServiceImpl) ValidateFile(header *multipart.FileHeader) *models.MessageOptions {
+func (fs *fileUploadService) ValidateFile(header *multipart.FileHeader) *models.MessageOptions {
 	// 檢查檔案名稱
 	if header.Filename == "" {
 		return &models.MessageOptions{
@@ -238,7 +238,7 @@ func (fs *FileUploadServiceImpl) ValidateFile(header *multipart.FileHeader) *mod
 }
 
 // ValidateImage 圖片檔案驗證
-func (fs *FileUploadServiceImpl) ValidateImage(header *multipart.FileHeader) *models.MessageOptions {
+func (fs *fileUploadService) ValidateImage(header *multipart.FileHeader) *models.MessageOptions {
 	if msgOpt := fs.ValidateFile(header); msgOpt != nil {
 		return msgOpt
 	}
@@ -278,7 +278,7 @@ func (fs *FileUploadServiceImpl) ValidateImage(header *multipart.FileHeader) *mo
 }
 
 // ValidateDocument 文件檔案驗證
-func (fs *FileUploadServiceImpl) ValidateDocument(header *multipart.FileHeader) *models.MessageOptions {
+func (fs *fileUploadService) ValidateDocument(header *multipart.FileHeader) *models.MessageOptions {
 	if msgOpt := fs.ValidateFile(header); msgOpt != nil {
 		return msgOpt
 	}
@@ -318,7 +318,7 @@ func (fs *FileUploadServiceImpl) ValidateDocument(header *multipart.FileHeader) 
 }
 
 // CheckFileContent 檢查檔案內容安全性
-func (fs *FileUploadServiceImpl) CheckFileContent(file multipart.File, header *multipart.FileHeader) *models.MessageOptions {
+func (fs *fileUploadService) CheckFileContent(file multipart.File, header *multipart.FileHeader) *models.MessageOptions {
 	// 重置檔案指針
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
 		return &models.MessageOptions{
@@ -373,7 +373,7 @@ func (fs *FileUploadServiceImpl) CheckFileContent(file multipart.File, header *m
 }
 
 // isMimeTypeCompatible 檢查MIME類型相容性
-func (fs *FileUploadServiceImpl) isMimeTypeCompatible(detected, declared string) bool {
+func (fs *fileUploadService) isMimeTypeCompatible(detected, declared string) bool {
 	// 如果完全相同
 	if detected == declared {
 		return true
@@ -397,7 +397,7 @@ func (fs *FileUploadServiceImpl) isMimeTypeCompatible(detected, declared string)
 }
 
 // containsMaliciousContent 檢查是否包含惡意內容
-func (fs *FileUploadServiceImpl) containsMaliciousContent(content []byte) bool {
+func (fs *fileUploadService) containsMaliciousContent(content []byte) bool {
 	// 檢查常見的惡意軟體標誌
 	maliciousSignatures := [][]byte{
 		[]byte("MZ"),             // PE執行檔標誌
@@ -455,7 +455,7 @@ func (fs *FileUploadServiceImpl) containsMaliciousContent(content []byte) bool {
 }
 
 // ScanFileForMalware 惡意軟體掃描（簡化實現）
-func (fs *FileUploadServiceImpl) ScanFileForMalware(filePath string) *models.MessageOptions {
+func (fs *fileUploadService) ScanFileForMalware(filePath string) *models.MessageOptions {
 	// 這裡可以整合第三方防毒引擎，如 ClamAV
 	// 目前實現基本的檔案檢查
 
@@ -492,7 +492,7 @@ func (fs *FileUploadServiceImpl) ScanFileForMalware(filePath string) *models.Mes
 }
 
 // DeleteFile 刪除檔案
-func (fs *FileUploadServiceImpl) DeleteFile(filePath string) *models.MessageOptions {
+func (fs *fileUploadService) DeleteFile(filePath string) *models.MessageOptions {
 	// 從資料庫刪除記錄
 	if err := fs.fileRepo.DeleteFileByPath(filePath); err != nil {
 		return &models.MessageOptions{
@@ -515,7 +515,7 @@ func (fs *FileUploadServiceImpl) DeleteFile(filePath string) *models.MessageOpti
 }
 
 // GetFileInfo 取得檔案資訊
-func (fs *FileUploadServiceImpl) GetFileInfo(filePath string) (*models.FileInfo, *models.MessageOptions) {
+func (fs *fileUploadService) GetFileInfo(filePath string) (*models.FileInfo, *models.MessageOptions) {
 	// 從資料庫取得檔案資訊
 	uploadedFile, err := fs.fileRepo.GetFileByPath(filePath)
 	if err != nil {
@@ -548,7 +548,7 @@ func (fs *FileUploadServiceImpl) GetFileInfo(filePath string) (*models.FileInfo,
 }
 
 // CleanupExpiredFiles 清理過期檔案
-func (fs *FileUploadServiceImpl) CleanupExpiredFiles() *models.MessageOptions {
+func (fs *fileUploadService) CleanupExpiredFiles() *models.MessageOptions {
 	// 取得過期的檔案列表
 	expiredFiles, err := fs.fileRepo.GetExpiredFiles()
 	if err != nil {
@@ -571,7 +571,7 @@ func (fs *FileUploadServiceImpl) CleanupExpiredFiles() *models.MessageOptions {
 }
 
 // GetUserFiles 獲取用戶的檔案列表
-func (fs *FileUploadServiceImpl) GetUserFiles(userID string) ([]*models.UploadedFile, *models.MessageOptions) {
+func (fs *fileUploadService) GetUserFiles(userID string) ([]*models.UploadedFile, *models.MessageOptions) {
 	if userID == "" {
 		return nil, &models.MessageOptions{
 			Code:    models.ErrInvalidParams,
@@ -598,7 +598,7 @@ func (fs *FileUploadServiceImpl) GetUserFiles(userID string) ([]*models.Uploaded
 }
 
 // DeleteFileByID 根據檔案ID刪除檔案
-func (fs *FileUploadServiceImpl) DeleteFileByID(fileID string, userID string) *models.MessageOptions {
+func (fs *fileUploadService) DeleteFileByID(fileID string, userID string) *models.MessageOptions {
 	if fileID == "" {
 		return &models.MessageOptions{
 			Code:    models.ErrInvalidParams,
@@ -652,7 +652,7 @@ func (fs *FileUploadServiceImpl) DeleteFileByID(fileID string, userID string) *m
 }
 
 // GetFileURLByID 根據檔案ID獲取檔案連結
-func (fs *FileUploadServiceImpl) GetFileURLByID(fileID string) (string, *models.MessageOptions) {
+func (fs *fileUploadService) GetFileURLByID(fileID string) (string, *models.MessageOptions) {
 	if fileID == "" {
 		return "", &models.MessageOptions{
 			Code:    models.ErrInvalidParams,
@@ -692,7 +692,7 @@ func (fs *FileUploadServiceImpl) GetFileURLByID(fileID string) (string, *models.
 }
 
 // GetFileInfoByID 根據檔案ID獲取完整檔案資訊
-func (fs *FileUploadServiceImpl) GetFileInfoByID(fileID string) (*models.UploadedFile, *models.MessageOptions) {
+func (fs *fileUploadService) GetFileInfoByID(fileID string) (*models.UploadedFile, *models.MessageOptions) {
 	if fileID == "" {
 		return nil, &models.MessageOptions{
 			Code:    models.ErrInvalidParams,

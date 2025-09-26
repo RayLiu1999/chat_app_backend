@@ -16,11 +16,11 @@ import (
 type ServerController struct {
 	config        *config.Config
 	mongoConnect  *mongo.Database
-	serverService services.ServerServiceInterface
+	serverService services.ServerService
 }
 
 // 創建控制器的工廠函數
-func NewServerController(cfg *config.Config, mongodb *mongo.Database, serverService services.ServerServiceInterface) *ServerController {
+func NewServerController(cfg *config.Config, mongodb *mongo.Database, serverService services.ServerService) *ServerController {
 	return &ServerController{
 		config:        cfg,
 		mongoConnect:  mongodb,

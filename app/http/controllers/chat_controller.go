@@ -16,12 +16,12 @@ import (
 type ChatController struct {
 	config       *config.Config
 	mongoConnect *mongo.Database
-	chatService  services.ChatServiceInterface
-	userService  services.UserServiceInterface
+	chatService  services.ChatService
+	userService  services.UserService
 }
 
 // 創建控制器的工廠函數
-func NewChatController(cfg *config.Config, mongodb *mongo.Database, chatService services.ChatServiceInterface, userService services.UserServiceInterface) *ChatController {
+func NewChatController(cfg *config.Config, mongodb *mongo.Database, chatService services.ChatService, userService services.UserService) *ChatController {
 	return &ChatController{
 		config:       cfg,
 		mongoConnect: mongodb,
