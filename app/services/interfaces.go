@@ -2,6 +2,8 @@ package services
 
 import (
 	"chat_app_backend/app/models"
+	"chat_app_backend/app/providers"
+	"context"
 	"mime/multipart"
 
 	"github.com/gin-gonic/gin"
@@ -67,13 +69,6 @@ type UserService interface {
 
 	// DeleteAccount 刪除帳號
 	DeleteAccount(userID string) error
-
-	// 未來可能添加的其他方法
-	// CreateUser(user *models.User) (primitive.ObjectID, error)
-	// UpdateUser(userID primitive.ObjectID, updates map[string]any) error
-	// DeleteUser(userID primitive.ObjectID) error
-	// VerifyUserCredentials(username, password string) (*models.User, error)
-	// ... 其他方法 ...
 }
 
 // ChatService 定義了聊天服務的接口
@@ -96,9 +91,6 @@ type ChatService interface {
 
 	// GetChannelMessages 獲取頻道訊息
 	GetChannelMessages(userID string, channelID string, before string, after string, limit string) ([]models.MessageResponse, *models.MessageOptions)
-
-	// 其他已實現的方法應該添加到這裡
-	// ... 其他方法 ...
 }
 
 // ServerService 定義了伺服器服務的接口
@@ -133,9 +125,6 @@ type ServerService interface {
 
 	// LeaveServer 離開伺服器
 	LeaveServer(userID string, serverID string) *models.MessageOptions
-
-	// 其他已實現的方法應該添加到這裡
-	// ... 其他方法 ...
 }
 
 type FriendService interface {
@@ -212,4 +201,41 @@ type FileUploadService interface {
 	GetFileInfoByID(fileID string) (*models.UploadedFile, *models.MessageOptions)
 	GetUserFiles(userID string) ([]*models.UploadedFile, *models.MessageOptions)
 	CleanupExpiredFiles() *models.MessageOptions
+}
+
+type WebSocketHandler interface {
+	// HandleWebSocket 處理 WebSocket 連接
+	HandleWebSocket(ws *websocket.Conn, userID string)
+}
+
+// --- WebSocket Handler Dependencies ---
+
+type ClientManager interface {
+	NewClient(userID string, ws *websocket.Conn) *Client
+	Register(client *Client)
+	Unregister(client *Client)
+	GetClient(userID string) (*Client, bool)
+	GetAllClients() map[*Client]bool
+	IsUserOnline(userID string) bool
+}
+
+// RoomManager defines the interface for room management.
+type RoomManager interface {
+	CheckUserAllowedJoinRoom(userID string, roomID string, roomType models.RoomType) (bool, error)
+	GetRoom(roomType models.RoomType, roomID string) (*Room, bool)
+	AddRoom(room *Room)
+	InitRoom(roomType models.RoomType, roomID string) *Room
+	JoinRoom(client *Client, roomType models.RoomType, roomID string)
+	LeaveRoom(client *Client, roomType models.RoomType, roomID string)
+}
+
+// MessageHandler defines the interface for handling messages.
+type MessageHandler interface {
+	HandleMessage(message *MessageResponse)
+}
+
+// WebSocketODM defines the interface for WebSocket-related database operations.
+type WebSocketODM interface {
+	Find(ctx context.Context, filter map[string]any, results interface{}) error
+	Create(ctx context.Context, document providers.Model) error
 }

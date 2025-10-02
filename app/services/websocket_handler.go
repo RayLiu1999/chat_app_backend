@@ -12,19 +12,19 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// WebSocketHandler 處理 WebSocket 相關操作
-type WebSocketHandler struct {
-	odm            *providers.ODM
-	clientManager  *ClientManager
-	roomManager    *RoomManager
-	messageHandler *MessageHandler
+// webSocketHandler 處理 WebSocket 相關操作
+type webSocketHandler struct {
+	odm            providers.ODM
+	clientManager  ClientManager
+	roomManager    RoomManager
+	messageHandler MessageHandler
 	userService    UserService
 	cache          providers.CacheProvider
 }
 
 // NewWebSocketHandler 創建新的 WebSocket 處理器
-func NewWebSocketHandler(odm *providers.ODM, clientManager *ClientManager, roomManager *RoomManager, messageHandler *MessageHandler, userService UserService, cache providers.CacheProvider) *WebSocketHandler {
-	return &WebSocketHandler{
+func NewWebSocketHandler(odm providers.ODM, clientManager ClientManager, roomManager RoomManager, messageHandler MessageHandler, userService UserService, cache providers.CacheProvider) *webSocketHandler {
+	return &webSocketHandler{
 		odm:            odm,
 		clientManager:  clientManager,
 		roomManager:    roomManager,
@@ -35,7 +35,7 @@ func NewWebSocketHandler(odm *providers.ODM, clientManager *ClientManager, roomM
 }
 
 // HandleWebSocket 處理 WebSocket 連線
-func (wsh *WebSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) {
+func (wsh *webSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) {
 	// 設置連接參數
 	ws.SetReadLimit(MaxMessageSize)
 	ws.SetReadDeadline(time.Now().Add(PongWait))
@@ -83,7 +83,7 @@ func (wsh *WebSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) 
 }
 
 // handleDMRoomCreation 處理私聊房間創建邏輯
-func (wsh *WebSocketHandler) handleDMRoomCreation(roomID, userID string) {
+func (wsh *webSocketHandler) handleDMRoomCreation(roomID, userID string) {
 	roomObjectID, err := primitive.ObjectIDFromHex(roomID)
 	if err != nil {
 		utils.PrettyPrintf("無法解析房間 ID：%v", err)
@@ -148,7 +148,7 @@ func (wsh *WebSocketHandler) handleDMRoomCreation(roomID, userID string) {
 }
 
 // clientReadPump 處理客戶端讀取
-func (wsh *WebSocketHandler) clientReadPump(client *Client) {
+func (wsh *webSocketHandler) clientReadPump(client *Client) {
 	defer func() {
 		if r := recover(); r != nil {
 			utils.PrettyPrintf("讀取泵 panic 已恢復，用戶 %s：%v", client.UserID, r)
@@ -189,7 +189,7 @@ func (wsh *WebSocketHandler) clientReadPump(client *Client) {
 }
 
 // updateActivityWithThrottle 使用 Redis 節流閥來更新資料庫中的用戶活動時間
-func (wsh *WebSocketHandler) updateActivityWithThrottle(userID string) {
+func (wsh *webSocketHandler) updateActivityWithThrottle(userID string) {
 	throttleKey := utils.UserActivityThrottleCacheKey(userID)
 
 	// 1. 檢查節流閥是否存在
@@ -217,7 +217,7 @@ func (wsh *WebSocketHandler) updateActivityWithThrottle(userID string) {
 }
 
 // clientWritePump 處理客戶端寫入
-func (wsh *WebSocketHandler) clientWritePump(client *Client) {
+func (wsh *webSocketHandler) clientWritePump(client *Client) {
 	ticker := time.NewTicker(PingPeriod)
 	defer func() {
 		ticker.Stop()
@@ -256,7 +256,7 @@ func (wsh *WebSocketHandler) clientWritePump(client *Client) {
 }
 
 // handleClientMessage 處理客戶端訊息
-func (wsh *WebSocketHandler) handleClientMessage(client *Client, msg WsMessage[json.RawMessage]) {
+func (wsh *webSocketHandler) handleClientMessage(client *Client, msg WsMessage[json.RawMessage]) {
 	switch msg.Action {
 	case "join_room":
 		utils.PrettyPrintf("用戶 %s 正在加入房間：%s", client.UserID, msg.Data)
@@ -276,7 +276,7 @@ func (wsh *WebSocketHandler) handleClientMessage(client *Client, msg WsMessage[j
 }
 
 // handleJoinRoom 處理加入房間請求
-func (wsh *WebSocketHandler) handleJoinRoom(client *Client, data json.RawMessage) {
+func (wsh *webSocketHandler) handleJoinRoom(client *Client, data json.RawMessage) {
 	// 用於錯誤回應的原始動作
 	action := "join_room"
 
@@ -292,7 +292,7 @@ func (wsh *WebSocketHandler) handleJoinRoom(client *Client, data json.RawMessage
 		return
 	}
 
-	allowed, err := wsh.roomManager.checkUserAllowedJoinRoom(client.UserID, requestData.RoomID, requestData.RoomType)
+	allowed, err := wsh.roomManager.CheckUserAllowedJoinRoom(client.UserID, requestData.RoomID, requestData.RoomType)
 	if err != nil {
 		// 使用統一的 error action
 		client.SendError(action, "檢查用戶權限失敗")
@@ -318,7 +318,7 @@ func (wsh *WebSocketHandler) handleJoinRoom(client *Client, data json.RawMessage
 }
 
 // handleLeaveRoom 處理離開房間請求
-func (wsh *WebSocketHandler) handleLeaveRoom(client *Client, data json.RawMessage) {
+func (wsh *webSocketHandler) handleLeaveRoom(client *Client, data json.RawMessage) {
 	// 用於錯誤回應的原始動作
 	action := "leave_room"
 
@@ -345,7 +345,7 @@ func (wsh *WebSocketHandler) handleLeaveRoom(client *Client, data json.RawMessag
 }
 
 // handleSendMessage 處理發送消息請求
-func (wsh *WebSocketHandler) handleSendMessage(client *Client, data json.RawMessage) {
+func (wsh *webSocketHandler) handleSendMessage(client *Client, data json.RawMessage) {
 	// 用於錯誤回應的原始動作
 	action := "send_message"
 
@@ -384,7 +384,7 @@ func (wsh *WebSocketHandler) handleSendMessage(client *Client, data json.RawMess
 }
 
 // handlePing 處理ping請求
-func (wsh *WebSocketHandler) handlePing(client *Client) {
+func (wsh *webSocketHandler) handlePing(client *Client) {
 	pongMsg := &WsMessage[PingResponse]{
 		Action: "pong",
 		Data: PingResponse{

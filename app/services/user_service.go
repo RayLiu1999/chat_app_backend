@@ -19,11 +19,11 @@ import (
 type userService struct {
 	config            *config.Config
 	userRepo          repositories.UserRepository
-	odm               *providers.ODM
+	odm               providers.ODM
 	fileUploadService FileUploadService // 添加 FileUploadService 依賴
 }
 
-func NewUserService(cfg *config.Config, odm *providers.ODM, userRepo repositories.UserRepository, fileUploadService FileUploadService) *userService {
+func NewUserService(cfg *config.Config, odm providers.ODM, userRepo repositories.UserRepository, fileUploadService FileUploadService) *userService {
 	return &userService{
 		config:            cfg,
 		userRepo:          userRepo,

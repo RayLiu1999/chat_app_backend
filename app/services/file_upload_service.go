@@ -22,12 +22,12 @@ import (
 type fileUploadService struct {
 	config       *config.Config
 	fileProvider providers.FileProvider
-	odm          *providers.ODM
+	odm          providers.ODM
 	fileRepo     repositories.FileRepository
 }
 
 // NewFileUploadService 創建新的檔案上傳服務
-func NewFileUploadService(cfg *config.Config, fileProvider providers.FileProvider, odm *providers.ODM, fileRepo repositories.FileRepository) *fileUploadService {
+func NewFileUploadService(cfg *config.Config, fileProvider providers.FileProvider, odm providers.ODM, fileRepo repositories.FileRepository) *fileUploadService {
 	return &fileUploadService{
 		config:       cfg,
 		fileProvider: fileProvider,

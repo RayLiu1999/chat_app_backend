@@ -14,9 +14,9 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// RoomManager 管理房間的創建、加入、離開等操作
-type RoomManager struct {
-	odm   *providers.ODM
+// roomManager 管理房間的創建、加入、離開等操作
+type roomManager struct {
+	odm   providers.ODM
 	rooms map[string]*Room
 	// roomPubSubs      map[string]*redis.PubSub
 	redisClient      *redis.Client
@@ -26,8 +26,8 @@ type RoomManager struct {
 }
 
 // NewRoomManager 創建新的房間管理器
-func NewRoomManager(odm *providers.ODM, redisClient *redis.Client, serverMemberRepo repositories.ServerMemberRepository) *RoomManager {
-	return &RoomManager{
+func NewRoomManager(odm providers.ODM, redisClient *redis.Client, serverMemberRepo repositories.ServerMemberRepository) *roomManager {
+	return &roomManager{
 		odm:   odm,
 		rooms: make(map[string]*Room, 1000),
 		// roomPubSubs:      make(map[string]*redis.PubSub),
@@ -37,7 +37,7 @@ func NewRoomManager(odm *providers.ODM, redisClient *redis.Client, serverMemberR
 }
 
 // GetRoom 獲取房間
-func (rm *RoomManager) GetRoom(roomType models.RoomType, roomID string) (*Room, bool) {
+func (rm *roomManager) GetRoom(roomType models.RoomType, roomID string) (*Room, bool) {
 	key := RoomKey{Type: roomType, RoomID: roomID}
 	rm.mutex.RLock()
 	room, exists := rm.rooms[key.String()]
@@ -46,14 +46,14 @@ func (rm *RoomManager) GetRoom(roomType models.RoomType, roomID string) (*Room, 
 }
 
 // AddRoom 新增房間
-func (rm *RoomManager) AddRoom(room *Room) {
+func (rm *roomManager) AddRoom(room *Room) {
 	rm.mutex.Lock()
 	rm.rooms[room.Key.String()] = room
 	rm.mutex.Unlock()
 }
 
 // InitRoom 動態初始化房間
-func (rm *RoomManager) InitRoom(roomType models.RoomType, roomID string) *Room {
+func (rm *roomManager) InitRoom(roomType models.RoomType, roomID string) *Room {
 	key := RoomKey{Type: roomType, RoomID: roomID}
 
 	// 先檢查房間是否存在（使用讀鎖）
@@ -116,7 +116,7 @@ func (rm *RoomManager) InitRoom(roomType models.RoomType, roomID string) *Room {
 }
 
 // JoinRoom 讓使用者加入房間
-func (rm *RoomManager) JoinRoom(client *Client, roomType models.RoomType, roomID string) {
+func (rm *roomManager) JoinRoom(client *Client, roomType models.RoomType, roomID string) {
 	key := RoomKey{Type: roomType, RoomID: roomID}
 	rm.mutex.RLock()
 	room, exists := rm.rooms[key.String()]
@@ -141,7 +141,7 @@ func (rm *RoomManager) JoinRoom(client *Client, roomType models.RoomType, roomID
 }
 
 // LeaveRoom 讓使用者離開房間
-func (rm *RoomManager) LeaveRoom(client *Client, roomType models.RoomType, roomID string) {
+func (rm *roomManager) LeaveRoom(client *Client, roomType models.RoomType, roomID string) {
 	key := RoomKey{Type: roomType, RoomID: roomID}
 	rm.mutex.RLock()
 	room, exists := rm.rooms[key.String()]
@@ -170,27 +170,8 @@ func (rm *RoomManager) LeaveRoom(client *Client, roomType models.RoomType, roomI
 	}
 }
 
-// CleanupRoom 清理空房間
-func (rm *RoomManager) cleanupRoom(roomKey string) {
-	rm.mutex.Lock()
-	defer rm.mutex.Unlock()
-
-	if room, exists := rm.rooms[roomKey]; exists && len(room.Clients) == 0 {
-		close(room.Broadcast)
-
-		// rm.pubSubMutex.Lock()
-		// if pubsub, exists := rm.roomPubSubs[roomKey]; exists {
-		// 	pubsub.Unsubscribe(context.Background(), "room:"+roomKey)
-		// 	delete(rm.roomPubSubs, roomKey)
-		// }
-		// rm.pubSubMutex.Unlock()
-
-		delete(rm.rooms, roomKey)
-	}
-}
-
-// checkUserAllowedJoinRoom 檢查房間是否允許使用者進入
-func (rm *RoomManager) checkUserAllowedJoinRoom(userID string, roomID string, roomType models.RoomType) (bool, error) {
+// CheckUserAllowedJoinRoom 檢查房間是否允許使用者進入
+func (rm *roomManager) CheckUserAllowedJoinRoom(userID string, roomID string, roomType models.RoomType) (bool, error) {
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return false, err
@@ -243,8 +224,27 @@ func (rm *RoomManager) checkUserAllowedJoinRoom(userID string, roomID string, ro
 	return false, nil
 }
 
+// CleanupRoom 清理空房間
+func (rm *roomManager) cleanupRoom(roomKey string) {
+	rm.mutex.Lock()
+	defer rm.mutex.Unlock()
+
+	if room, exists := rm.rooms[roomKey]; exists && len(room.Clients) == 0 {
+		close(room.Broadcast)
+
+		// rm.pubSubMutex.Lock()
+		// if pubsub, exists := rm.roomPubSubs[roomKey]; exists {
+		// 	pubsub.Unsubscribe(context.Background(), "room:"+roomKey)
+		// 	delete(rm.roomPubSubs, roomKey)
+		// }
+		// rm.pubSubMutex.Unlock()
+
+		delete(rm.rooms, roomKey)
+	}
+}
+
 // broadcastWorker 房間的廣播工作池
-func (rm *RoomManager) broadcastWorker(room *Room) {
+func (rm *roomManager) broadcastWorker(room *Room) {
 	for msg := range room.Broadcast {
 		room.Mutex.RLock()
 		for client := range room.Clients {
@@ -255,7 +255,7 @@ func (rm *RoomManager) broadcastWorker(room *Room) {
 }
 
 // safelyBroadcastToClient 安全發送消息
-func (rm *RoomManager) safelyBroadcastToClient(client *Client, message *WsMessage[MessageResponse]) {
+func (rm *roomManager) safelyBroadcastToClient(client *Client, message *WsMessage[MessageResponse]) {
 	// 使用統一的發送機制，而不是直接寫入 WebSocket
 	if err := client.SendMessage(message); err != nil {
 		utils.PrettyPrintf("發送消息失敗: %v", err)

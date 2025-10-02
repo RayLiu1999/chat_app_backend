@@ -12,7 +12,7 @@ import (
 
 type channelService struct {
 	config           *config.Config
-	odm              *providers.ODM
+	odm              providers.ODM
 	channelRepo      repositories.ChannelRepository
 	serverRepo       repositories.ServerRepository
 	serverMemberRepo repositories.ServerMemberRepository
@@ -21,7 +21,7 @@ type channelService struct {
 }
 
 func NewChannelService(cfg *config.Config,
-	odm *providers.ODM,
+	odm providers.ODM,
 	channelRepo repositories.ChannelRepository,
 	serverRepo repositories.ServerRepository,
 	serverMemberRepo repositories.ServerMemberRepository,

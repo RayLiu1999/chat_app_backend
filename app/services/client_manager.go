@@ -10,8 +10,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// ClientManager 管理客戶端的註冊和註銷
-type ClientManager struct {
+// clientManager 管理客戶端的註冊和註銷
+type clientManager struct {
 	clients         map[*Client]bool
 	clientsByUserID map[string]*Client
 	mutex           sync.RWMutex
@@ -20,8 +20,8 @@ type ClientManager struct {
 }
 
 // NewClientManager 創建新的客戶端管理器
-func NewClientManager() *ClientManager {
-	cm := &ClientManager{
+func NewClientManager() *clientManager {
+	cm := &clientManager{
 		clients:         make(map[*Client]bool, 1000),
 		clientsByUserID: make(map[string]*Client, 1000),
 		register:        make(chan *Client, 1000),
@@ -35,7 +35,7 @@ func NewClientManager() *ClientManager {
 }
 
 // NewClient 創建新的客戶端
-func (cm *ClientManager) NewClient(userID string, ws *websocket.Conn) *Client {
+func (cm *clientManager) NewClient(userID string, ws *websocket.Conn) *Client {
 	return &Client{
 		UserID:       userID,
 		Conn:         ws,
@@ -52,17 +52,17 @@ func (cm *ClientManager) NewClient(userID string, ws *websocket.Conn) *Client {
 }
 
 // Register 註冊客戶端
-func (cm *ClientManager) Register(client *Client) {
+func (cm *clientManager) Register(client *Client) {
 	cm.register <- client
 }
 
 // Unregister 註銷客戶端
-func (cm *ClientManager) Unregister(client *Client) {
+func (cm *clientManager) Unregister(client *Client) {
 	cm.unregister <- client
 }
 
 // GetClient 根據用戶ID獲取客戶端
-func (cm *ClientManager) GetClient(userID string) (*Client, bool) {
+func (cm *clientManager) GetClient(userID string) (*Client, bool) {
 	cm.mutex.RLock()
 	client, exists := cm.clientsByUserID[userID]
 	cm.mutex.RUnlock()
@@ -70,7 +70,7 @@ func (cm *ClientManager) GetClient(userID string) (*Client, bool) {
 }
 
 // GetAllClients 獲取所有客戶端
-func (cm *ClientManager) GetAllClients() map[*Client]bool {
+func (cm *clientManager) GetAllClients() map[*Client]bool {
 	cm.mutex.RLock()
 	defer cm.mutex.RUnlock()
 	result := make(map[*Client]bool)
@@ -79,7 +79,7 @@ func (cm *ClientManager) GetAllClients() map[*Client]bool {
 }
 
 // handleRegister 處理客戶端註冊
-func (cm *ClientManager) handleRegister() {
+func (cm *clientManager) handleRegister() {
 	for client := range cm.register {
 		utils.PrettyPrintf("正在處理用戶 %s 的註冊事件", client.UserID)
 		cm.registerClient(client)
@@ -88,7 +88,7 @@ func (cm *ClientManager) handleRegister() {
 }
 
 // handleUnregister 處理客戶端註銷
-func (cm *ClientManager) handleUnregister() {
+func (cm *clientManager) handleUnregister() {
 	for client := range cm.unregister {
 		utils.PrettyPrintf("正在處理用戶 %s 的註銷事件", client.UserID)
 		cm.unregisterClient(client)
@@ -97,7 +97,7 @@ func (cm *ClientManager) handleUnregister() {
 }
 
 // registerClient 註冊客戶端
-func (cm *ClientManager) registerClient(client *Client) {
+func (cm *clientManager) registerClient(client *Client) {
 	cm.mutex.Lock()
 	defer cm.mutex.Unlock()
 
@@ -111,7 +111,7 @@ func (cm *ClientManager) registerClient(client *Client) {
 }
 
 // unregisterClient 註銷客戶端
-func (cm *ClientManager) unregisterClient(client *Client) {
+func (cm *clientManager) unregisterClient(client *Client) {
 	cm.mutex.Lock()
 	defer cm.mutex.Unlock()
 
@@ -138,7 +138,7 @@ func (cm *ClientManager) unregisterClient(client *Client) {
 }
 
 // CheckClientsHealth 檢查所有客戶端的健康狀態
-func (cm *ClientManager) CheckClientsHealth() {
+func (cm *clientManager) CheckClientsHealth() {
 	cm.mutex.RLock()
 	var unhealthyClients []*Client
 
@@ -157,7 +157,7 @@ func (cm *ClientManager) CheckClientsHealth() {
 }
 
 // StartHealthChecker 啟動健康檢查器
-func (cm *ClientManager) StartHealthChecker(ctx context.Context) {
+func (cm *clientManager) StartHealthChecker(ctx context.Context) {
 	ticker := time.NewTicker(30 * time.Second) // 每30秒檢查一次
 	defer ticker.Stop()
 
@@ -172,7 +172,7 @@ func (cm *ClientManager) StartHealthChecker(ctx context.Context) {
 }
 
 // IsUserOnline 基於 WebSocket 連線檢查用戶是否在線
-func (cm *ClientManager) IsUserOnline(userID string) bool {
+func (cm *clientManager) IsUserOnline(userID string) bool {
 	_, exists := cm.GetClient(userID)
 	return exists
 }

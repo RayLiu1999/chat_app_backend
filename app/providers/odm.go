@@ -13,7 +13,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// ODM 錯誤定義
+// odm 錯誤定義
 var (
 	ErrInvalidModel     = errors.New("無效的模型結構")
 	ErrDocumentNotFound = errors.New("文檔不存在")
@@ -76,14 +76,14 @@ func setTimestamps(model Model, isCreate bool) {
 	}
 }
 
-// ODM 提供對模型的資料庫操作
-type ODM struct {
+// odm 提供對模型的資料庫操作
+type odm struct {
 	db *mongo.Database
 }
 
 // NewODM 創建新的ODM實例
-func NewODM(db *mongo.Database) *ODM {
-	return &ODM{
+func NewODM(db *mongo.Database) *odm {
+	return &odm{
 		db: db,
 	}
 }
@@ -91,19 +91,19 @@ func NewODM(db *mongo.Database) *ODM {
 // ===== 基礎工具方法 =====
 
 // GetDatabase 返回數據庫連接
-func (o *ODM) GetDatabase() *mongo.Database {
+func (o *odm) GetDatabase() *mongo.Database {
 	return o.db
 }
 
 // Collection 獲取模型對應的集合
-func (o *ODM) Collection(model Model) *mongo.Collection {
+func (o *odm) Collection(model Model) *mongo.Collection {
 	return o.db.Collection(model.GetCollectionName())
 }
 
 // ===== 創建操作 =====
 
 // Create 創建新文檔
-func (o *ODM) Create(ctx context.Context, model Model) error {
+func (o *odm) Create(ctx context.Context, model Model) error {
 	if reflect.ValueOf(model).Kind() != reflect.Ptr {
 		return ErrInvalidModel
 	}
@@ -121,7 +121,7 @@ func (o *ODM) Create(ctx context.Context, model Model) error {
 }
 
 // InsertMany 插入多個文檔
-func (o *ODM) InsertMany(ctx context.Context, models []Model) error {
+func (o *odm) InsertMany(ctx context.Context, models []Model) error {
 	if len(models) == 0 {
 		return nil
 	}
@@ -147,7 +147,7 @@ func (o *ODM) InsertMany(ctx context.Context, models []Model) error {
 // ===== 查詢操作 =====
 
 // FindByID 通過ID查找文檔
-func (o *ODM) FindByID(ctx context.Context, ID string, model Model) error {
+func (o *odm) FindByID(ctx context.Context, ID string, model Model) error {
 	if reflect.ValueOf(model).Kind() != reflect.Ptr {
 		return ErrInvalidModel
 	}
@@ -171,7 +171,7 @@ func (o *ODM) FindByID(ctx context.Context, ID string, model Model) error {
 }
 
 // FindOne 查找單個文檔
-func (o *ODM) FindOne(ctx context.Context, filter bson.M, model Model) error {
+func (o *odm) FindOne(ctx context.Context, filter bson.M, model Model) error {
 	if reflect.ValueOf(model).Kind() != reflect.Ptr {
 		return ErrInvalidModel
 	}
@@ -188,7 +188,7 @@ func (o *ODM) FindOne(ctx context.Context, filter bson.M, model Model) error {
 }
 
 // Find 查找多個文檔
-func (o *ODM) Find(ctx context.Context, filter bson.M, models any) error {
+func (o *odm) Find(ctx context.Context, filter bson.M, models any) error {
 	// 確保models是指向切片的指針
 	modelsValue := reflect.ValueOf(models)
 	if modelsValue.Kind() != reflect.Ptr || modelsValue.Elem().Kind() != reflect.Slice {
@@ -218,7 +218,7 @@ func (o *ODM) Find(ctx context.Context, filter bson.M, models any) error {
 // ===== 更新操作 =====
 
 // Update 更新文檔
-func (o *ODM) Update(ctx context.Context, model Model) error {
+func (o *odm) Update(ctx context.Context, model Model) error {
 	if reflect.ValueOf(model).Kind() != reflect.Ptr {
 		return ErrInvalidModel
 	}
@@ -237,7 +237,7 @@ func (o *ODM) Update(ctx context.Context, model Model) error {
 }
 
 // UpdateFields 更新文檔的特定欄位
-func (o *ODM) UpdateFields(ctx context.Context, model Model, fields bson.M) error {
+func (o *odm) UpdateFields(ctx context.Context, model Model, fields bson.M) error {
 	if reflect.ValueOf(model).Kind() != reflect.Ptr {
 		return ErrInvalidModel
 	}
@@ -257,7 +257,7 @@ func (o *ODM) UpdateFields(ctx context.Context, model Model, fields bson.M) erro
 }
 
 // UpdateMany 更新多個文檔
-func (o *ODM) UpdateMany(ctx context.Context, model Model, filter bson.M, update bson.M) error {
+func (o *odm) UpdateMany(ctx context.Context, model Model, filter bson.M, update bson.M) error {
 	// 添加更新時間
 	if updateSet, ok := update["$set"]; ok {
 		if updateSetMap, ok := updateSet.(bson.M); ok {
@@ -274,7 +274,7 @@ func (o *ODM) UpdateMany(ctx context.Context, model Model, filter bson.M, update
 // ===== 刪除操作 =====
 
 // Delete 刪除文檔
-func (o *ODM) Delete(ctx context.Context, model Model) error {
+func (o *odm) Delete(ctx context.Context, model Model) error {
 	if reflect.ValueOf(model).Kind() != reflect.Ptr {
 		return ErrInvalidModel
 	}
@@ -290,13 +290,13 @@ func (o *ODM) Delete(ctx context.Context, model Model) error {
 }
 
 // DeleteMany 刪除多個文檔
-func (o *ODM) DeleteMany(ctx context.Context, model Model, filter bson.M) error {
+func (o *odm) DeleteMany(ctx context.Context, model Model, filter bson.M) error {
 	_, err := o.Collection(model).DeleteMany(ctx, filter)
 	return err
 }
 
 // DeleteByID 通過ID刪除文檔
-func (o *ODM) DeleteByID(ctx context.Context, ID string, model Model) error {
+func (o *odm) DeleteByID(ctx context.Context, ID string, model Model) error {
 	objectID, err := primitive.ObjectIDFromHex(ID)
 	if err != nil {
 		return ErrInvalidID
@@ -309,14 +309,14 @@ func (o *ODM) DeleteByID(ctx context.Context, ID string, model Model) error {
 // ===== 統計和工具方法 =====
 
 // Count 計算符合條件的文檔數量
-func (o *ODM) Count(ctx context.Context, filter bson.M, model Model) (int64, error) {
+func (o *odm) Count(ctx context.Context, filter bson.M, model Model) (int64, error) {
 	return o.Collection(model).CountDocuments(ctx, filter)
 }
 
 // ===== 存在性檢查 =====
 
 // Exists 檢查文檔是否存在
-func (o *ODM) Exists(ctx context.Context, filter bson.M, model Model) (bool, error) {
+func (o *odm) Exists(ctx context.Context, filter bson.M, model Model) (bool, error) {
 	count, err := o.Count(ctx, filter, model)
 	if err != nil {
 		return false, err
@@ -325,7 +325,7 @@ func (o *ODM) Exists(ctx context.Context, filter bson.M, model Model) (bool, err
 }
 
 // ExistsByID 通過ID檢查文檔是否存在
-func (o *ODM) ExistsByID(ctx context.Context, ID string, model Model) (bool, error) {
+func (o *odm) ExistsByID(ctx context.Context, ID string, model Model) (bool, error) {
 	objectID, err := primitive.ObjectIDFromHex(ID)
 	if err != nil {
 		return false, ErrInvalidID
@@ -337,7 +337,7 @@ func (o *ODM) ExistsByID(ctx context.Context, ID string, model Model) (bool, err
 // ===== 高級查詢操作 =====
 
 // FindWithOptions 使用自定義選項查找文檔
-func (o *ODM) FindWithOptions(ctx context.Context, filter bson.M, models any, options *QueryOptions) error {
+func (o *odm) FindWithOptions(ctx context.Context, filter bson.M, models any, options *QueryOptions) error {
 	// 確保models是指向切片的指針
 	modelsValue := reflect.ValueOf(models)
 	if modelsValue.Kind() != reflect.Ptr || modelsValue.Elem().Kind() != reflect.Slice {
@@ -368,7 +368,7 @@ func (o *ODM) FindWithOptions(ctx context.Context, filter bson.M, models any, op
 }
 
 // Aggregate 執行聚合查詢
-func (o *ODM) Aggregate(ctx context.Context, pipeline any, models any, model Model) error {
+func (o *odm) Aggregate(ctx context.Context, pipeline any, models any, model Model) error {
 	cursor, err := o.Collection(model).Aggregate(ctx, pipeline)
 	if err != nil {
 		return err
@@ -381,7 +381,7 @@ func (o *ODM) Aggregate(ctx context.Context, pipeline any, models any, model Mod
 // ===== 批量操作 =====
 
 // BulkWrite 執行批量寫入操作
-func (o *ODM) BulkWrite(ctx context.Context, operations []mongo.WriteModel, model Model) (*mongo.BulkWriteResult, error) {
+func (o *odm) BulkWrite(ctx context.Context, operations []mongo.WriteModel, model Model) (*mongo.BulkWriteResult, error) {
 	return o.Collection(model).BulkWrite(ctx, operations)
 }
 

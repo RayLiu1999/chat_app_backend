@@ -15,12 +15,12 @@ import (
 // chatRepository 處理聊天相關的數據庫操作
 type chatRepository struct {
 	config *config.Config
-	odm    *providers.ODM
+	odm    providers.ODM
 	// queryBuilder *providers.QueryBuilder // 如有需要可加
 }
 
 // NewChatRepository 創建一個新的聊天存儲庫實例
-func NewChatRepository(cfg *config.Config, odm *providers.ODM) *chatRepository {
+func NewChatRepository(cfg *config.Config, odm providers.ODM) *chatRepository {
 	return &chatRepository{
 		config: cfg,
 		odm:    odm,

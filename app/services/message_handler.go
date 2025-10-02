@@ -10,22 +10,22 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// MessageHandler 處理消息相關邏輯
-type MessageHandler struct {
-	odm         *providers.ODM
-	roomManager *RoomManager
+// messageHandler 處理消息相關邏輯
+type messageHandler struct {
+	odm         providers.ODM
+	roomManager RoomManager
 }
 
 // NewMessageHandler 創建新的消息處理器
-func NewMessageHandler(odm *providers.ODM, roomManager *RoomManager) *MessageHandler {
-	return &MessageHandler{
+func NewMessageHandler(odm providers.ODM, roomManager RoomManager) *messageHandler {
+	return &messageHandler{
 		odm:         odm,
 		roomManager: roomManager,
 	}
 }
 
 // HandleMessage 處理消息邏輯
-func (mh *MessageHandler) HandleMessage(message *MessageResponse) {
+func (mh *messageHandler) HandleMessage(message *MessageResponse) {
 	// 先儲存消息到資料庫（不管房間是否存在客戶端）
 	err := mh.saveMessageToDB(message)
 	if err != nil {
@@ -81,7 +81,7 @@ func (mh *MessageHandler) HandleMessage(message *MessageResponse) {
 }
 
 // saveMessageToDB 儲存消息到資料庫
-func (mh *MessageHandler) saveMessageToDB(data *MessageResponse) error {
+func (mh *messageHandler) saveMessageToDB(data *MessageResponse) error {
 	roomObjectID, err := primitive.ObjectIDFromHex(data.RoomID)
 	if err != nil {
 		utils.PrettyPrintf("解析房間ID失敗: %v", err)
@@ -117,7 +117,7 @@ func (mh *MessageHandler) saveMessageToDB(data *MessageResponse) error {
 }
 
 // updateRoomLastMessage 更新房間的最後訊息時間
-func (mh *MessageHandler) updateRoomLastMessage(roomID string, roomType models.RoomType) {
+func (mh *messageHandler) updateRoomLastMessage(roomID string, roomType models.RoomType) {
 	roomObjectID, err := primitive.ObjectIDFromHex(roomID)
 	if err != nil {
 		utils.PrettyPrintf("解析房間ID失敗: %v", err)
@@ -148,7 +148,7 @@ func (mh *MessageHandler) updateRoomLastMessage(roomID string, roomType models.R
 }
 
 // isClientConnectionValid 檢查客戶端連線是否仍然有效
-func (mh *MessageHandler) isClientConnectionValid(client *Client) bool {
+func (mh *messageHandler) isClientConnectionValid(client *Client) bool {
 	// 檢查連線是否為 nil
 	if client == nil || client.Conn == nil {
 		return false

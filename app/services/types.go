@@ -64,8 +64,8 @@ type Notification struct {
 type Client struct {
 	UserID string
 	Conn   *websocket.Conn
-	Send   chan []byte    // 發送訊息通道
-	Hub    *ClientManager // 所屬的客戶端管理器
+	Send   chan []byte   // 發送訊息通道
+	Hub    ClientManager // 所屬的客戶端管理器
 	// Subscribed    map[string]bool
 	// SubscribedMux sync.RWMutex
 	// 房間活躍時間追蹤

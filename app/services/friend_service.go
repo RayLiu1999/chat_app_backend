@@ -14,20 +14,20 @@ import (
 
 type friendService struct {
 	config            *config.Config
-	odm               *providers.ODM
+	odm               providers.ODM
 	friendRepo        repositories.FriendRepository
 	userRepo          repositories.UserRepository
 	fileUploadService FileUploadService // 添加 FileUploadService 依賴
-	clientManager     *ClientManager
+	clientManager     ClientManager
 }
 
 func NewFriendService(
 	cfg *config.Config,
-	odm *providers.ODM,
+	odm providers.ODM,
 	friendRepo repositories.FriendRepository,
 	userRepo repositories.UserRepository,
 	fileUploadService FileUploadService,
-	clientManager *ClientManager,
+	clientManager ClientManager,
 ) *friendService {
 	return &friendService{
 		config:            cfg,

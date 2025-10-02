@@ -11,10 +11,10 @@ import (
 )
 
 type channelCategoryRepository struct {
-	odm *providers.ODM
+	odm providers.ODM
 }
 
-func NewChannelCategoryRepository(odm *providers.ODM) *channelCategoryRepository {
+func NewChannelCategoryRepository(odm providers.ODM) *channelCategoryRepository {
 	return &channelCategoryRepository{
 		odm: odm,
 	}

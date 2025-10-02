@@ -13,10 +13,10 @@ import (
 
 type fileRepository struct {
 	config *config.Config
-	odm    *providers.ODM
+	odm    providers.ODM
 }
 
-func NewFileRepository(cfg *config.Config, odm *providers.ODM) FileRepository {
+func NewFileRepository(cfg *config.Config, odm providers.ODM) FileRepository {
 	return &fileRepository{
 		config: cfg,
 		odm:    odm,

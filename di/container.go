@@ -28,7 +28,7 @@ type ServiceContainer struct {
 	FriendService     services.FriendService
 	ChannelService    services.ChannelService
 	FileUploadService services.FileUploadService
-	ClientManager     *services.ClientManager
+	ClientManager     services.ClientManager
 }
 
 // Controller容器
@@ -44,7 +44,7 @@ type ControllerContainer struct {
 
 // Providers容器
 type ProviderContainer struct {
-	ODM          *providers.ODM
+	ODM          providers.ODM
 	FileProvider providers.FileProvider
 	Cache        providers.CacheProvider
 }

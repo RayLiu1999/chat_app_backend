@@ -23,20 +23,20 @@ type chatService struct {
 	serverRepo        repositories.ServerRepository
 	serverMemberRepo  repositories.ServerMemberRepository
 	userRepo          repositories.UserRepository
-	odm               *providers.ODM
+	odm               providers.ODM
 	userService       UserService
 	fileUploadService FileUploadService // 添加 FileUploadService 依賴
 
 	// 新增的模組化組件
-	clientManager    *ClientManager
-	roomManager      *RoomManager
-	messageHandler   *MessageHandler
-	websocketHandler *WebSocketHandler
+	clientManager    ClientManager
+	roomManager      RoomManager
+	messageHandler   MessageHandler
+	websocketHandler WebSocketHandler
 }
 
 // NewChatService 初始化聊天室服務
 func NewChatService(cfg *config.Config,
-	odm *providers.ODM,
+	odm providers.ODM,
 	redisClient *redis.Client,
 	cache providers.CacheProvider,
 	chatRepo repositories.ChatRepository,
@@ -90,14 +90,8 @@ func (cs *chatService) HandleWebSocket(ws *websocket.Conn, userID string) {
 }
 
 // GetClientManager 獲取客戶端管理器
-func (cs *chatService) GetClientManager() *ClientManager {
+func (cs *chatService) GetClientManager() ClientManager {
 	return cs.clientManager
-}
-
-// UpdateUserService 更新 UserService 引用
-func (cs *chatService) UpdateUserService(userService UserService) {
-	cs.userService = userService
-	cs.websocketHandler.userService = userService
 }
 
 // 取得聊天記錄response

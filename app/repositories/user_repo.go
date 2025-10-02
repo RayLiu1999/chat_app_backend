@@ -15,11 +15,11 @@ import (
 
 type userRepository struct {
 	config *config.Config
-	odm    *providers.ODM
+	odm    providers.ODM
 	cache  providers.CacheProvider
 }
 
-func NewUserRepository(cfg *config.Config, odm *providers.ODM, cache providers.CacheProvider) *userRepository {
+func NewUserRepository(cfg *config.Config, odm providers.ODM, cache providers.CacheProvider) *userRepository {
 	return &userRepository{
 		config: cfg,
 		odm:    odm,

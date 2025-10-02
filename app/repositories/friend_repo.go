@@ -12,10 +12,10 @@ import (
 
 type friendRepository struct {
 	config *config.Config
-	odm    *providers.ODM
+	odm    providers.ODM
 }
 
-func NewFriendRepository(cfg *config.Config, odm *providers.ODM) *friendRepository {
+func NewFriendRepository(cfg *config.Config, odm providers.ODM) *friendRepository {
 	return &friendRepository{
 		config: cfg,
 		odm:    odm,

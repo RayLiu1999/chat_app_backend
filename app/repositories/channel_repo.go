@@ -11,10 +11,10 @@ import (
 
 type channelRepository struct {
 	config *config.Config
-	odm    *providers.ODM
+	odm    providers.ODM
 }
 
-func NewChannelRepository(cfg *config.Config, odm *providers.ODM) ChannelRepository {
+func NewChannelRepository(cfg *config.Config, odm providers.ODM) ChannelRepository {
 	return &channelRepository{
 		config: cfg,
 		odm:    odm,

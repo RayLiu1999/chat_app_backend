@@ -13,11 +13,11 @@ import (
 
 type serverRepository struct {
 	config *config.Config
-	odm    *providers.ODM
+	odm    providers.ODM
 	// queryBuilder *providers.QueryBuilder // 如有需要可加
 }
 
-func NewServerRepository(cfg *config.Config, odm *providers.ODM) *serverRepository {
+func NewServerRepository(cfg *config.Config, odm providers.ODM) *serverRepository {
 	return &serverRepository{
 		config: cfg,
 		odm:    odm,

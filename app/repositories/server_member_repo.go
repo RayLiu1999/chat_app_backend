@@ -12,10 +12,10 @@ import (
 )
 
 type serverMemberRepository struct {
-	odm *providers.ODM
+	odm providers.ODM
 }
 
-func NewServerMemberRepository(odm *providers.ODM) *serverMemberRepository {
+func NewServerMemberRepository(odm providers.ODM) *serverMemberRepository {
 	return &serverMemberRepository{
 		odm: odm,
 	}

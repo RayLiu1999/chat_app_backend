@@ -15,7 +15,7 @@ import (
 
 type serverService struct {
 	config              *config.Config
-	odm                 *providers.ODM
+	odm                 providers.ODM
 	serverRepo          repositories.ServerRepository
 	serverMemberRepo    repositories.ServerMemberRepository
 	userRepo            repositories.UserRepository
@@ -24,11 +24,11 @@ type serverService struct {
 	chatRepo            repositories.ChatRepository
 	fileUploadService   FileUploadService
 	userService         UserService
-	clientManager       *ClientManager
+	clientManager       ClientManager
 }
 
 func NewServerService(cfg *config.Config,
-	odm *providers.ODM,
+	odm providers.ODM,
 	serverRepo repositories.ServerRepository,
 	serverMemberRepo repositories.ServerMemberRepository,
 	userRepo repositories.UserRepository,
@@ -37,7 +37,7 @@ func NewServerService(cfg *config.Config,
 	chatRepo repositories.ChatRepository,
 	fileUploadService FileUploadService,
 	userService UserService,
-	clientManager *ClientManager,
+	clientManager ClientManager,
 ) *serverService {
 	return &serverService{
 		config:              cfg,
@@ -52,11 +52,6 @@ func NewServerService(cfg *config.Config,
 		userService:         userService,
 		clientManager:       clientManager,
 	}
-}
-
-// UpdateUserService 更新 UserService 引用
-func (ss *serverService) UpdateUserService(userService UserService) {
-	ss.userService = userService
 }
 
 // getUserPictureURL 獲取用戶頭像 URL（從 ObjectID 解析）
