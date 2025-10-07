@@ -62,6 +62,16 @@ func (ur *userRepository) GetUserById(userID string) (*models.User, error) {
 	return &user, nil
 }
 
+// GetUserByUsername 根據用戶名獲取用戶信息（測試用）
+func (ur *userRepository) GetUserByUsername(username string) (*models.User, error) {
+	var user models.User
+	err := ur.odm.FindOne(context.Background(), bson.M{"username": username}, &user)
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 // GetUserListByIds 根據用戶 ID 列表獲取用戶列表
 func (ur *userRepository) GetUserListByIds(userIds []string) ([]models.User, error) {
 	var users []models.User

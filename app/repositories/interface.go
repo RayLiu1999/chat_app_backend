@@ -77,6 +77,9 @@ type UserRepository interface {
 	// GetUserById 根據用戶ID獲取用戶
 	GetUserById(userID string) (*models.User, error)
 
+	// GetUserByUsername 根據用戶名獲取用戶（測試用）
+	GetUserByUsername(username string) (*models.User, error)
+
 	// GetUserListByIds 根據用戶ID陣列獲取用戶
 	GetUserListByIds(userIds []string) ([]models.User, error)
 

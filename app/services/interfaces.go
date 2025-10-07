@@ -16,6 +16,9 @@ type UserService interface {
 	// GetUserById 根據ID獲取用戶信息ch
 	GetUserResponseById(userID string) (*models.UserResponse, error)
 
+	// GetUserByUsername 根據用戶名獲取用戶信息（測試用）
+	GetUserByUsername(username string) (*models.User, *models.MessageOptions)
+
 	// RegisterUser 註冊新用戶
 	RegisterUser(user models.User) *models.MessageOptions
 

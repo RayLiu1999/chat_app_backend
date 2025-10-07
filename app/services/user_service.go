@@ -58,6 +58,26 @@ func (us *userService) getUserBannerURL(user *models.User) string {
 	return bannerURL
 }
 
+// GetUserByUsername 根據用戶名獲取用戶信息（測試用）
+func (us *userService) GetUserByUsername(username string) (*models.User, *models.MessageOptions) {
+	user, err := us.userRepo.GetUserByUsername(username)
+	if err != nil {
+		if err == providers.ErrDocumentNotFound {
+			return nil, &models.MessageOptions{
+				Code:    models.ErrUserNotFound,
+				Message: "用戶不存在",
+			}
+		}
+		return nil, &models.MessageOptions{
+			Code:    models.ErrInternalServer,
+			Message: "獲取用戶信息失敗",
+			Details: err.Error(),
+		}
+	}
+
+	return user, nil
+}
+
 // 註冊新用戶
 func (us *userService) RegisterUser(user models.User) *models.MessageOptions {
 	// 檢查用戶名是否已存在

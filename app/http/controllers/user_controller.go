@@ -97,6 +97,50 @@ func (uc *UserController) Logout(c *gin.Context) {
 	SuccessResponse(c, nil, "登出成功")
 }
 
+// GetUserByUsername 根據用戶名獲取用戶信息（測試用，不需要認證）
+func (uc *UserController) GetUserByUsername(c *gin.Context) {
+	username := c.Query("username")
+	if username == "" {
+		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
+			Code:    models.ErrInvalidParams,
+			Message: "用戶名不能為空",
+		})
+		return
+	}
+
+	user, appErr := uc.userService.GetUserByUsername(username)
+	if appErr != nil {
+		statusCode := http.StatusNotFound
+		if appErr.Code != models.ErrUserNotFound {
+			statusCode = http.StatusInternalServerError
+		}
+		ErrorResponse(c, statusCode, models.MessageOptions{
+			Code:    appErr.Code,
+			Message: "獲取用戶信息失敗",
+			Details: appErr.Message,
+		})
+		return
+	}
+
+	// 移除敏感信息
+	user.Password = ""
+
+	SuccessResponse(c, gin.H{
+		"id":             user.ID.Hex(),
+		"username":       user.Username,
+		"email":          user.Email,
+		"nickname":       user.Nickname,
+		"picture_id":     user.PictureID.Hex(),
+		"banner_id":      user.BannerID.Hex(),
+		"status":         user.Status,
+		"bio":            user.Bio,
+		"is_online":      user.IsOnline,
+		"last_active_at": user.LastActiveAt,
+		"created_at":     user.CreatedAt,
+		"is_active":      user.IsActive,
+	}, "獲取用戶信息成功")
+}
+
 // 刷新 access token
 func (uc *UserController) RefreshToken(c *gin.Context) {
 	token, err := c.Cookie("refresh_token")

@@ -45,6 +45,12 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, controllers *di.ControllerCo
 	public.POST("/logout", middlewares.VerifyCSRFToken(), controllers.UserController.Logout)
 	public.POST("/refresh_token", middlewares.VerifyCSRFToken(), controllers.UserController.RefreshToken)
 
+	// 測試用 API
+	if cfg.Server.Mode != config.ProductionMode {
+		// 透過用戶名取得使用者資訊（不需要認證）
+		public.GET("/test/user", controllers.UserController.GetUserByUsername)
+	}
+
 	// 需要認證的路由
 	auth := r.Group("/")
 	auth.Use(middlewares.Auth())

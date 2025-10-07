@@ -1,0 +1,18 @@
+{
+  "smoke": {
+    "exec": "smokeTest",
+    "description": "執行基礎功能的冒煙測試"
+  },
+  "light": {
+    "exec": "lightLoadTest",
+    "description": "執行輕量級負載測試"
+  },
+  "medium": {
+    "exec": "mediumLoadTest",
+    "description": "執行中等負載測試"
+  },
+  "heavy": {
+    "exec": "heavyLoadTest",
+    "description": "執行高負載壓力測試"
+  }
+}
