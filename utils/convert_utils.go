@@ -112,7 +112,7 @@ func ToStr(value any) string {
 	case bool:
 		return strconv.FormatBool(v)
 	case time.Time:
-		return v.Format("2006-01-02 15:04:05")
+		return v.Format(time.RFC3339Nano)
 	case []byte:
 		return string(v)
 	default:

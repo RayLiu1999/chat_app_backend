@@ -173,6 +173,14 @@ func GetAccessTokenByHeader(c *gin.Context) (string, error) {
 
 // 從 HTTP 請求頭中獲取用戶 ID
 func GetUserIDFromHeader(c *gin.Context) (string, primitive.ObjectID, error) {
+	// 優先檢查上下文中的用戶資訊（用於測試環境）
+	if userID, exists := c.Get("user_id"); exists {
+		if userObjectID, exists := c.Get("user_object_id"); exists {
+			return userID.(string), userObjectID.(primitive.ObjectID), nil
+		}
+	}
+
+	// 正常流程：從 Authorization header 解析 JWT token
 	accessToken, err := GetAccessTokenByHeader(c)
 	if err != nil {
 		return "", primitive.NilObjectID, err
