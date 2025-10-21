@@ -134,6 +134,29 @@ export function logInfo(message, data = null) {
 }
 
 /**
+ * 記錄成功資訊
+ * @param {string} message - 成功訊息
+ * @param {Object} data - 相關資料
+ * @param {number} duration - 耗時 (毫秒)
+ */
+export function logSuccess(message, data = null, duration = null) {
+  const timestamp = new Date().toISOString().slice(11, 23);
+  const vu = __VU || 0;
+  const iter = __ITER || 0;
+
+  let logMessage = `[${timestamp}] [VU:${vu}] [Iter:${iter}] ✅ SUCCESS: ${message}`;
+
+  if (duration !== null) {
+    logMessage += ` | Duration: ${duration}ms`;
+  }
+  
+  if (data && VERBOSE_MODE) {
+    logMessage += ` | ${JSON.stringify(data)}`;
+  }
+
+}
+
+/**
  * 記錄錯誤資訊
  * @param {string} message - 錯誤訊息
  * @param {Object} error - 錯誤物件

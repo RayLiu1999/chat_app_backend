@@ -60,6 +60,57 @@ export const TEST_CONFIG = {
             { duration: '2m', target: 200 },  // 2 分鐘內提升到 200 個 VU
             { duration: '1m', target: 0 },    // 1 分鐘內降到 0 個 VU
         ],
+
+        // ========== WebSocket 專用壓力測試 ==========
+        
+        // WebSocket 連線壓力測試：測試大量並發連線
+        websocket_stress: [
+            { duration: '30s', target: 50 },   // 30 秒內建立 50 個連線
+            { duration: '2m', target: 100 },   // 2 分鐘內提升到 100 個連線
+            { duration: '3m', target: 150 },   // 3 分鐘內提升到 150 個連線
+            { duration: '5m', target: 150 },   // 維持 150 個連線 5 分鐘
+            { duration: '1m', target: 0 },     // 1 分鐘內關閉所有連線
+        ],
+
+        // 🆕 本地環境安全版 WebSocket 壓力測試
+        websocket_stress_safe: [
+            { duration: '30s', target: 20 },   // 30 秒到 20 個連線
+            { duration: '2m', target: 40 },    // 2 分鐘到 40 個連線
+            { duration: '2m', target: 50 },    // 2 分鐘到 50 個連線
+            { duration: '2m', target: 50 },    // 維持 50 個連線 2 分鐘
+            { duration: '1m', target: 0 },     // 1 分鐘內關閉所有連線
+        ],
+
+        // WebSocket 峰值測試：突然湧入大量連線
+        websocket_spike: [
+            { duration: '10s', target: 10 },   // 預熱：10 秒到 10 個 VU
+            { duration: '10s', target: 200 },  // 峰值：10 秒內暴增到 200 個 VU
+            { duration: '1m', target: 200 },   // 維持峰值 1 分鐘
+            { duration: '30s', target: 10 },   // 回落到 10 個 VU
+            { duration: '10s', target: 0 },    // 關閉
+        ],
+
+        // WebSocket 浸泡測試：長時間穩定性測試
+        websocket_soak: [
+            { duration: '2m', target: 50 },    // 2 分鐘升到 50 個 VU
+            { duration: '1h', target: 50 },    // 維持 50 個 VU 運行 1 小時
+            { duration: '2m', target: 0 },     // 2 分鐘內關閉
+        ],
+
+        // WebSocket 階梯測試：逐步增加負載找出系統極限
+        websocket_stress_ladder: [
+            { duration: '2m', target: 50 },    // 第一階：50 個連線
+            { duration: '2m', target: 50 },    // 維持
+            { duration: '2m', target: 100 },   // 第二階：100 個連線
+            { duration: '2m', target: 100 },   // 維持
+            { duration: '2m', target: 200 },   // 第三階：200 個連線
+            { duration: '2m', target: 200 },   // 維持
+            { duration: '2m', target: 300 },   // 第四階：300 個連線
+            { duration: '2m', target: 300 },   // 維持
+            { duration: '2m', target: 500 },   // 第五階：500 個連線
+            { duration: '2m', target: 500 },   // 維持
+            { duration: '2m', target: 0 },     // 關閉
+        ],
     },
 };
 

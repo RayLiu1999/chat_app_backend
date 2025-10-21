@@ -1,0 +1,30 @@
+{
+  "name": "chat-app-loadtest",
+  "version": "1.0.0",
+  "description": "k6 Load Testing for Chat Application",
+  "scripts": {
+    "test:smoke": "k6 run run.js --env SCENARIO=smoke",
+    "test:light": "k6 run run.js --env SCENARIO=light",
+    "test:medium": "k6 run run.js --env SCENARIO=medium",
+    "test:heavy": "k6 run run.js --env SCENARIO=heavy",
+    "test:ws:stress": "k6 run run.js --env SCENARIO=websocket_stress --env WS_TEST_TYPE=mixed",
+    "test:ws:connections": "k6 run run.js --env SCENARIO=websocket_stress --env WS_TEST_TYPE=connections",
+    "test:ws:messaging": "k6 run run.js --env SCENARIO=websocket_stress --env WS_TEST_TYPE=messaging",
+    "test:ws:spike": "k6 run run.js --env SCENARIO=websocket_spike",
+    "test:ws:soak": "k6 run run.js --env SCENARIO=websocket_soak",
+    "test:ws:soak:long": "k6 run run.js --env SCENARIO=websocket_soak --env SOAK_DURATION=7200",
+    "test:ws:ladder": "k6 run run.js --env SCENARIO=websocket_stress_ladder --env WS_TEST_TYPE=connections",
+    "test:all:basic": "npm run test:smoke && npm run test:light && npm run test:medium",
+    "test:all:websocket": "npm run test:ws:connections && npm run test:ws:messaging && npm run test:ws:spike",
+    "test:quick": "npm run test:smoke && npm run test:ws:connections"
+  },
+  "keywords": [
+    "k6",
+    "load-testing",
+    "websocket",
+    "performance",
+    "stress-testing"
+  ],
+  "author": "",
+  "license": "MIT"
+}

@@ -6,6 +6,10 @@
  * k6 run run.js --env SCENARIO=light
  * k6 run run.js --env SCENARIO=medium
  * k6 run run.js --env SCENARIO=heavy
+ * k6 run run.js --env SCENARIO=websocket_stress
+ * k6 run run.js --env SCENARIO=websocket_spike
+ * k6 run run.js --env SCENARIO=websocket_soak
+ * k6 run run.js --env SCENARIO=websocket_stress_ladder
  *
  * 參數:
  * --env SCENARIO: 要執行的測試場景 (smoke, light, medium, heavy)
@@ -21,6 +25,10 @@ import smokeTest from './scenarios/smoke.js';
 import lightLoadTest from './scenarios/light.js';
 import mediumLoadTest from './scenarios/medium.js';
 import heavyLoadTest from './scenarios/heavy.js';
+import websocketStressTest from './scenarios/websocket_stress.js';
+import websocketSpikeTest from './scenarios/websocket_spike.js';
+import websocketSoakTest from './scenarios/websocket_soak.js';
+import { logInfo, logSuccess, logError } from './scripts/common/logger.js';
 
 // 自定義metrics用於即時監控
 export const apiRequestCount = new Counter('api_requests_total');
@@ -30,53 +38,6 @@ export const wsConnectionCount = new Counter('ws_connections_total');
 // 設定詳細日誌模式
 const VERBOSE_MODE = __ENV.VERBOSE === '1';
 
-// 全域日誌函數
-export function logInfo(message, data = null) {
-  const timestamp = new Date().toISOString();
-  const vu = __VU || 0;
-  const iter = __ITER || 0;
-  
-  let logMessage = `[${timestamp}] [VU:${vu}] [Iter:${iter}] ${message}`;
-  
-  if (data && VERBOSE_MODE) {
-    logMessage += ` | Data: ${JSON.stringify(data)}`;
-  }
-  
-  console.log(logMessage);
-}
-
-export function logError(message, error = null) {
-  const timestamp = new Date().toISOString();
-  const vu = __VU || 0;
-  const iter = __ITER || 0;
-  
-  let logMessage = `[${timestamp}] [VU:${vu}] [Iter:${iter}] ❌ ERROR: ${message}`;
-  
-  if (error) {
-    logMessage += ` | ${error}`;
-  }
-  
-  console.error(logMessage);
-}
-
-export function logSuccess(message, statusCode = null, duration = null) {
-  const timestamp = new Date().toISOString();
-  const vu = __VU || 0;
-  const iter = __ITER || 0;
-  
-  let logMessage = `[${timestamp}] [VU:${vu}] [Iter:${iter}] ✅ SUCCESS: ${message}`;
-  
-  if (statusCode) {
-    logMessage += ` | Status: ${statusCode}`;
-  }
-  
-  if (duration) {
-    logMessage += ` | Duration: ${duration}ms`;
-  }
-  
-  console.log(logMessage);
-}
-
 // 選擇測試場景
 const scenarioName = __ENV.SCENARIO || 'smoke';
 const scenarios = {
@@ -84,6 +45,10 @@ const scenarios = {
   light: lightLoadTest,
   medium: mediumLoadTest,
   heavy: heavyLoadTest,
+  websocket_stress: websocketStressTest,
+  websocket_spike: websocketSpikeTest,
+  websocket_soak: websocketSoakTest,
+  websocket_stress_ladder: websocketStressTest, // 使用相同的測試函數，但不同的 stages
 };
 
 if (!scenarios[scenarioName]) {
@@ -110,18 +75,6 @@ export const options = {
   // 每 10 秒輸出一次狀態
   summaryTimeUnit: 'ms',
 };
-
-// export const options = {
-//   // discardResponseBodies: true,
-//   scenarios: {
-//     smoke: {
-//       executor: 'constant-vus',
-//       vus: 1,
-//       duration: '10s',
-//       gracefulStop: '3s',
-//     },
-//   },
-// };
 
 // 設置迭代初始化（每個 VU 開始時執行一次）
 export function setup() {
