@@ -2,7 +2,7 @@
 
 ## 專案簡介
 
-本專案為一個即時聊天室後端，模仿 Discord 架構，支援伺服器（Server/Guild）、頻道（Channel/Room）、私訊（DM）、好友系統、檔案上傳等功能。採用 Go 語言開發，資料儲存採用 MongoDB，並整合 Redis 以支援高效能的即時訊息推播與狀態管理。
+本專案為一個即時聊天室後端，模仿 Discord 架構，支援伺服器（Server/Guild）、頻道（Channel/Room）、私訊（DM）、好友系統、檔案上傳等功能。採用 Go 語言開發，資料儲存採用 MongoDB，並整合 Redis 資料快取。
 
 ---
 
@@ -37,7 +37,7 @@
 
 - **資料庫**
   - MongoDB（官方 Driver）
-  - Redis（狀態、Pub/Sub、快取）
+  - Redis（狀態、快取）
 
 ---
 
@@ -46,7 +46,7 @@
 - **語言/框架**：Go、Gin
 - **即時通訊**：gorilla/websocket
 - **資料庫**：MongoDB
-- **快取/訊息推播**：Redis
+- **快取**：Redis
 - **驗證**：dgrijalva/jwt-go
 - **設定管理**：Viper
 - **其他**：Docker Compose（開發環境）、ttacon/chalk（終端色彩）
@@ -56,54 +56,46 @@
 ## 系統架構圖
 
 ```mermaid
-flowchart TD
-    subgraph Client
-        A["瀏覽器 / 前端"]
-    end
-    subgraph Server
-        B["Gin Router"]
-        C["Middleware - CORS, CSRF, Auth"]
-        D["Controllers"]
-        E["Services"]
-        F["Repositories"]
-        G["MongoDB"]
-        H["WebSocket Hub"]
+graph TD
+    subgraph "外部使用者/客戶端"
+        User[用戶 Client]
     end
 
-    A -- HTTP / WS --> B
-    B --> C --> D
-    D --> H
-    D --> E
-    E --> F
-    F --> G
-    H -- WS Push --> A
+    subgraph "Go 應用程式 chat_app_backend"
+        Router[路由層 routes.go]
+        Middleware[中介軟體層 middlewares]
+        Controllers[HTTP 控制器層 controllers]
+        WebSocket_Handler[WebSocket 處理器 websocket_handler.go]
+        Services[服務層 services]
+        Repositories[倉儲層 repositories]
+    end
+
+    subgraph "外部依賴服務"
+        MongoDB[MongoDB 資料庫]
+        Redis[Redis 快取]
+        FileStorage[檔案儲存 本地]
+    end
+
+    %% 流程箭頭
+    User -- "HTTP API 請求 / WebSocket 連線" --> Router
+
+    Router -- "WebSocket 升級請求" --> WebSocket_Handler
+    Router -- "標準 HTTP 請求" --> Middleware
+
+    Middleware --> Controllers
+
+    Controllers --> Services
+    WebSocket_Handler -- "處理即時訊息" --> Services
+
+    Services -- "檔案操作" --> FileStorage
+    Services -- "資料庫操作" --> Repositories
+
+    Repositories -- "讀寫主要資料" --> MongoDB
+    Repositories -- "讀寫快取" --> Redis
 ```
 
 ---
 
-## 目前進度
-
-- 已完成：
-  - 使用者註冊/登入/登出、JWT 驗證
-  - CSRF 防護
-  - 好友系統（清單、邀請、狀態）
-  - 私訊與頻道聊天（WebSocket 即時通訊）
-  - 房間動態建立與閒置自動清理
-  - 伺服器/頻道基本 CRUD
-  - 檔案上傳
-  - 三層分層、依賴注入、集中設定
-  - MongoDB/Redis 整合
-
-- 進行中/待辦：
-  - 更完善的錯誤處理與結構化日誌
-  - 單元測試（Mock Repo、Controller 測試）
-  - Redis Pub/Sub 多節點支援
-  - CI/CD、靜態分析、Swagger 文件
-  - 伺服器/頻道權限管理
-  - API Rate Limiter
-  - Prometheus、OpenTelemetry 整合
-
----
 
 ## 開發環境快速啟動
 
