@@ -7,8 +7,7 @@ services:
     restart: unless-stopped
     ports:
       - "${SERVER_PORT}:${SERVER_PORT}"
-    env_file:
-      .env
+    env_file: .env
     environment:
       # redis設定
       REDIS_PASSWORD: ${REDIS_PASSWORD}
@@ -36,11 +35,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "2"
-          memory: 512M
+          cpus: "2" # 保持不變
+          memory: 1G # 提高至 1G
         reservations:
-          cpus: "0.2"
-          memory: 256M
+          cpus: "0.5"
+          memory: 512M
 
   # MongoDB 資料庫
   mongodb:
@@ -49,8 +48,7 @@ services:
     restart: unless-stopped
     ports:
       - "${MONGODB_OUT_PORT}:${MONGODB_PORT}"
-    env_file:
-      .env
+    env_file: .env
     environment:
       MONGODB_PORT: ${MONGODB_PORT}
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
@@ -59,7 +57,7 @@ services:
     volumes:
       - mongodb-data:/data/db
       - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
-    command: mongod --bind_ip_all --auth  # 新增：允許所有 IP 連線並啟用認證
+    command: mongod --bind_ip_all --auth # 新增：允許所有 IP 連線並啟用認證
     networks:
       - chat-network
     healthcheck:
@@ -75,8 +73,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: 512M
+          cpus: "1" # 提高至 1 核心
+          memory: 1G # 提高至 1G
         reservations:
           cpus: "0.2"
           memory: 256M
@@ -88,8 +86,7 @@ services:
     restart: unless-stopped
     expose:
       - "${REDIS_PORT}"
-    env_file:
-      .env
+    env_file: .env
     environment:
       REDIS_PORT: ${REDIS_PORT}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
@@ -103,6 +100,14 @@ services:
       interval: 30s
       timeout: 3s
       retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5" # 提高至 0.5 核心
+          memory: 512M # 提高至 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
 
   # Redis 管理界面 (可選)
   redis-commander:
@@ -111,8 +116,7 @@ services:
     restart: unless-stopped
     ports:
       - "${REDIS_COMMANDER_PORT}:${REDIS_COMMANDER_PORT}"
-    env_file:
-      .env
+    env_file: .env
     environment:
       REDIS_COMMANDER_PORT: ${REDIS_COMMANDER_PORT}
       REDIS_HOSTS: "local:redis:${REDIS_PORT}:0:${REDIS_PASSWORD}"
