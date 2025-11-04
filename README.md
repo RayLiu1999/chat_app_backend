@@ -33,7 +33,7 @@
   - 採用 `app` 目錄封裝核心業務邏輯
   - 三層分層：Controller → Service → Repository
   - 依賴注入（手寫 DI）
-  - 配置集中管理（Viper 讀取 YAML/ENV）
+  - 配置集中管理（Viper 讀取 ENV）
 
 - **資料庫**
   - MongoDB（官方 Driver）
@@ -116,17 +116,8 @@ graph TD
    go run main.go
    ```
 
-4. 設定檔參考 `config.example.yaml`，可自訂連線資訊
+4. 設定檔參考 `.env.example`，可自訂連線資訊
 
 ---
 
-## 參考文件
-
-- [docs/architecture_overview.md](docs/architecture_overview.md)
-- [API.md](API.md)
-- [docs/聊天室問題.md](docs/聊天室問題.md)
-- [docs/chat_service優化建議.md](docs/chat_service優化建議.md)
-
----
-
-如需更詳細的設計、API 或貢獻方式，請參考 `docs/` 目錄或聯絡專案維護者。
+如需更詳細的設計、API 或貢獻方式，請聯絡專案維護者。
