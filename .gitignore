@@ -2,6 +2,7 @@
 /main
 /main.exe
 /chat_app_backend
+/bin
 *.exe
 *.test
 *.out
@@ -35,7 +36,8 @@ Thumbs.db
 *.swo
 
 # 測試覆蓋率報告
-coverage.out
+coverage*.out
+coverage*.html
 
 # 備份檔案
 *.bak
