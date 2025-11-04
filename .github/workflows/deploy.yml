@@ -6,8 +6,139 @@ on:
       - main
 
 jobs:
-  build-and-deploy:
+  test:
+    name: Run Tests
     runs-on: ubuntu-latest
+    # 註解：目前所有測試都使用 Mock，不需要真實的 MongoDB/Redis 服務
+    # 如果未來新增整合測試，可以取消註解以下 services 區塊
+    # services:
+    #   mongodb:
+    #     image: mongo:7.0
+    #     ports:
+    #       - 27017:27017
+    #     env:
+    #       MONGO_INITDB_ROOT_USERNAME: test_user
+    #       MONGO_INITDB_ROOT_PASSWORD: test_password
+    #     options: >-
+    #       --health-cmd "mongosh --eval 'db.runCommand({ ping: 1 })'"
+    #       --health-interval 10s
+    #       --health-timeout 5s
+    #       --health-retries 5
+    #
+    #   redis:
+    #     image: redis:7-alpine
+    #     ports:
+    #       - 6379:6379
+    #     options: >-
+    #       --health-cmd "redis-cli ping"
+    #       --health-interval 10s
+    #       --health-timeout 5s
+    #       --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.3"
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install dependencies
+        run: go mod tidy
+
+      # 註解：目前單元測試使用 Mock，不需要環境變數
+      # 如果未來需要整合測試，可以取消註解
+      # - name: Create test environment file
+      #   run: |
+      #     cat > .env.test << EOF
+      #     # 測試環境配置
+      #     GIN_MODE=test
+      #     SERVER_MODE=test
+      #     SERVER_PORT=8111
+      #
+      #     # MongoDB 測試配置
+      #     MONGO_URI=mongodb://test_user:test_password@localhost:27017
+      #     MONGO_DB_NAME=chat_app_test
+      #
+      #     # Redis 測試配置
+      #     REDIS_HOST=localhost
+      #     REDIS_PORT=6379
+      #     REDIS_PASSWORD=
+      #     REDIS_DB=0
+      #
+      #     # JWT 測試配置
+      #     JWT_SECRET=test_secret_key_for_testing_only
+      #     JWT_ACCESS_EXPIRY=15
+      #     JWT_REFRESH_EXPIRY=7
+      #
+      #     # CSRF 測試配置
+      #     CSRF_SECRET=test_csrf_secret_key
+      #
+      #     # 其他配置
+      #     ALLOWED_ORIGINS=http://localhost:3000
+      #     TIMEZONE=Asia/Taipei
+      #     EOF
+
+      - name: Run tests
+        run: |
+          echo "執行單元測試（使用 Mock）..."
+          go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: Generate coverage report
+        run: |
+          go tool cover -html=coverage.out -o coverage.html
+          go tool cover -func=coverage.out
+
+      # - name: Upload coverage to Codecov (optional)
+      #   uses: codecov/codecov-action@v4
+      #   if: success()
+      #   with:
+      #     file: ./coverage.out
+      #     flags: unittests
+      #     name: codecov-umbrella
+      #     fail_ci_if_error: false
+      #   continue-on-error: true
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: |
+            coverage.out
+            coverage.html
+          retention-days: 30
+
+      - name: Check test coverage threshold
+        run: |
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+          echo "總覆蓋率: ${COVERAGE}%"
+
+          # 設定最低覆蓋率門檻（可調整）
+          THRESHOLD=30
+
+          if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
+            echo "❌ 測試覆蓋率 ${COVERAGE}% 低於門檻 ${THRESHOLD}%"
+            exit 1
+          else
+            echo "✅ 測試覆蓋率 ${COVERAGE}% 符合門檻 ${THRESHOLD}%"
+          fi
+  build-and-deploy:
+    name: Build and Deploy
+    needs: test  # 只有測試通過才會執行部署
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -22,7 +153,7 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
-      
+
       - name: Create remote directory
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -57,5 +188,5 @@ jobs:
             mkdir -p uploads # 確保 uploads 目錄存在
             mkdir -p logs   # 確保 logs 目錄存在
             docker-compose down
-            docker-compose up -d --build
-            echo "Deployed!" 
+            docker-compose up -d --build --no-cache # 避免有大量快取佔用磁碟空間
+            echo "Deployed!"
