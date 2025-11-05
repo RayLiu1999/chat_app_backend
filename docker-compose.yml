@@ -11,7 +11,6 @@ services:
     environment:
       # redis設定
       REDIS_PASSWORD: ${REDIS_PASSWORD}
-      HEALTH_CHECK_URL: http://localhost:${SERVER_PORT}/health
     depends_on:
       mongodb:
         condition: service_healthy
@@ -19,13 +18,12 @@ services:
         condition: service_healthy
     volumes:
       - ./uploads:/app/uploads
-      - ./logs:/app/logs
     networks:
       - chat-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -f $HEALTH_CHECK_URL || exit 1"]
+      test: ["CMD-SHELL", "wget --spider --quiet http://localhost:${SERVER_PORT}/health || exit 1"]
       interval: 30s
-      timeout: 10s
+      timeout: 5s
       retries: 3
       start_period: 40s
     ulimits:

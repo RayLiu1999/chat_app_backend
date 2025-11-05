@@ -1,5 +1,5 @@
 # 使用官方 Go 鏡像作為構建階段
-FROM golang:1.23-alpine AS builder
+FROM golang:1.25.3-alpine AS builder
 
 # 安裝必要的工具
 RUN apk add --no-cache git ca-certificates tzdata
@@ -38,7 +38,7 @@ WORKDIR /app
 COPY --from=builder /app/main .
 
 # 創建必要的目錄
-RUN mkdir -p uploads logs && chown -R appuser:appgroup /app
+RUN mkdir -p uploads && chown -R appuser:appgroup /app
 
 # 切換到應用用戶
 USER appuser
