@@ -11,7 +11,7 @@ WORKDIR /app
 COPY go.mod go.sum ./
 
 # 下載依賴
-RUN go mod tidy
+RUN go mod download
 
 # 複製源代碼
 COPY . .
@@ -28,8 +28,12 @@ RUN apk --no-cache add ca-certificates curl tzdata
 # 設置時區
 RUN cp /usr/share/zoneinfo/Asia/Taipei /etc/localtime && echo "Asia/Taipei" > /etc/timezone
 
-# 創建應用用戶
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+# 定義 build args（預設值）
+ARG APP_UID=1000
+ARG APP_GID=1000
+
+# 創建應用用戶（使用 args 設定 UID/GID）
+RUN addgroup -g ${APP_GID} -S appgroup && adduser -u ${APP_UID} -G appgroup -S appuser
 
 # 設置工作目錄
 WORKDIR /app

@@ -1,0 +1,32 @@
+# 使用官方 Go 鏡像作為構建階段
+FROM golang:1.25.3-alpine
+
+# 更新套件以修復已知的漏洞
+RUN apk update && apk upgrade
+
+# 安裝必要的工具
+RUN apk add --no-cache git ca-certificates tzdata
+
+# 設置工作目錄
+WORKDIR /app
+
+# 複製 go mod 和 sum 檔案
+COPY go.mod go.sum ./
+
+# 下載依賴
+RUN go mod download
+
+# 安裝 air 用於熱重載
+RUN go install github.com/air-verse/air@latest
+
+# 設置時區
+RUN cp /usr/share/zoneinfo/Asia/Taipei /etc/localtime && echo "Asia/Taipei" > /etc/timezone
+
+# 創建應用用戶
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+# 創建必要的目錄
+RUN mkdir -p uploads && chown -R appuser:appgroup /app
+
+# 運行應用
+CMD ["air"]

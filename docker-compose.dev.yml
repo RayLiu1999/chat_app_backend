@@ -1,0 +1,151 @@
+# Docker Compose - Development Environment
+# 使用方式: docker-compose -f docker-compose.dev.yml up -d
+
+services:
+  # 聊天應用後端服務 - 開發環境
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: chat_app_backend_dev
+    restart: unless-stopped
+    ports:
+      - "${SERVER_PORT:-8111}:${SERVER_PORT:-8111}"
+    env_file: ./.env.development
+    environment:
+      DOCKER_ENV: "true"
+      SERVER_MODE: "development"
+      GIN_MODE: "debug"
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      # 掛載整個專案目錄（實現熱重載）
+      - .:/app
+      # 掛載 Go modules 快取（加速編譯）
+      - go-modules-dev:/go/pkg/mod
+      # 掛載編譯快取（加速編譯）
+      - go-build-cache-dev:/root/.cache/go-build
+      # 靜態檔案
+      - ./uploads:/app/uploads
+    networks:
+      - chat-network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --spider --quiet http://localhost:${SERVER_PORT:-8111}/health || exit 1",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+  # MongoDB 資料庫 - 開發環境
+  mongodb:
+    image: mongo:7.0
+    container_name: chat_mongodb_dev
+    restart: unless-stopped
+    ports:
+      - "${MONGODB_OUT_PORT:-27017}:27017"
+    env_file: ./.env.development
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE}
+    volumes:
+      - mongodb-data-dev:/data/db
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    command: mongod --bind_ip_all --auth
+    networks:
+      - chat-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+        reservations:
+          cpus: "0.2"
+          memory: 256M
+
+  # Redis 快取和訊息廣播 - 開發環境
+  redis:
+    image: redis:7.2-alpine
+    container_name: chat_redis_dev
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    env_file: ./.env.development
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    volumes:
+      - redis-data-dev:/data
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD} --save 60 1
+    networks:
+      - chat-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+
+  # Redis 管理界面 - 開發環境專用
+  # redis-commander:
+  #   image: rediscommander/redis-commander:latest
+  #   container_name: chat_redis_commander_dev
+  #   restart: unless-stopped
+  #   ports:
+  #     - "${REDIS_COMMANDER_PORT:-8081}:8081"
+  #   environment:
+  #     REDIS_HOSTS: "local:redis:6379:0:${REDIS_PASSWORD}"
+  #   depends_on:
+  #     - redis
+  #   networks:
+  #     - chat-network
+
+volumes:
+  mongodb-data-dev:
+    driver: local
+  redis-data-dev:
+    driver: local
+  go-modules-dev:
+    driver: local
+  go-build-cache-dev:
+    driver: local
+
+networks:
+  chat-network:
+    driver: bridge
