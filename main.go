@@ -6,10 +6,12 @@ import (
 	"time"
 
 	"chat_app_backend/app/providers"
+	"chat_app_backend/app/services"
 	"chat_app_backend/config"
 	"chat_app_backend/di"
 	"chat_app_backend/routes"
 
+	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 )
 
@@ -45,7 +47,9 @@ func main() {
 	defer redis.Close()
 
 	// 初始化 Gin
-	r := gin.Default()
+	// 使用 New() 而不是 Default() 以便自定義中間件 (例如使用 JSON Logger)
+	r := gin.New()
+	r.Use(gin.Recovery())
 
 	// 設置信任的代理
 	// 在生產環境中，使用配置中的可信代理設置
@@ -59,12 +63,12 @@ func main() {
 	// 構建依賴
 	deps := di.BuildDependencies(config.AppConfig, mongodb, redis)
 
-	// // 使用依賴容器中的 UserService 來啟動後台任務
-	// backgroundTasks := services.NewBackgroundTasks(deps.Services.UserService)
-	// go backgroundTasks.StartAllBackgroundTasks()
+	// 使用依賴容器中的 UserService 來啟動後台任務
+	backgroundTasks := services.NewBackgroundTasks(deps.Services.UserService)
+	go backgroundTasks.StartAllBackgroundTasks()
 
 	// 註冊 pprof
-	// pprof.Register(r)
+	pprof.Register(r)
 
 	// 設置路由
 	routes.SetupRoutes(r, config.AppConfig, deps.Controllers)

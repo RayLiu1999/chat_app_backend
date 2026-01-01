@@ -9,9 +9,17 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	ginprometheus "github.com/zsais/go-gin-prometheus"
 )
 
 func SetupRoutes(r *gin.Engine, cfg *config.Config, controllers *di.ControllerContainer) {
+	// 初始化 Prometheus 監控
+	p := ginprometheus.NewPrometheus("gin")
+	p.Use(r)
+
+	// 使用 JSON 日誌中間件 (配合 Loki)
+	r.Use(middlewares.JSONLoggerMiddleware())
+
 	// 設定靜態文件服務
 	// 使用絕對路徑，確保在任何環境下都可以正確訪問上傳的文件
 	uploadsAbsPath := filepath.Join(".", "uploads")
