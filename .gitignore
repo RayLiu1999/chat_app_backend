@@ -41,3 +41,8 @@ coverage*.html
 
 # 備份檔案
 *.bak
+
+# 監控系統範例（本地模板）
+/monitoring/
+
+/doc

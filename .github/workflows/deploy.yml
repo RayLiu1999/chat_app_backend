@@ -175,6 +175,15 @@ jobs:
             --exclude='.env' \
             --exclude='.env.example' \
             --exclude='uploads/' \
+            --exclude='Makefile' \
+            --exclude='loadtest/' \
+            --exclude='*_test.go' \
+            --exclude='docs/' \
+            --exclude='README.md' \
+            --exclude='docker-compose.dev.yml' \
+            --exclude='coverage.out' \
+            --exclude='coverage.html' \
+            --exclude='backups/' \
             . ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:~/docker_pj/chat_app_backend/
 
       - name: Run remote deploy/reload command
@@ -187,8 +196,7 @@ jobs:
             cd ~/docker_pj/chat_app_backend
             echo "Building and restarting containers..."
             mkdir -p uploads # 確保 uploads 目錄存在
-            mkdir -p logs   # 確保 logs 目錄存在
-            docker-compose down
-            docker-compose build --no-cache
-            docker-compose up -d
-            echo "Deployed!"
+            docker-compose -f docker-compose.prod.yml down
+            docker-compose -f docker-compose.prod.yml build --no-cache
+            docker-compose -f docker-compose.prod.yml up -d
+            echo "Deployed successfully with production configuration!"

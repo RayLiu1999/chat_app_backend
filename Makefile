@@ -1,12 +1,15 @@
 # Makefile for Chat App Backend
-# 簡化 Docker Compose 和常用操作指令
+# 用於本地開發環境的指令集
+# 注意：此檔案不會部署到生產環境
 
-.PHONY: help dev prod test clean build logs status restart stop start shell db-backup db-restore test-limit test-smoke
+.PHONY: help dev dev-logs dev-down dev-restart build logs status ps restart stop start
+.PHONY: shell mongo-shell redis-cli test test-coverage test-smoke test-limit test-ws test-analyze
+.PHONY: clean clean-dev fmt lint tidy run env-check install-deps init
 
 # 預設顯示幫助訊息
 help:
 	@echo "==================================================================="
-	@echo "  Chat App Backend - Makefile 指令列表"
+	@echo "  Chat App Backend - 本地開發環境 Makefile"
 	@echo "==================================================================="
 	@echo ""
 	@echo "📦 開發環境 (Development):"
@@ -15,32 +18,24 @@ help:
 	@echo "  make dev-down         - 停止並移除開發環境容器"
 	@echo "  make dev-restart      - 重啟開發環境"
 	@echo ""
-	@echo "🚀 生產環境 (Production):"
-	@echo "  make prod             - 啟動生產環境 (detached mode)"
-	@echo "  make prod-logs        - 啟動生產環境並顯示日誌"
-	@echo "  make prod-down        - 停止並移除生產環境容器"
-	@echo "  make prod-restart     - 重啟生產環境"
-	@echo ""
 	@echo "🔧 通用操作:"
-	@echo "  make build            - 重新構建 Docker 映像"
-	@echo "  make logs             - 查看當前環境日誌 (dev)"
+	@echo "  make build            - 建置 Docker 映像"
+	@echo "  make rebuild          - 強制重新建置 (無快取)"
+	@echo "  make logs             - 查看當前環境日誌"
+	@echo "  make logs-app         - 查看應用服務日誌"
 	@echo "  make status           - 查看容器狀態"
 	@echo "  make ps               - 查看運行中的容器"
-	@echo "  make restart          - 重啟應用服務 (dev)"
-	@echo "  make stop             - 停止所有服務 (dev)"
-	@echo "  make start            - 啟動已停止的服務 (dev)"
-	@echo "  make clean            - 清理所有容器、映像、卷"
+	@echo "  make stats            - 實時資源使用統計"
+	@echo "  make health           - 檢查應用健康狀態"
+	@echo "  make restart          - 重啟應用服務"
+	@echo "  make stop             - 停止所有服務"
+	@echo "  make start            - 啟動已停止的服務"
+	@echo "  make clean            - 清理開發環境容器和卷"
 	@echo ""
 	@echo "🐚 容器互動:"
-	@echo "  make shell            - 進入應用容器 shell (dev)"
-	@echo "  make shell-prod       - 進入應用容器 shell (prod)"
-	@echo "  make mongo-shell      - 進入 MongoDB shell (dev)"
-	@echo "  make redis-cli        - 進入 Redis CLI (dev)"
-	@echo ""
-	@echo "💾 資料庫操作:"
-	@echo "  make db-backup        - 備份 MongoDB 資料"
-	@echo "  make db-restore       - 恢復 MongoDB 資料"
-	@echo "  make db-clean         - 清空 MongoDB 資料 (危險!)"
+	@echo "  make shell            - 進入應用容器 shell"
+	@echo "  make mongo-shell      - 進入 MongoDB shell"
+	@echo "  make redis-cli        - 進入 Redis CLI"
 	@echo ""
 	@echo "🧪 測試:"
 	@echo "  make test             - 執行單元測試"
@@ -48,19 +43,19 @@ help:
 	@echo "  make test-limit       - 執行極限測試 (k6)"
 	@echo "  make test-ws          - 執行 WebSocket 壓力測試"
 	@echo "  make test-coverage    - 執行測試並生成覆蓋率報告"
+	@echo "  make test-analyze     - 分析最新測試結果"
 	@echo ""
-	@echo "🏗️  建置:"
-	@echo "  make build-dev        - 建置開發環境映像"
-	@echo "  make build-prod       - 建置生產環境映像"
-	@echo "  make rebuild          - 強制重新建置 (無快取)"
+	@echo "🏗️  Go 開發:"
+	@echo "  make run              - 本地執行應用"
+	@echo "  make fmt              - 格式化程式碼"
+	@echo "  make lint             - 程式碼檢查"
+	@echo "  make tidy             - 整理依賴"
 	@echo ""
-	@echo "📊 監控:"
-	@echo "  make stats            - 實時顯示資源使用統計"
-	@echo "  make health           - 檢查應用健康狀態"
-	@echo "  make metrics          - 查看 Prometheus 指標"
-	@echo "  make monitoring-up    - 啟動監控整合 (連接到 prometheus-grafana)"
-	@echo "  make monitoring-down  - 停止監控整合"
-	@echo "  make check-network    - 檢查 prometheus-grafana network"
+	@echo "🛠️  環境設置:"
+	@echo "  make env-check        - 檢查環境變數"
+	@echo "  make env-example      - 生成 .env.example"
+	@echo "  make install-deps     - 安裝依賴"
+	@echo "  make init             - 初始化專案"
 	@echo ""
 	@echo "==================================================================="
 
@@ -89,43 +84,12 @@ dev-restart:
 	@echo "✅ 開發環境已重啟"
 
 # ============================================
-# 生產環境指令
-# ============================================
-
-prod:
-	@echo "🚀 啟動生產環境..."
-	docker-compose -f docker-compose.prod.yml up -d
-	@echo "✅ 生產環境已啟動"
-	@echo "⚠️  請確保已設置 .env.production 文件"
-
-prod-logs:
-	@echo "🚀 啟動生產環境並顯示日誌..."
-	docker-compose -f docker-compose.prod.yml up
-
-prod-down:
-	@echo "🛑 停止生產環境..."
-	docker-compose -f docker-compose.prod.yml down
-
-prod-restart:
-	@echo "🔄 重啟生產環境..."
-	docker-compose -f docker-compose.prod.yml restart
-	@echo "✅ 生產環境已重啟"
-
-# ============================================
 # 建置指令
 # ============================================
 
 build:
 	@echo "🏗️  建置 Docker 映像..."
 	docker-compose -f docker-compose.dev.yml build
-
-build-dev:
-	@echo "🏗️  建置開發環境映像..."
-	docker-compose -f docker-compose.dev.yml build
-
-build-prod:
-	@echo "🏗️  建置生產環境映像..."
-	docker-compose -f docker-compose.prod.yml build
 
 rebuild:
 	@echo "🏗️  強制重新建置 (無快取)..."
@@ -186,10 +150,6 @@ shell:
 	@echo "🐚 進入應用容器..."
 	docker exec -it chat_app_backend_dev sh
 
-shell-prod:
-	@echo "🐚 進入生產應用容器..."
-	docker exec -it chat_app_backend_prod sh
-
 mongo-shell:
 	@echo "🍃 進入 MongoDB shell..."
 	docker exec -it chat_mongodb_dev mongosh -u ${MONGO_INITDB_ROOT_USERNAME} -p ${MONGO_INITDB_ROOT_PASSWORD}
@@ -197,31 +157,6 @@ mongo-shell:
 redis-cli:
 	@echo "📮 進入 Redis CLI..."
 	docker exec -it chat_redis_dev redis-cli -a ${REDIS_PASSWORD}
-
-# ============================================
-# 資料庫操作
-# ============================================
-
-db-backup:
-	@echo "💾 備份 MongoDB 資料..."
-	@mkdir -p backups/mongodb
-	docker exec chat_mongodb_dev mongodump --username=${MONGO_INITDB_ROOT_USERNAME} --password=${MONGO_INITDB_ROOT_PASSWORD} --authenticationDatabase=admin --out=/backups/mongodb-$(shell date +%Y%m%d_%H%M%S)
-	@echo "✅ 備份完成"
-
-db-restore:
-	@echo "📥 恢復 MongoDB 資料..."
-	@read -p "請輸入備份目錄名稱: " backup_dir; \
-	docker exec chat_mongodb_dev mongorestore --username=${MONGO_INITDB_ROOT_USERNAME} --password=${MONGO_INITDB_ROOT_PASSWORD} --authenticationDatabase=admin /backups/$$backup_dir
-
-db-clean:
-	@echo "⚠️  警告: 此操作將清空所有 MongoDB 資料!"
-	@read -p "確定要繼續嗎? (yes/no): " confirm; \
-	if [ "$$confirm" = "yes" ]; then \
-		docker exec chat_mongodb_dev mongosh -u ${MONGO_INITDB_ROOT_USERNAME} -p ${MONGO_INITDB_ROOT_PASSWORD} --authenticationDatabase admin --eval "db.dropDatabase()"; \
-		echo "✅ 資料庫已清空"; \
-	else \
-		echo "❌ 操作已取消"; \
-	fi
 
 # ============================================
 # 測試
@@ -254,17 +189,15 @@ test-analyze:
 	cd loadtest && npm run analyze:limit
 
 # ============================================
-# 清理
+# 清理（僅限開發環境）
 # ============================================
 
 clean:
-	@echo "🧹 清理所有容器、映像、卷..."
-	@read -p "⚠️  這將刪除所有資料! 確定要繼續嗎? (yes/no): " confirm; \
+	@echo "🧹 清理開發環境容器和卷..."
+	@read -p "⚠️  這將刪除所有開發環境資料! 確定要繼續嗎? (yes/no): " confirm; \
 	if [ "$$confirm" = "yes" ]; then \
 		docker-compose -f docker-compose.dev.yml down -v; \
-		docker-compose -f docker-compose.prod.yml down -v; \
-		docker system prune -af --volumes; \
-		echo "✅ 清理完成"; \
+		echo "✅ 開發環境已清理"; \
 	else \
 		echo "❌ 操作已取消"; \
 	fi
@@ -274,13 +207,8 @@ clean-dev:
 	docker-compose -f docker-compose.dev.yml down -v
 	@echo "✅ 開發環境已清理"
 
-clean-prod:
-	@echo "🧹 清理生產環境容器和卷..."
-	docker-compose -f docker-compose.prod.yml down -v
-	@echo "✅ 生產環境已清理"
-
 # ============================================
-# Go 相關指令
+# Go 開發指令
 # ============================================
 
 run:
@@ -300,7 +228,7 @@ tidy:
 	go mod tidy
 
 # ============================================
-# 實用工具
+# 環境設置與初始化
 # ============================================
 
 env-check:
@@ -330,69 +258,6 @@ init:
 	@echo "🎬 初始化專案..."
 	@make env-check
 	@make install-deps
-	@make build-dev
+	@make build
 	@echo "✅ 專案初始化完成"
 	@echo "💡 使用 'make dev' 啟動開發環境"
-
-# ============================================
-# Prometheus + Grafana 監控整合
-# ============================================
-
-check-network:
-	@echo "🔍 檢查 prometheus-grafana network..."
-	@if docker network inspect prometheus-grafana >/dev/null 2>&1; then \
-		echo "✅ prometheus-grafana network 存在"; \
-		echo ""; \
-		echo "📋 Network 詳細資訊:"; \
-		docker network inspect prometheus-grafana --format='{{range .Containers}}  - {{.Name}} ({{.IPv4Address}}){{println}}{{end}}'; \
-	else \
-		echo "❌ prometheus-grafana network 不存在"; \
-		echo ""; \
-		echo "💡 請先確認您的 prometheus-grafana 容器 network 名稱:"; \
-		echo "   docker inspect prometheus-grafana | grep NetworkMode"; \
-		echo "   docker network ls | grep prometheus"; \
-		echo ""; \
-		echo "然後更新 docker-compose.monitoring.yml 中的 network 名稱"; \
-	fi
-
-monitoring-up:
-	@echo "🚀 啟動監控整合..."
-	@make check-network
-	@echo ""
-	@echo "📊 啟動 Promtail 和連接到監控 network..."
-	docker-compose -f docker-compose.prod.yml -f docker-compose.monitoring.yml up -d
-	@echo "✅ 監控整合已啟動"
-	@echo ""
-	@echo "📍 Metrics endpoint: http://localhost:8111/metrics"
-	@echo "📍 Prometheus: http://your-prometheus:9090"
-	@echo "📍 Grafana: http://your-grafana:3000"
-
-monitoring-down:
-	@echo "🛑 停止監控整合..."
-	docker-compose -f docker-compose.prod.yml -f docker-compose.monitoring.yml down
-	@echo "✅ 監控整合已停止"
-
-metrics:
-	@echo "📊 查看 Prometheus 指標..."
-	@echo ""
-	@if curl -f http://localhost:8111/metrics 2>/dev/null; then \
-		echo ""; \
-		echo "✅ Metrics endpoint 正常"; \
-	else \
-		echo "❌ 無法訪問 metrics endpoint"; \
-		echo "💡 請確認應用是否正在運行: make status"; \
-	fi
-
-prometheus-config:
-	@echo "📝 Prometheus 配置範例..."
-	@echo ""
-	@echo "# 在您的 Prometheus 配置中添加:"
-	@echo "scrape_configs:"
-	@echo "  - job_name: 'chat_app_backend'"
-	@echo "    static_configs:"
-	@echo "      - targets: ['chat_app_backend_prod:8111']"
-	@echo "    metrics_path: '/metrics'"
-	@echo "    scrape_interval: 10s"
-	@echo ""
-	@echo "# 然後重新載入 Prometheus:"
-	@echo "curl -X POST http://localhost:9090/-/reload"
