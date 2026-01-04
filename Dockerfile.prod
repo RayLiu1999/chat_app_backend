@@ -1,6 +1,12 @@
 # 使用官方 Go 鏡像作為構建階段
 FROM golang:1.25.3-alpine AS builder
 
+# 版本資訊 ARGs
+ARG VERSION=1.0.0
+ARG BUILD_TIME=unknown
+ARG GIT_COMMIT=unknown
+ARG GIT_BRANCH=unknown
+
 # 安裝必要的工具
 RUN apk add --no-cache git ca-certificates tzdata
 
@@ -16,8 +22,13 @@ RUN go mod download
 # 複製源代碼
 COPY . .
 
-# 構建應用
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
+# 構建應用（使用 ldflags 注入版本資訊）
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo \
+    -ldflags "-X chat_app_backend/version.Version=${VERSION} \
+              -X chat_app_backend/version.BuildTime=${BUILD_TIME} \
+              -X chat_app_backend/version.GitCommit=${GIT_COMMIT} \
+              -X chat_app_backend/version.GitBranch=${GIT_BRANCH}" \
+    -o main .
 
 # 使用輕量級的 alpine 鏡像作為運行階段
 FROM alpine:latest

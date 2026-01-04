@@ -4,6 +4,7 @@ import (
 	"chat_app_backend/app/http/middlewares"
 	"chat_app_backend/config"
 	"chat_app_backend/di"
+	"chat_app_backend/version"
 	"path/filepath"
 	"time"
 
@@ -30,6 +31,11 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, controllers *di.ControllerCo
 	r.GET("/health", controllers.HealthController.HealthCheck)
 	r.GET("/health/proxy", middlewares.PublicHealthCheckAuth(cfg), controllers.HealthController.ProxyCheck)
 	r.GET("/health/detailed", middlewares.HealthCheckAuth(cfg), controllers.HealthController.DetailedHealthCheck)
+
+	// 版本資訊 API
+	r.GET("/version", func(c *gin.Context) {
+		c.JSON(200, version.GetInfo())
+	})
 
 	// 驗證前端來源
 	if cfg.Server.Mode == config.ProductionMode {

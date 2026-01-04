@@ -9,6 +9,10 @@ services:
       args:
         APP_UID: ${UID}
         APP_GID: ${GID}
+        VERSION: ${VERSION:-1.0.0}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+        GIT_BRANCH: ${GIT_BRANCH:-unknown}
       dockerfile: Dockerfile.prod
     container_name: chat_app_backend_prod
     restart: always
@@ -26,11 +30,15 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      - ./uploads:/app/uploads:ro  # 生產環境只讀
+      - ./uploads:/app/uploads:ro # 生產環境只讀
     networks:
       - chat-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:${SERVER_PORT:-8111}/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -f http://localhost:${SERVER_PORT:-8111}/health || exit 1",
+        ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -42,7 +50,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "4"      # 生產環境更多資源
+          cpus: "4" # 生產環境更多資源
           memory: 2G
         reservations:
           cpus: "1"
@@ -59,7 +67,7 @@ services:
     container_name: chat_mongodb_prod
     restart: always
     ports:
-      - "127.0.0.1:${MONGODB_OUT_PORT:-27017}:27017"  # 僅本地訪問
+      - "127.0.0.1:${MONGODB_OUT_PORT:-27017}:27017" # 僅本地訪問
     env_file: .env.production
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
@@ -101,13 +109,13 @@ services:
     container_name: chat_redis_prod
     restart: always
     ports:
-      - "127.0.0.1:${REDIS_PORT:-6379}:6379"  # 僅本地訪問
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379" # 僅本地訪問
     env_file: .env.production
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
     volumes:
       - redis-data-prod:/data
-      - ./backups/redis:/backups  # 備份目錄
+      - ./backups/redis:/backups # 備份目錄
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD} --save 900 1 --save 300 10 --save 60 10000 --maxmemory 256mb --maxmemory-policy allkeys-lru
     networks:
       - chat-network
