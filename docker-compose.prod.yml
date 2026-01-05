@@ -108,8 +108,6 @@ services:
     image: redis:7.2-alpine
     container_name: chat_redis_prod
     restart: always
-    ports:
-      - "127.0.0.1:${REDIS_PORT:-6379}:6379" # 僅本地訪問
     env_file: ./.env.production
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
