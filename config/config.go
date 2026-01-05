@@ -68,7 +68,7 @@ func LoadConfig() {
 	// 根據環境載入對應的 .env 檔案
 	// Docker 環境會透過 docker-compose 的 env_file 載入，這裡是給本地開發用
 	envFile := ".env.development"
-	if os.Getenv("SERVER_MODE") == "production" {
+	if os.Getenv("SERVER_MODE") == string(ProductionMode) {
 		envFile = ".env.production"
 	}
 

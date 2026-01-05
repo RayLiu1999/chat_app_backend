@@ -148,6 +148,8 @@ jobs:
             --exclude='.github/' \
             --exclude='tmp/' \
             --exclude='test_results/' \
+            --exclude='.env.example' \
+            --exclude='.env.development' \
             --exclude='.env.production' \
             --exclude='uploads/' \
             --exclude='Makefile' \

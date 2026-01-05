@@ -68,7 +68,7 @@ services:
     restart: always
     ports:
       - "127.0.0.1:${MONGODB_OUT_PORT:-27017}:27017" # 僅本地訪問
-    env_file: .env.production
+    env_file: ./.env.production
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
@@ -110,7 +110,7 @@ services:
     restart: always
     ports:
       - "127.0.0.1:${REDIS_PORT:-6379}:6379" # 僅本地訪問
-    env_file: .env.production
+    env_file: ./.env.production
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
     volumes:
