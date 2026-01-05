@@ -58,11 +58,11 @@ services:
 
   # MongoDB 資料庫 - 開發環境
   mongodb:
-    image: mongo:7.0
+    image: mongo:7.0.28
     container_name: chat_mongodb_dev
     restart: unless-stopped
     ports:
-      - "${MONGODB_OUT_PORT:-27017}:27017"
+      - "127.0.0.1:${MONGODB_OUT_PORT:-27017}:27017"
     env_file: ./.env.development
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
@@ -99,7 +99,7 @@ services:
     container_name: chat_redis_dev
     restart: unless-stopped
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     env_file: ./.env.development
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD}

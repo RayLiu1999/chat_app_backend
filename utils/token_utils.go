@@ -5,21 +5,21 @@ import (
 	"errors"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // AccessTokenClaims 定義了 access token 中的聲明
 type AccessTokenClaims struct {
 	UserID string `json:"user_id"`
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 }
 
 // RefreshTokenClaims 定義了 refresh token 中的聲明
 type RefreshTokenClaims struct {
 	UserID string `json:"user_id"`
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 }
 
 type TokenResponse struct {
@@ -38,12 +38,13 @@ func GenAccessToken(userID string) (TokenResponse, error) {
 
 	// 將小時轉換為分鐘
 	accessTokenExpireDuration := time.Duration(accessTokenExpireHours*60) * time.Minute
-	expiresAt := time.Now().Add(accessTokenExpireDuration).Unix()
+	expireTime := time.Now().Add(accessTokenExpireDuration)
+	expiresAt := jwt.NewNumericDate(expireTime)
 
 	// 設置 access token 的聲明
 	accessTokenClaims := &AccessTokenClaims{
 		UserID: userID,
-		StandardClaims: jwt.StandardClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: expiresAt,
 		},
 	}
@@ -58,7 +59,7 @@ func GenAccessToken(userID string) (TokenResponse, error) {
 
 	return TokenResponse{
 		Token:     accessTokenString,
-		ExpiresAt: expiresAt,
+		ExpiresAt: expireTime.Unix(),
 	}, nil
 }
 
@@ -73,12 +74,13 @@ func GenRefreshToken(userID string) (TokenResponse, error) {
 
 	// 將小時轉換為分鐘
 	refreshTokenExpireDuration := time.Duration(refreshTokenExpireHours*60) * time.Minute
-	expiresAt := time.Now().Add(refreshTokenExpireDuration).Unix()
+	expireTime := time.Now().Add(refreshTokenExpireDuration)
+	expiresAt := jwt.NewNumericDate(expireTime)
 
 	// 設置 refresh token 的聲明
 	refreshTokenClaims := &RefreshTokenClaims{
 		UserID: userID,
-		StandardClaims: jwt.StandardClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: expiresAt,
 		},
 	}
@@ -93,7 +95,7 @@ func GenRefreshToken(userID string) (TokenResponse, error) {
 
 	return TokenResponse{
 		Token:     refreshTokenString,
-		ExpiresAt: expiresAt,
+		ExpiresAt: expireTime.Unix(),
 	}, nil
 }
 
@@ -106,7 +108,8 @@ func ValidateAccessToken(tokenString string) (bool, error) {
 	jwtSecret := []byte(config.AppConfig.JWT.AccessSecret)
 
 	// 解析和驗證 JWT 簽章
-	token, err := jwt.ParseWithClaims(tokenString, &AccessTokenClaims{}, func(token *jwt.Token) (any, error) {
+	// v5 ParseWithClaims 會自動驗證過期時間 (exp)
+	token, err := jwt.ParseWithClaims(tokenString, &AccessTokenClaims{}, func(token *jwt.Token) (interface{}, error) {
 		// 檢查簽名方法是否為預期的 HMAC 方法
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("unexpected signing method")
@@ -119,11 +122,7 @@ func ValidateAccessToken(tokenString string) (bool, error) {
 	}
 
 	// 檢查 token 是否有效
-	if claims, ok := token.Claims.(*AccessTokenClaims); ok && token.Valid {
-		// 檢查 token 是否過期
-		if claims.ExpiresAt < time.Now().Unix() {
-			return false, errors.New("token is expired")
-		}
+	if _, ok := token.Claims.(*AccessTokenClaims); ok && token.Valid {
 		return true, nil
 	}
 
@@ -139,7 +138,7 @@ func GetUserFromToken(tokenString string) (string, primitive.ObjectID, error) {
 	jwtSecret := []byte(config.AppConfig.JWT.AccessSecret)
 
 	// 解析和驗證 JWT token
-	token, err := jwt.ParseWithClaims(tokenString, &AccessTokenClaims{}, func(token *jwt.Token) (any, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &AccessTokenClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return jwtSecret, nil
 	})
 	if err != nil {
@@ -147,7 +146,7 @@ func GetUserFromToken(tokenString string) (string, primitive.ObjectID, error) {
 	}
 
 	claims, ok := token.Claims.(*AccessTokenClaims)
-	if !ok {
+	if !ok || !token.Valid {
 		return "", primitive.NilObjectID, errors.New("invalid token")
 	}
 

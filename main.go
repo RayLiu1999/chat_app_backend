@@ -67,8 +67,10 @@ func main() {
 	backgroundTasks := services.NewBackgroundTasks(deps.Services.UserService)
 	go backgroundTasks.StartAllBackgroundTasks()
 
-	// 註冊 pprof
-	pprof.Register(r)
+	// 註冊 pprof（僅限非生產環境，避免暴露敏感效能資訊）
+	if config.AppConfig.Server.Mode != config.ProductionMode {
+		pprof.Register(r)
+	}
 
 	// 設置路由
 	routes.SetupRoutes(r, config.AppConfig, deps.Controllers)

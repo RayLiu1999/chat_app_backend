@@ -28,5 +28,8 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 # 創建必要的目錄
 RUN mkdir -p uploads && chown -R appuser:appgroup /app
 
+# 切換到非 root 使用者
+USER appuser
+
 # 運行應用
 CMD ["air"]

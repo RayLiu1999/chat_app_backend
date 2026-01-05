@@ -286,7 +286,8 @@ chat_app_backend/
 ├── backup/                   # 歷史文檔與優化記錄
 ├── loadtest/                 # K6 負載測試腳本
 ├── uploads/                  # 靜態檔案上傳目錄
-├── docker-compose.yml        # Docker 開發環境配置
+├── docker-compose.dev.yml    # Docker 開發環境配置
+├── docker-compose.prod.yml   # Docker 生產環境配置
 └── main.go                   # 程式入口點
 ```
 

@@ -110,7 +110,12 @@ jobs:
           fi
           echo "BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
           echo "GIT_COMMIT=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-          echo "GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_OUTPUT
+          # GIT_BRANCH: tag 部署時使用 main，避免 detached HEAD 返回 "HEAD"
+          if [[ $GITHUB_REF == refs/tags/v* ]]; then
+            echo "GIT_BRANCH=main" >> $GITHUB_OUTPUT
+          else
+            echo "GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_OUTPUT
+          fi
 
       - name: Set up SSH key
         uses: webfactory/ssh-agent@v0.9.0
