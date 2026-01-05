@@ -3,15 +3,15 @@ name: CI/CD Pipeline
 on:
   push:
     branches:
-      - main        # 推送到 main 時執行 CI（測試）
+      - main # 推送到 main 時執行 CI（測試）
     tags:
-      - 'v*'        # 推送 v 開頭的 tag 時觸發 CD（部署）
+      - "v*" # 推送 v 開頭的 tag 時觸發 CD（部署）
   pull_request:
     branches:
-      - main        # PR 到 main 時執行 CI（測試）
+      - main # PR 到 main 時執行 CI（測試）
 
 env:
-  GO_VERSION: '1.25.3'
+  GO_VERSION: "1.25.3"
 
 jobs:
   # ============================================
@@ -92,7 +92,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # 獲取完整歷史以取得 tag 資訊
+          fetch-depth: 0 # 獲取完整歷史以取得 tag 資訊
 
       - name: Extract version info
         id: version
@@ -172,15 +172,15 @@ jobs:
             echo "📅 建置時間: ${{ steps.version.outputs.BUILD_TIME }}"
             echo "🔖 Git Commit: ${{ steps.version.outputs.GIT_COMMIT }}"
             echo "=========================================="
-            
+
             mkdir -p uploads
-            
+
             # 使用 ldflags 注入版本資訊
             export VERSION="${{ steps.version.outputs.VERSION }}"
             export BUILD_TIME="${{ steps.version.outputs.BUILD_TIME }}"
             export GIT_COMMIT="${{ steps.version.outputs.GIT_COMMIT }}"
             export GIT_BRANCH="${{ steps.version.outputs.GIT_BRANCH }}"
-            
+
             docker-compose -f docker-compose.prod.yml down
             docker-compose -f docker-compose.prod.yml build --no-cache \
               --build-arg VERSION=$VERSION \
@@ -188,7 +188,7 @@ jobs:
               --build-arg GIT_COMMIT=$GIT_COMMIT \
               --build-arg GIT_BRANCH=$GIT_BRANCH
             docker-compose -f docker-compose.prod.yml up -d
-            
+
             echo "✅ 部署成功！版本: v$VERSION"
 
   # ============================================
@@ -199,7 +199,7 @@ jobs:
     needs: deploy
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -217,7 +217,7 @@ jobs:
         run: |
           # 取得上一個 tag
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-          
+
           if [ -n "$PREV_TAG" ]; then
             echo "📝 生成 $PREV_TAG 到 v${{ steps.version.outputs.VERSION }} 的變更日誌"
             CHANGELOG=$(git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges)
@@ -225,12 +225,12 @@ jobs:
             echo "📝 生成首次發布的變更日誌"
             CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges -20)
           fi
-          
+
           # 將變更日誌寫入檔案（處理多行）
           echo "$CHANGELOG" > changelog.txt
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           name: "Chat App Backend v${{ steps.version.outputs.VERSION }}"
           body_path: changelog.txt

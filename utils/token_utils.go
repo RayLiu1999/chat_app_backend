@@ -139,6 +139,10 @@ func GetUserFromToken(tokenString string) (string, primitive.ObjectID, error) {
 
 	// 解析和驗證 JWT token
 	token, err := jwt.ParseWithClaims(tokenString, &AccessTokenClaims{}, func(token *jwt.Token) (interface{}, error) {
+		// 檢查簽名方法是否為預期的 HMAC 方法
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("unexpected signing method")
+		}
 		return jwtSecret, nil
 	})
 	if err != nil {
@@ -165,8 +169,13 @@ func GetAccessTokenByHeader(c *gin.Context) (string, error) {
 		return "", errors.New("no authorization header")
 	}
 
-	// 驗證 token
-	accessToken := authHeader[len("Bearer "):]
+	// 驗證 Bearer 前綴
+	const bearerPrefix = "Bearer "
+	if len(authHeader) < len(bearerPrefix) || authHeader[:len(bearerPrefix)] != bearerPrefix {
+		return "", errors.New("invalid authorization header format")
+	}
+
+	accessToken := authHeader[len(bearerPrefix):]
 	return accessToken, nil
 }
 
