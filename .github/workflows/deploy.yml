@@ -186,13 +186,16 @@ jobs:
             export GIT_COMMIT="${{ steps.version.outputs.GIT_COMMIT }}"
             export GIT_BRANCH="${{ steps.version.outputs.GIT_BRANCH }}"
 
-            docker-compose -f docker-compose.prod.yml down
-            docker-compose -f docker-compose.prod.yml build --no-cache \
+            # 載入環境變數供 docker-compose 使用
+            set -a && source .env.production && set +a
+
+            docker-compose --env-file .env.production -f docker-compose.prod.yml down
+            docker-compose --env-file .env.production -f docker-compose.prod.yml build --no-cache \
               --build-arg VERSION=$VERSION \
               --build-arg BUILD_TIME=$BUILD_TIME \
               --build-arg GIT_COMMIT=$GIT_COMMIT \
               --build-arg GIT_BRANCH=$GIT_BRANCH
-            docker-compose -f docker-compose.prod.yml up -d
+            docker-compose --env-file .env.production -f docker-compose.prod.yml up -d
 
             echo "✅ 部署成功！版本: v$VERSION"
 
