@@ -4,14 +4,23 @@ import (
 	"chat_app_backend/app/http/middlewares"
 	"chat_app_backend/config"
 	"chat_app_backend/di"
+	"chat_app_backend/version"
 	"path/filepath"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	ginprometheus "github.com/zsais/go-gin-prometheus"
 )
 
 func SetupRoutes(r *gin.Engine, cfg *config.Config, controllers *di.ControllerContainer) {
+	// 初始化 Prometheus 監控
+	p := ginprometheus.NewPrometheus("gin")
+	p.Use(r)
+
+	// 使用 JSON 日誌中間件 (配合 Loki)
+	r.Use(middlewares.JSONLoggerMiddleware())
+
 	// 設定靜態文件服務
 	// 使用絕對路徑，確保在任何環境下都可以正確訪問上傳的文件
 	uploadsAbsPath := filepath.Join(".", "uploads")
@@ -22,6 +31,11 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, controllers *di.ControllerCo
 	r.GET("/health", controllers.HealthController.HealthCheck)
 	r.GET("/health/proxy", middlewares.PublicHealthCheckAuth(cfg), controllers.HealthController.ProxyCheck)
 	r.GET("/health/detailed", middlewares.HealthCheckAuth(cfg), controllers.HealthController.DetailedHealthCheck)
+
+	// 版本資訊 API
+	r.GET("/version", func(c *gin.Context) {
+		c.JSON(200, version.GetInfo())
+	})
 
 	// 驗證前端來源
 	if cfg.Server.Mode == config.ProductionMode {

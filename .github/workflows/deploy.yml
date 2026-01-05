@@ -1,40 +1,25 @@
-name: Deploy to VPS
+name: CI/CD Pipeline
 
 on:
   push:
     branches:
-      - main
+      - main # 推送到 main 時執行 CI（測試）
+    tags:
+      - "v*" # 推送 v 開頭的 tag 時觸發 CD（部署）
+  pull_request:
+    branches:
+      - main # PR 到 main 時執行 CI（測試）
+
+env:
+  GO_VERSION: "1.25.3"
 
 jobs:
+  # ============================================
+  # CI 階段 - 測試（PR、推送 main、推送 tag 都會執行）
+  # ============================================
   test:
     name: Run Tests
     runs-on: ubuntu-latest
-    # 註解：目前所有測試都使用 Mock，不需要真實的 MongoDB/Redis 服務
-    # 如果未來新增整合測試，可以取消註解以下 services 區塊
-    # services:
-    #   mongodb:
-    #     image: mongo:7.0
-    #     ports:
-    #       - 27017:27017
-    #     env:
-    #       MONGO_INITDB_ROOT_USERNAME: test_user
-    #       MONGO_INITDB_ROOT_PASSWORD: test_password
-    #     options: >-
-    #       --health-cmd "mongosh --eval 'db.runCommand({ ping: 1 })'"
-    #       --health-interval 10s
-    #       --health-timeout 5s
-    #       --health-retries 5
-    #
-    #   redis:
-    #     image: redis:7-alpine
-    #     ports:
-    #       - 6379:6379
-    #     options: >-
-    #       --health-cmd "redis-cli ping"
-    #       --health-interval 10s
-    #       --health-timeout 5s
-    #       --health-retries 5
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -42,7 +27,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.25.3"
+          go-version: ${{ env.GO_VERSION }}
 
       - name: Cache Go modules
         uses: actions/cache@v4
@@ -58,39 +43,6 @@ jobs:
       - name: Install dependencies
         run: go mod tidy
 
-      # 註解：目前單元測試使用 Mock，不需要環境變數
-      # 如果未來需要整合測試，可以取消註解
-      # - name: Create test environment file
-      #   run: |
-      #     cat > .env.test << EOF
-      #     # 測試環境配置
-      #     GIN_MODE=test
-      #     SERVER_MODE=test
-      #     SERVER_PORT=8111
-      #
-      #     # MongoDB 測試配置
-      #     MONGO_URI=mongodb://test_user:test_password@localhost:27017
-      #     MONGO_DB_NAME=chat_app_test
-      #
-      #     # Redis 測試配置
-      #     REDIS_HOST=localhost
-      #     REDIS_PORT=6379
-      #     REDIS_PASSWORD=
-      #     REDIS_DB=0
-      #
-      #     # JWT 測試配置
-      #     JWT_SECRET=test_secret_key_for_testing_only
-      #     JWT_ACCESS_EXPIRY=15
-      #     JWT_REFRESH_EXPIRY=7
-      #
-      #     # CSRF 測試配置
-      #     CSRF_SECRET=test_csrf_secret_key
-      #
-      #     # 其他配置
-      #     ALLOWED_ORIGINS=http://localhost:3000
-      #     TIMEZONE=Asia/Taipei
-      #     EOF
-
       - name: Run tests
         run: |
           echo "執行單元測試（使用 Mock）..."
@@ -100,16 +52,6 @@ jobs:
         run: |
           go tool cover -html=coverage.out -o coverage.html
           go tool cover -func=coverage.out
-
-      # - name: Upload coverage to Codecov (optional)
-      #   uses: codecov/codecov-action@v4
-      #   if: success()
-      #   with:
-      #     file: ./coverage.out
-      #     flags: unittests
-      #     name: codecov-umbrella
-      #     fail_ci_if_error: false
-      #   continue-on-error: true
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -135,14 +77,45 @@ jobs:
           else
             echo "✅ 測試覆蓋率 ${COVERAGE}% 符合門檻 ${THRESHOLD}%"
           fi
-  build-and-deploy:
+
+  # ============================================
+  # CD 階段 - 部署（僅限版本標籤 v* 觸發）
+  # ============================================
+  deploy:
     name: Build and Deploy
-    needs: test  # 只有測試通過才會執行部署
+    needs: test
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # 只在推送版本標籤時執行部署
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 獲取完整歷史以取得 tag 資訊
+
+      - name: Extract version info
+        id: version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+            echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+            echo "IS_RELEASE=true" >> $GITHUB_OUTPUT
+            echo "📦 部署版本: v$VERSION"
+          else
+            VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
+            echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+            echo "IS_RELEASE=false" >> $GITHUB_OUTPUT
+            echo "🔄 部署開發版本: $VERSION"
+          fi
+          echo "BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
+          echo "GIT_COMMIT=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          # GIT_BRANCH: tag 部署時使用 main，避免 detached HEAD 返回 "HEAD"
+          if [[ $GITHUB_REF == refs/tags/v* ]]; then
+            echo "GIT_BRANCH=main" >> $GITHUB_OUTPUT
+          else
+            echo "GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_OUTPUT
+          fi
 
       - name: Set up SSH key
         uses: webfactory/ssh-agent@v0.9.0
@@ -175,9 +148,18 @@ jobs:
             --exclude='.env' \
             --exclude='.env.example' \
             --exclude='uploads/' \
+            --exclude='Makefile' \
+            --exclude='loadtest/' \
+            --exclude='*_test.go' \
+            --exclude='docs/' \
+            --exclude='README.md' \
+            --exclude='docker-compose.dev.yml' \
+            --exclude='coverage.out' \
+            --exclude='coverage.html' \
+            --exclude='backups/' \
             . ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:~/docker_pj/chat_app_backend/
 
-      - name: Run remote deploy/reload command
+      - name: Deploy with version info
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -185,10 +167,74 @@ jobs:
           key: ${{ secrets.VPS_DEPLOY_KEY }}
           script: |
             cd ~/docker_pj/chat_app_backend
-            echo "Building and restarting containers..."
-            mkdir -p uploads # 確保 uploads 目錄存在
-            mkdir -p logs   # 確保 logs 目錄存在
-            docker-compose down
-            docker-compose build --no-cache
-            docker-compose up -d
-            echo "Deployed!"
+            echo "=========================================="
+            echo "🚀 部署版本: v${{ steps.version.outputs.VERSION }}"
+            echo "📅 建置時間: ${{ steps.version.outputs.BUILD_TIME }}"
+            echo "🔖 Git Commit: ${{ steps.version.outputs.GIT_COMMIT }}"
+            echo "=========================================="
+
+            mkdir -p uploads
+
+            # 使用 ldflags 注入版本資訊
+            export VERSION="${{ steps.version.outputs.VERSION }}"
+            export BUILD_TIME="${{ steps.version.outputs.BUILD_TIME }}"
+            export GIT_COMMIT="${{ steps.version.outputs.GIT_COMMIT }}"
+            export GIT_BRANCH="${{ steps.version.outputs.GIT_BRANCH }}"
+
+            docker-compose -f docker-compose.prod.yml down
+            docker-compose -f docker-compose.prod.yml build --no-cache \
+              --build-arg VERSION=$VERSION \
+              --build-arg BUILD_TIME=$BUILD_TIME \
+              --build-arg GIT_COMMIT=$GIT_COMMIT \
+              --build-arg GIT_BRANCH=$GIT_BRANCH
+            docker-compose -f docker-compose.prod.yml up -d
+
+            echo "✅ 部署成功！版本: v$VERSION"
+
+  # ============================================
+  # 發布階段 (僅限版本標籤)
+  # ============================================
+  release:
+    name: Create GitHub Release
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # 取得上一個 tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          if [ -n "$PREV_TAG" ]; then
+            echo "📝 生成 $PREV_TAG 到 v${{ steps.version.outputs.VERSION }} 的變更日誌"
+            CHANGELOG=$(git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          else
+            echo "📝 生成首次發布的變更日誌"
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges -20)
+          fi
+
+          # 將變更日誌寫入檔案（處理多行）
+          echo "$CHANGELOG" > changelog.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Chat App Backend v${{ steps.version.outputs.VERSION }}"
+          body_path: changelog.txt
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.VERSION, '-') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

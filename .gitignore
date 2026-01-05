@@ -21,7 +21,7 @@ Thumbs.db
 
 # 環境變數設定檔 (敏感資訊)
 .env
-.env.local
+.env.development
 .env.production
 
 # 暫存與上傳資料夾
@@ -41,3 +41,8 @@ coverage*.html
 
 # 備份檔案
 *.bak
+
+# 監控系統範例（本地模板）
+/monitoring/
+
+/doc

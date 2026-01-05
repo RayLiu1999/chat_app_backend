@@ -103,7 +103,6 @@ chat_app_backend/
 2. **Redis**
    - 使用有意義的鍵命名規範
    - 設置適當的過期時間
-   - 使用 Pub/Sub 進行即時通訊
 
 ### API 設計規範
 1. **RESTful API**
