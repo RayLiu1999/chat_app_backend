@@ -233,17 +233,17 @@ tidy:
 
 env-check:
 	@echo "🔍 檢查環境變數..."
-	@if [ ! -f .env ]; then \
-		echo "❌ .env 文件不存在"; \
+	@if [ ! -f .env.development ]; then \
+		echo "❌ .env.development 文件不存在"; \
 		echo "💡 請複製 .env.example 並配置:"; \
-		echo "   cp .env.example .env"; \
+		echo "   cp .env.example .env.development"; \
 	else \
-		echo "✅ .env 文件存在"; \
+		echo "✅ .env.development 文件存在"; \
 	fi
 
 env-example:
 	@echo "📝 生成 .env.example..."
-	@echo "# 請參考此範例配置您的 .env 文件" > .env.example
+	@echo "# 請參考此範例配置您的 .env.development 文件" > .env.example
 	@echo "SERVER_PORT=8111" >> .env.example
 	@echo "✅ .env.example 已生成"
 

@@ -65,9 +65,15 @@ type UploadConfig struct {
 var AppConfig *Config
 
 func LoadConfig() {
-	// 載入 .env 檔案
-	if err := godotenv.Load(); err != nil {
-		log.Println("未找到 .env 檔案，使用系統環境變數")
+	// 根據環境載入對應的 .env 檔案
+	// Docker 環境會透過 docker-compose 的 env_file 載入，這裡是給本地開發用
+	envFile := ".env.development"
+	if os.Getenv("SERVER_MODE") == "production" {
+		envFile = ".env.production"
+	}
+
+	if err := godotenv.Load(envFile); err != nil {
+		log.Printf("未找到 %s 檔案，使用系統環境變數", envFile)
 	}
 
 	AppConfig = &Config{

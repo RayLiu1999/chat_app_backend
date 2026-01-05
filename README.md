@@ -167,8 +167,8 @@ graph TD
 make init
 
 # 2. 配置環境變數
-cp .env.example .env
-# 編輯 .env 文件
+cp .env.example .env.development
+# 編輯 .env.development 文件
 
 # 3. 啟動開發環境
 make dev
@@ -190,7 +190,7 @@ make help
 go mod tidy
 
 # 2. 配置環境變數
-cp .env.example .env
+cp .env.example .env.development
 
 # 3. 啟動服務（開發環境）
 docker-compose -f docker-compose.dev.yml up -d
@@ -210,7 +210,7 @@ go mod tidy
 # 2. 確保 MongoDB 和 Redis 運行中
 
 # 3. 配置環境變數
-cp .env.example .env
+cp .env.example .env.development
 
 # 4. 啟動應用
 go run main.go

@@ -144,17 +144,18 @@ jobs:
           echo "Deploying to VPS..."
           rsync -avz --delete \
             --exclude='.git/' \
+            --exclude='.gitignore' \
             --exclude='.github/' \
             --exclude='tmp/' \
             --exclude='test_results/' \
-            --exclude='.env' \
-            --exclude='.env.example' \
+            --exclude='.env.production' \
             --exclude='uploads/' \
             --exclude='Makefile' \
             --exclude='loadtest/' \
             --exclude='*_test.go' \
             --exclude='docs/' \
             --exclude='README.md' \
+            --exclude='Dockerfile.dev' \
             --exclude='docker-compose.dev.yml' \
             --exclude='coverage.out' \
             --exclude='coverage.html' \
