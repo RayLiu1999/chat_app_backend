@@ -18,7 +18,7 @@ services:
     restart: always
     ports:
       - "${SERVER_PORT:-8111}:${SERVER_PORT:-8111}"
-    env_file: .env.production
+    env_file: ./.env.production
     environment:
       DOCKER_ENV: "true"
       SERVER_MODE: "production"
@@ -30,7 +30,7 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      - ./uploads:/app/uploads  # 需要寫入權限以支援檔案上傳
+      - ./uploads:/app/uploads # 需要寫入權限以支援檔案上傳
     networks:
       - chat-network
     healthcheck:
@@ -68,7 +68,7 @@ services:
     restart: always
     ports:
       - "127.0.0.1:${MONGODB_OUT_PORT:-27017}:27017" # 僅本地訪問
-    env_file: .env.production
+    env_file: ./.env.production
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
@@ -110,7 +110,7 @@ services:
     restart: always
     ports:
       - "127.0.0.1:${REDIS_PORT:-6379}:6379" # 僅本地訪問
-    env_file: .env.production
+    env_file: ./.env.production
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
     volumes:
