@@ -1,0 +1,27 @@
+# ConfigMap - 非敏感配置
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chat-app-config
+  namespace: chat-app
+data:
+  SERVER_PORT: "8111"
+  SERVER_MODE: "development"
+  SERVER_MAIN_DOMAIN: "localhost"
+  SERVER_BASE_URL: "http://localhost"
+  TIMEZONE: "Asia/Taipei"
+  GIN_MODE: "debug"
+  # MongoDB 連線 (使用 K8s 內部 DNS)
+  MONGO_URI: "mongodb:27017"
+  MONGO_DB_NAME: "chat_app"
+  MONGO_AUTH_SOURCE: "admin"
+  # Redis 連線 (使用 K8s 內部 DNS)
+  REDIS_ADDR: "redis:6379"
+  # Token 設定
+  ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+  REFRESH_TOKEN_EXPIRE_HOURS: "72"
+  JWT_ACCESS_EXPIRE_HOURS: "24"
+  JWT_REFRESH_EXPIRE_HOURS: "168"
+  # 檔案上傳
+  UPLOAD_MAX_SIZE: "10485760"
+  UPLOAD_ALLOWED_TYPES: "image/jpeg,image/png,image/gif"

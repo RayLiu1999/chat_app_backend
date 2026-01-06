@@ -5,6 +5,8 @@
 .PHONY: help dev dev-logs dev-down dev-restart build logs status ps restart stop start
 .PHONY: shell mongo-shell redis-cli test test-coverage test-smoke test-limit test-ws test-analyze
 .PHONY: clean clean-dev fmt lint tidy run env-check install-deps init
+.PHONY: scale scale-up scale-down scale-logs scale-status scale-build
+.PHONY: k8s-deploy k8s-delete k8s-scale k8s-status k8s-logs k8s-pods
 
 # 預設顯示幫助訊息
 help:
@@ -17,6 +19,20 @@ help:
 	@echo "  make dev-logs         - 啟動開發環境並顯示日誌"
 	@echo "  make dev-down         - 停止並移除開發環境容器"
 	@echo "  make dev-restart      - 重啟開發環境"
+	@echo ""
+	@echo "🔄 水平擴展測試 (Horizontal Scaling):"
+	@echo "  make scale            - 啟動 3 個實例 (nginx + 3x app)"
+	@echo "  make scale-up N=5     - 擴展到 N 個實例"
+	@echo "  make scale-down       - 停止擴展環境"
+	@echo "  make scale-logs       - 查看擴展環境日誌"
+	@echo "  make scale-status     - 查看實例狀態"
+	@echo ""
+	@echo "☸️  Kubernetes (OrbStack):"
+	@echo "  make k8s-deploy       - 部署到本地 K8s"
+	@echo "  make k8s-scale N=5    - 擴展到 N 個 pods"
+	@echo "  make k8s-status       - 查看部署狀態"
+	@echo "  make k8s-logs         - 查看 pods 日誌"
+	@echo "  make k8s-delete       - 刪除 K8s 部署"
 	@echo ""
 	@echo "🔧 通用操作:"
 	@echo "  make build            - 建置 Docker 映像"
@@ -261,3 +277,101 @@ init:
 	@make build
 	@echo "✅ 專案初始化完成"
 	@echo "💡 使用 'make dev' 啟動開發環境"
+
+# ============================================
+# 水平擴展測試 (Docker Compose)
+# ============================================
+
+# 預設實例數量
+N ?= 3
+
+scale:
+	@echo "🔄 啟動水平擴展環境 ($(N) 個實例)..."
+	docker-compose -f docker-compose.scale.yml --env-file .env.development up -d --scale app=$(N)
+	@echo "✅ 擴展環境已啟動"
+	@echo "📍 API (via nginx): http://localhost"
+	@echo "📊 查看實例狀態: make scale-status"
+
+scale-build:
+	@echo "🏗️  建置擴展環境映像..."
+	docker-compose -f docker-compose.scale.yml --env-file .env.development build
+
+scale-up:
+	@echo "📈 擴展到 $(N) 個實例..."
+	docker-compose -f docker-compose.scale.yml --env-file .env.development up -d --scale app=$(N) --no-recreate
+	@echo "✅ 已擴展到 $(N) 個實例"
+
+scale-down:
+	@echo "🛑 停止擴展環境..."
+	docker-compose -f docker-compose.scale.yml --env-file .env.development down
+	@echo "✅ 擴展環境已停止"
+
+scale-logs:
+	docker-compose -f docker-compose.scale.yml --env-file .env.development logs -f
+
+scale-status:
+	@echo "📊 擴展環境狀態:"
+	@docker-compose -f docker-compose.scale.yml --env-file .env.development ps
+	@echo ""
+	@echo "🔍 測試負載均衡 (訪問 10 次):"
+	@for i in 1 2 3 4 5 6 7 8 9 10; do \
+		echo -n "請求 $$i: "; \
+		curl -s http://localhost/health 2>/dev/null | head -1 || echo "連線失敗"; \
+	done
+
+# ============================================
+# Kubernetes 本地部署 (OrbStack)
+# ============================================
+
+k8s-build:
+	@echo "🏗️  建置 Docker 映像 (for K8s)..."
+	docker build -t chat_app_backend:latest -f Dockerfile.dev .
+	@echo "✅ 映像建置完成: chat_app_backend:latest"
+
+k8s-deploy: k8s-build
+	@echo "☸️  部署到 Kubernetes..."
+	kubectl apply -f k8s/namespace.yaml
+	kubectl apply -f k8s/secret.yaml
+	kubectl apply -f k8s/configmap.yaml
+	kubectl apply -f k8s/mongodb.yaml
+	kubectl apply -f k8s/redis.yaml
+	kubectl apply -f k8s/app.yaml
+	kubectl apply -f k8s/service.yaml
+	kubectl apply -f k8s/ingress.yaml
+	kubectl apply -f k8s/hpa.yaml
+	@echo "✅ K8s 部署完成"
+	@echo "⏳ 等待 pods 就緒..."
+	kubectl -n chat-app wait --for=condition=ready pod -l app=chat-app --timeout=120s || true
+	@make k8s-status
+
+k8s-delete:
+	@echo "🗑️  刪除 K8s 部署..."
+	kubectl delete -f k8s/ --ignore-not-found
+	@echo "✅ K8s 部署已刪除"
+
+k8s-scale:
+	@echo "📈 擴展到 $(N) 個 pods..."
+	kubectl -n chat-app scale deployment chat-app --replicas=$(N)
+	@echo "✅ 已擴展到 $(N) 個 pods"
+	kubectl -n chat-app get pods -w
+
+k8s-status:
+	@echo "📊 K8s 部署狀態:"
+	@echo ""
+	@echo "=== Pods ==="
+	@kubectl -n chat-app get pods -o wide 2>/dev/null || echo "Namespace 不存在"
+	@echo ""
+	@echo "=== Services ==="
+	@kubectl -n chat-app get svc 2>/dev/null || true
+	@echo ""
+	@echo "=== HPA ==="
+	@kubectl -n chat-app get hpa 2>/dev/null || true
+	@echo ""
+	@echo "=== Ingress ==="
+	@kubectl -n chat-app get ingress 2>/dev/null || true
+
+k8s-logs:
+	kubectl -n chat-app logs -f -l app=chat-app --max-log-requests=10
+
+k8s-pods:
+	kubectl -n chat-app get pods -w

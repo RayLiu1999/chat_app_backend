@@ -1,0 +1,154 @@
+# Docker Compose - 水平擴展測試環境
+# 使用方式: docker-compose -f docker-compose.scale.yml up -d --scale app=3
+
+services:
+  # nginx 負載均衡器
+  nginx:
+    image: nginx:alpine
+    container_name: chat_nginx_lb
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.scale.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app
+    networks:
+      - chat-network
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # 聊天應用後端服務 - 可擴展
+  # 注意：移除了 container_name 以支援 --scale
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    # 不暴露固定端口，由 nginx 負載均衡
+    expose:
+      - "${SERVER_PORT:-8111}"
+    env_file: ./.env.development
+    environment:
+      DOCKER_ENV: "true"
+      SERVER_MODE: "development"
+      GIN_MODE: "debug"
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      # 用於識別不同實例
+      INSTANCE_ID: "${HOSTNAME:-unknown}"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - go-modules-scale:/go/pkg/mod:ro # 共享 modules 作為唯讀
+      # 每個實例使用獨立的 build cache，避免競爭
+      - /root/.cache/go-build
+      - ./uploads:/app/uploads
+    networks:
+      - chat-network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --spider --quiet http://localhost:${SERVER_PORT:-8111}/health || exit 1",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
+  # MongoDB 資料庫
+  mongodb:
+    image: mongo:7.0.28
+    container_name: chat_mongodb_scale
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${MONGODB_OUT_PORT:-27017}:27017"
+    env_file: ./.env.development
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE}
+    volumes:
+      - mongodb-data-scale:/data/db
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    command: mongod --bind_ip_all --auth
+    networks:
+      - chat-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+        reservations:
+          cpus: "0.2"
+          memory: 256M
+
+  # Redis 快取和訊息廣播
+  redis:
+    image: redis:7.2-alpine
+    container_name: chat_redis_scale
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    env_file: ./.env.development
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    volumes:
+      - redis-data-scale:/data
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD} --save 60 1
+    networks:
+      - chat-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+
+volumes:
+  mongodb-data-scale:
+    driver: local
+  redis-data-scale:
+    driver: local
+  go-modules-scale:
+    driver: local
+
+networks:
+  chat-network:
+    driver: bridge

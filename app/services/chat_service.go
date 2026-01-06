@@ -49,7 +49,7 @@ func NewChatService(cfg *config.Config,
 	// 創建模組化組件
 	clientManager := NewClientManager()
 	roomManager := NewRoomManager(odm, redisClient, serverMemberRepo)
-	messageHandler := NewMessageHandler(odm, roomManager)
+	messageHandler := NewMessageHandler(odm, roomManager, redisClient)
 	websocketHandler := NewWebSocketHandler(odm, clientManager, roomManager, messageHandler, userService, cache)
 
 	cs := &chatService{
