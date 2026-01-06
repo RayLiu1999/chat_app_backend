@@ -42,13 +42,20 @@ export default function (baseUrl) {
       logInfo('執行系統健康檢查');
       const res = http.get(`${baseUrl}/health`);
       
+      let body;
+      try {
+        body = res.json();
+      } catch (e) {
+        body = null;
+      }
+      
       // 記錄 HTTP 回應
       logHttpResponse('GET /health', res, { expectedStatus: 200 });
       
       check(res, { 
         'Health check: status is 200': (r) => r.status === 200,
-        'Health check: has success field': (r) => r.json('success') === true,
-        'Health check: has status field': (r) => r.json('status') !== undefined
+        'Health check: has status field': () => body && body.status !== undefined,
+        'Health check: system status is ok': () => body && body.data && body.data.status === 'ok'
       });
     });
   });

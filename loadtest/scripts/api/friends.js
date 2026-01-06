@@ -79,8 +79,16 @@ export default function (baseUrl, session, targetUsername, friendId) {
         logHttpResponse('POST /friends/requests', res, { expectedStatus: [200, 400, 403] });
         
         check(res, { 
-          'Send Friend Request: status is 200, 400 or 403': (r) => r.status === 200 || r.status === 400 || r.status === 403,
-          'Send Friend Request: response has status field': (r) => r.json('status') !== undefined
+          'Send Friend Request: status is 200, 400 or 403': (r) => [200, 400, 403].includes(r.status),
+          'Send Friend Request: response has status field': (r) => r.json('status') !== undefined,
+          'Send Friend Request: logic is correct': (r) => {
+            if (r.status === 200) return r.json('status') === 'success';
+            // 403 通常是 CSRF 或權限問題
+            if (r.status === 403) return true; 
+            // 400 通常是業務邏輯錯誤（如已是好友）
+            if (r.status === 400) return r.json('status') === 'error';
+            return false;
+          }
         });
         
         if (res.status === 200) {

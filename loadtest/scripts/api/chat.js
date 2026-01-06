@@ -66,14 +66,20 @@ export default function (baseUrl, session) {
       // 使用完整 URL 避免路徑問題
       const testApiUrl = `${baseUrl}/test/user?username=${user2.username}`;
       const userRes = http.get(testApiUrl);
+      let userBody;
+      try {
+        userBody = userRes.json();
+      } catch (e) {
+        userBody = null;
+      }
       
       logHttpResponse('GET /test/user', userRes, { expectedStatus: 200 });
       
       if (check(userRes, {
         'Get User by Username: status is 200': (r) => r.status === 200,
-        'Get User by Username: has user data': (r) => r.json('data.id') !== undefined
+        'Get User by Username: has user data': () => userBody && userBody.data && userBody.data.id !== undefined
       })) {
-        chatWithUserId = userRes.json('data.id');
+        chatWithUserId = userBody.data.id;
         logInfo(`✅ 取得第二個用戶 ID: ${chatWithUserId} (${user2.username})`);
       } else {
         logError('❌ 無法取得第二個用戶 ID');

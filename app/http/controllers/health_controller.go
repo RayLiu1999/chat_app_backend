@@ -42,8 +42,7 @@ func (hc *HealthController) HealthCheck(c *gin.Context) {
 	}
 
 	SuccessResponse(c, gin.H{
-		"success": true,
-		"status":  status, // ok | degraded
+		"status": status, // ok | degraded
 		"services": gin.H{
 			"mongo": gin.H{
 				"status": mongoStatus,
@@ -69,7 +68,6 @@ func (hc *HealthController) ProxyCheck(c *gin.Context) {
 	method := c.Request.Method
 
 	SuccessResponse(c, gin.H{
-		"success": true,
 		"proxy_info": gin.H{
 			"client_ip":         clientIP,
 			"remote_addr":       remoteAddr,
@@ -114,8 +112,7 @@ func (hc *HealthController) DetailedHealthCheck(c *gin.Context) {
 
 	// 組合響應
 	SuccessResponse(c, gin.H{
-		"success": true,
-		"status":  status, // ok | degraded
+		"status": status, // ok | degraded
 		"services": gin.H{
 			"mongo": gin.H{
 				"status": mongoStatus,

@@ -65,22 +65,22 @@ help:
 
 dev:
 	@echo "🚀 啟動開發環境..."
-	docker-compose -f docker-compose.dev.yml up -d
+	docker-compose -f docker-compose.dev.yml --env-file .env.development up -d
 	@echo "✅ 開發環境已啟動"
 	@echo "📍 API: http://localhost:8111"
 	@echo "📍 Redis Commander: http://localhost:8081"
 
 dev-logs:
 	@echo "🚀 啟動開發環境並顯示日誌..."
-	docker-compose -f docker-compose.dev.yml up
+	docker-compose -f docker-compose.dev.yml --env-file .env.development up
 
 dev-down:
 	@echo "🛑 停止開發環境..."
-	docker-compose -f docker-compose.dev.yml down
+	docker-compose -f docker-compose.dev.yml --env-file .env.development down
 
 dev-restart:
 	@echo "🔄 重啟開發環境..."
-	docker-compose -f docker-compose.dev.yml restart
+	docker-compose -f docker-compose.dev.yml --env-file .env.development restart
 	@echo "✅ 開發環境已重啟"
 
 # ============================================
@@ -89,31 +89,31 @@ dev-restart:
 
 build:
 	@echo "🏗️  建置 Docker 映像..."
-	docker-compose -f docker-compose.dev.yml build
+	docker-compose -f docker-compose.dev.yml --env-file .env.development build
 
 rebuild:
 	@echo "🏗️  強制重新建置 (無快取)..."
-	docker-compose -f docker-compose.dev.yml build --no-cache
+	docker-compose -f docker-compose.dev.yml --env-file .env.development build --no-cache
 
 # ============================================
 # 日誌與監控
 # ============================================
 
 logs:
-	docker-compose -f docker-compose.dev.yml logs -f
+	docker-compose -f docker-compose.dev.yml --env-file .env.development logs -f
 
 logs-app:
-	docker-compose -f docker-compose.dev.yml logs -f app
+	docker-compose -f docker-compose.dev.yml --env-file .env.development logs -f app
 
 logs-mongodb:
-	docker-compose -f docker-compose.dev.yml logs -f mongodb
+	docker-compose -f docker-compose.dev.yml --env-file .env.development logs -f mongodb
 
 logs-redis:
-	docker-compose -f docker-compose.dev.yml logs -f redis
+	docker-compose -f docker-compose.dev.yml --env-file .env.development logs -f redis
 
 status:
 	@echo "📊 容器狀態:"
-	@docker-compose -f docker-compose.dev.yml ps
+	@docker-compose -f docker-compose.dev.yml --env-file .env.development ps
 
 ps:
 	@docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
@@ -132,15 +132,15 @@ health:
 
 restart:
 	@echo "🔄 重啟應用服務..."
-	docker-compose -f docker-compose.dev.yml restart app
+	docker-compose -f docker-compose.dev.yml --env-file .env.development restart app
 
 stop:
 	@echo "🛑 停止所有服務..."
-	docker-compose -f docker-compose.dev.yml stop
+	docker-compose -f docker-compose.dev.yml --env-file .env.development stop
 
 start:
 	@echo "▶️  啟動服務..."
-	docker-compose -f docker-compose.dev.yml start
+	docker-compose -f docker-compose.dev.yml --env-file .env.development start
 
 # ============================================
 # 容器 Shell
@@ -196,7 +196,7 @@ clean:
 	@echo "🧹 清理開發環境容器和卷..."
 	@read -p "⚠️  這將刪除所有開發環境資料! 確定要繼續嗎? (yes/no): " confirm; \
 	if [ "$$confirm" = "yes" ]; then \
-		docker-compose -f docker-compose.dev.yml down -v; \
+		docker-compose -f docker-compose.dev.yml --env-file .env.development down -v; \
 		echo "✅ 開發環境已清理"; \
 	else \
 		echo "❌ 操作已取消"; \
@@ -204,7 +204,7 @@ clean:
 
 clean-dev:
 	@echo "🧹 清理開發環境容器和卷..."
-	docker-compose -f docker-compose.dev.yml down -v
+	docker-compose -f docker-compose.dev.yml --env-file .env.development down -v
 	@echo "✅ 開發環境已清理"
 
 # ============================================

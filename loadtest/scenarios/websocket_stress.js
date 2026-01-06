@@ -90,7 +90,7 @@ function testConnectionStress(config, session) {
 
     // 保持連線活躍，模擬真實用戶在線
     const keepAliveInterval = 10; // 每 10 秒發送一次 ping
-    for (let i = 0; i < 30; i++) { // 保持連線 5 分鐘
+    for (let i = 1; i <= 30; i++) { // 保持連線 5 分鐘
       socket.setTimeout(() => {
         if (socket.readyState === 1) { // OPEN
           socket.send(JSON.stringify({ action: 'ping' }));
@@ -176,6 +176,8 @@ function testMessagingStress(config, session) {
       const interval = 1000 / messagesPerSecond; // 每條訊息間隔
 
       for (let i = 0; i < totalMessages; i++) {
+        // 確保 timeout 值大於 0 (i=0 時使用 1ms)
+        const timeoutMs = Math.max(1, i * interval);
         socket.setTimeout(() => {
           if (socket.readyState === 1) {
             const sendStart = Date.now();
@@ -195,7 +197,7 @@ function testMessagingStress(config, session) {
               logInfo(`📤 已發送 ${i + 1}/${totalMessages} 條訊息`);
             }
           }
-        }, i * interval);
+        }, timeoutMs);
       }
 
       // 測試結束後關閉連線

@@ -30,13 +30,19 @@ export default function (baseUrl, session) {
       // 注意：multipart 請求不需要手動設定 Content-Type
 
       const res = http.post(url, data, { headers });
+      let body;
+      try {
+        body = res.json();
+      } catch (e) {
+        body = null;
+      }
       
       logHttpResponse('POST /upload/file', res, { expectedStatus: 200 });
       
       check(res, { 
         'Upload File: status is 200': (r) => r.status === 200,
-        'Upload File: response has success status': (r) => r.json('status') === 'success',
-        'Upload File: has file_url': (r) => r.json('data.file_url') !== undefined
+        'Upload File: response has success status': () => body && body.status === 'success',
+        'Upload File: has file_url': () => body && body.data && body.data.file_url !== undefined
       });
       
       if (res.status === 200) {
@@ -60,13 +66,19 @@ export default function (baseUrl, session) {
       };
 
       const res = http.post(url, data, { headers });
+      let body;
+      try {
+        body = res.json();
+      } catch (e) {
+        body = null;
+      }
       
       logHttpResponse('POST /upload/avatar', res, { expectedStatus: 200 });
       
       check(res, { 
         'Upload Avatar: status is 200': (r) => r.status === 200,
-        'Upload Avatar: response has success status': (r) => r.json('status') === 'success',
-        'Upload Avatar: has file_url': (r) => r.json('data.file_url') !== undefined
+        'Upload Avatar: response has success status': () => body && body.status === 'success',
+        'Upload Avatar: has file_url': () => body && body.data && body.data.file_url !== undefined
       });
       
       if (res.status === 200) {
@@ -84,19 +96,19 @@ export default function (baseUrl, session) {
         document: http.file(new ArrayBuffer(5120), 'report.pdf', 'application/pdf'),
       };
 
-      const headers = {
-        ...applyCsrf(url, session.headers),
-        'Authorization': session.headers['Authorization']
-      };
-
-      const res = http.post(url, data, { headers });
+      let body;
+      try {
+        body = res.json();
+      } catch (e) {
+        body = null;
+      }
       
       logHttpResponse('POST /upload/document', res, { expectedStatus: 200 });
       
       check(res, { 
         'Upload Document: status is 200': (r) => r.status === 200,
-        'Upload Document: response has success status': (r) => r.json('status') === 'success',
-        'Upload Document: has file_url': (r) => r.json('data.file_url') !== undefined
+        'Upload Document: response has success status': () => body && body.status === 'success',
+        'Upload Document: has file_url': () => body && body.data && body.data.file_url !== undefined
       });
       
       if (res.status === 200) {
