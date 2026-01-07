@@ -127,7 +127,7 @@ func TestUserController_Register(t *testing.T) {
 		assert.Equal(t, models.ErrInvalidParams, response.Code)
 	})
 
-	t.Run("服務層錯誤", func(t *testing.T) {
+	t.Run("用戶名已存在", func(t *testing.T) {
 		user := models.User{
 			Username: "testuser",
 			Email:    "test@example.com",
@@ -152,7 +152,8 @@ func TestUserController_Register(t *testing.T) {
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		// 用戶名已存在應該回傳 400 Bad Request（業務邏輯錯誤，非伺服器錯誤）
+		assert.Equal(t, http.StatusBadRequest, w.Code)
 
 		var response models.APIResponse
 		json.Unmarshal(w.Body.Bytes(), &response)
