@@ -65,15 +65,21 @@ export default function (baseUrl, session) {
         "Content-Type": `multipart/form-data; boundary=${formData.boundary}`
       };
       const res = http.post(url, formData.body(), { headers });
+      let body;
+      try {
+        body = res.json();
+      } catch (e) {
+        body = null;
+      }
     
       logHttpResponse('POST /servers', res, { expectedStatus: 200 });
     
       if (check(res, {
         'Create Server: status is 200': (r) => r.status === 200,
-        'Create Server: response has success status': (r) => r.json('status') === 'success',
-        'Create Server: has server data': (r) => r.json('data.id') !== undefined
+        'Create Server: response has success status': () => body && body.status === 'success',
+        'Create Server: has server data': () => body && body.data && body.data.id !== undefined
       })) {
-        serverId = res.json('data.id');
+        serverId = body.data.id;
         logInfo(`✅ 伺服器創建成功，ID: ${serverId}`);
       } else {
         logInfo(`❌ 伺服器創建失敗: ${res.status} ${res.body}`);

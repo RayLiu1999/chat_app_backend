@@ -120,3 +120,34 @@ func TestGetDateRange(t *testing.T) {
 		assert.True(t, end.Equal(wantEnd))
 	})
 }
+
+func TestTimeAgo(t *testing.T) {
+	now := time.Now()
+
+	tests := []struct {
+		name string
+		t    time.Time
+		want string
+	}{
+		{"剛剛", now.Add(-10 * time.Second), "剛剛"},
+		{"1分鐘前", now.Add(-1 * time.Minute), "1分鐘前"},
+		{"5分鐘前", now.Add(-5 * time.Minute), "5分鐘前"},
+		{"1小時前", now.Add(-1 * time.Hour), "1小時前"},
+		{"3小時前", now.Add(-3 * time.Hour), "3小時前"},
+		{"昨天", now.Add(-30 * time.Hour), "昨天"},
+		{"前天", now.Add(-50 * time.Hour), "前天"},
+		{"7天前", now.Add(-7 * 24 * time.Hour), "7天前"},
+		{"15天前", now.Add(-15 * 24 * time.Hour), "15天前"},
+		{"1個月前", now.Add(-31 * 24 * time.Hour), "1個月前"},
+		{"2個月前", now.Add(-60 * 24 * time.Hour), "2個月前"},
+		{"1年前", now.Add(-366 * 24 * time.Hour), "1年前"},
+		{"2年前", now.Add(-730 * 24 * time.Hour), "2年前"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := TimeAgo(tt.t)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

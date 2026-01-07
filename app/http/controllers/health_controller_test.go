@@ -43,7 +43,11 @@ func TestHealthController_HealthCheck(t *testing.T) {
 		// 檢查返回的數據結構
 		data, ok := response.Data.(map[string]interface{})
 		assert.True(t, ok)
-		assert.True(t, data["success"].(bool))
+
+		// 檢查 status 欄位（實際 API 回應的是 "status" 而非 "success"）
+		status, exists := data["status"]
+		assert.True(t, exists, "data['status'] should exist")
+		assert.Equal(t, "ok", status)
 
 		services, ok := data["services"].(map[string]interface{})
 		assert.True(t, ok)

@@ -124,7 +124,7 @@ export function teardown(data) {
 export function handleSummary(data) {
   const now = new Date().toISOString().replace(/[:.]/g, '').replace('T', '_').slice(0, 15);
   const scenario = __ENV.SCENARIO || 'smoke';
-  const outputDir = 'test_results/load_tests';  // 使用相對路徑
+  const outputDir = config.TEST_CONFIG.RESULTS_DIR;
 
   const passes = data.metrics.checks.values.passes || 0;
   const fails = data.metrics.checks.values.fails || 0;

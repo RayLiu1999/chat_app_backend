@@ -41,7 +41,15 @@ func (uc *UserController) Register(c *gin.Context) {
 
 	appError := uc.userService.RegisterUser(user)
 	if appError != nil {
-		ErrorResponse(c, http.StatusInternalServerError, models.MessageOptions{Code: appError.Code})
+		// 根據錯誤類型決定 HTTP 狀態碼
+		statusCode := http.StatusInternalServerError
+		if appError.Code == models.ErrUsernameExists || appError.Code == models.ErrEmailExists {
+			statusCode = http.StatusBadRequest
+		}
+		ErrorResponse(c, statusCode, models.MessageOptions{
+			Code:    appError.Code,
+			Message: appError.Message,
+		})
 		return
 	}
 
