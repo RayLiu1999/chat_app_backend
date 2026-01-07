@@ -3,7 +3,7 @@
  */
 import http from "k6/http";
 import { check } from "k6";
-import { extractCSRFToken, applyCsrf } from "./csrf.js";
+import { extractCSRFToken } from "./csrf.js";
 import { randomString } from "./utils.js";
 import { logHttpResponse, logInfo, logError } from "./logger.js";
 import { SharedArray } from "k6/data";
@@ -50,7 +50,12 @@ export function registerUser(baseUrl, user) {
   // 記錄 HTTP 回應
   logHttpResponse("POST /register", res, { expectedStatus: [200, 400] });
 
-  const body = res.json();
+  let body;
+  try {
+    body = res.json();
+  } catch (e) {
+    body = null;
+  }
   const isSuccess = res.status === 200 && body && body.status === "success";
   // 檢查是否為預期的錯誤（用戶已存在），同時驗證 HTTP 狀態碼和錯誤代碼
   const isUserExists =
@@ -60,7 +65,8 @@ export function registerUser(baseUrl, user) {
     (body.code === "USERNAME_EXISTS" || body.code === "EMAIL_EXISTS");
 
   check(res, {
-    "register: status is 200 or 400": (r) => r.status === 200 || r.status === 400,
+    "register: status is 200 or 400": (r) =>
+      r.status === 200 || r.status === 400,
     "register: success or user already exists": () => isSuccess || isUserExists,
   });
 
@@ -96,7 +102,12 @@ export function login(baseUrl, credentials) {
   // 記錄 HTTP 回應
   logHttpResponse("POST /login", res, { expectedStatus: [200, 400, 401] });
 
-  const body = res.json();
+  let body;
+  try {
+    body = res.json();
+  } catch (e) {
+    body = null;
+  }
   const isSuccess = res.status === 200 && body && body.status === "success";
   // 登入失敗通常是 400 或 401，且 status 為 error
   const isInvalidCredentials =
@@ -134,7 +145,9 @@ export function login(baseUrl, credentials) {
   } else {
     logError(
       "❌ 登入失敗",
-      `Status: ${res.status}, Response: ${res.body.substring(0, 100)}`
+      `Status: ${res.status}, Response: ${
+        res.body ? res.body.substring(0, 100) : "empty"
+      }`
     );
     return null;
   }

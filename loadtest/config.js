@@ -1,5 +1,4 @@
 // k6 測試配置文件
-import http from "k6/http";
 
 // 測試環境設定
 export const TEST_CONFIG = {
@@ -62,7 +61,7 @@ export const TEST_CONFIG = {
   SCENARIOS: {
     // 冒煙測試：最小負載，快速驗證功能
     smoke: [
-      { duration: "20s", target: 1 }, // 10 秒內維持 1 個 VU
+      { duration: "20s", target: 1 }, // 20 秒內維持 1 個 VU
       { duration: "5s", target: 0 }, // 5 秒內降到 0 個 VU
     ],
 

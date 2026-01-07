@@ -200,7 +200,7 @@ export default function (wsUrl, token, handler, timeout = 30) {
 
     // 更新指標
     if (connectionCheck && connectionEstablished) {
-      ws_connection_success.add(1);
+      // ws_connection_success 已在連線建立時（第 58 行）增加，這裡只記錄 duration
       ws_connection_duration.add(duration);
     }
 
