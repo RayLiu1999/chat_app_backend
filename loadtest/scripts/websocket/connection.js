@@ -23,7 +23,7 @@ export const ws_messages_sent = new Counter("ws_messages_sent");
 /**
  * 建立 WebSocket 連線並執行測試邏輯
  *
- * @param {string} wsUrl - WebSocket 基礎 URL (例如: ws://localhost:8111/ws)
+ * @param {string} wsUrl - WebSocket 基礎 URL (例如: ws://localhost:80/ws)
  * @param {string} token - Access Token
  * @param {function} handler - 連線成功後執行的處理函數
  * @param {number} timeout - 連線超時時間（秒），預設 30 秒

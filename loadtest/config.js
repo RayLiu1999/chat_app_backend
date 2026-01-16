@@ -2,9 +2,9 @@
 
 // 測試環境設定
 export const TEST_CONFIG = {
-  BASE_URL: __ENV.BASE_URL || "http://localhost:8111",
+  BASE_URL: __ENV.BASE_URL || "http://localhost:80",
   API_PREFIX: "",
-  WS_URL: __ENV.WS_URL || "ws://localhost:8111/ws",
+  WS_URL: __ENV.WS_URL || "ws://localhost:80/ws",
   RESULTS_DIR: "test_results",
 
   // 測試用戶配置（根據 API.md 規範）
@@ -98,15 +98,6 @@ export const TEST_CONFIG = {
       { duration: "1m", target: 0 }, // 1 分鐘內關閉所有連線
     ],
 
-    // 🆕 本地環境安全版 WebSocket 壓力測試
-    websocket_stress_safe: [
-      { duration: "30s", target: 20 }, // 30 秒到 20 個連線
-      { duration: "2m", target: 40 }, // 2 分鐘到 40 個連線
-      { duration: "2m", target: 50 }, // 2 分鐘到 50 個連線
-      { duration: "2m", target: 50 }, // 維持 50 個連線 2 分鐘
-      { duration: "1m", target: 0 }, // 1 分鐘內關閉所有連線
-    ],
-
     // WebSocket 峰值測試：突然湧入大量連線
     websocket_spike: [
       { duration: "10s", target: 10 }, // 預熱：10 秒到 10 個 VU
@@ -136,6 +127,14 @@ export const TEST_CONFIG = {
       { duration: "2m", target: 500 }, // 第五階：500 個連線
       { duration: "2m", target: 500 }, // 維持
       { duration: "2m", target: 0 }, // 關閉
+    ],
+
+    // WebSocket 斷線重連測試：測試網路不穩定情況
+    websocket_reconnect: [
+      { duration: "1m", target: 20 },  // 1 分鐘升到 20 個 VU
+      { duration: "3m", target: 50 },  // 3 分鐘升到 50 個 VU
+      { duration: "2m", target: 50 },  // 維持 50 個 VU
+      { duration: "1m", target: 0 },   // 1 分鐘內關閉
     ],
   },
 };

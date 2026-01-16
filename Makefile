@@ -83,8 +83,7 @@ dev:
 	@echo "🚀 啟動開發環境..."
 	docker-compose -f docker-compose.dev.yml --env-file .env.development up -d
 	@echo "✅ 開發環境已啟動"
-	@echo "📍 API: http://localhost:8111"
-	@echo "📍 Redis Commander: http://localhost:8081"
+	@echo "📍 API: http://localhost:80"
 
 dev-logs:
 	@echo "🚀 啟動開發環境並顯示日誌..."
@@ -140,7 +139,7 @@ stats:
 
 health:
 	@echo "🏥 檢查應用健康狀態..."
-	@curl -s http://localhost:8111/health | jq . || echo "❌ 健康檢查失敗"
+	@curl -s http://localhost:80/health | jq . || echo "❌ 健康檢查失敗"
 
 # ============================================
 # 容器操作
@@ -192,17 +191,77 @@ test-smoke:
 	@echo "🧪 執行冒煙測試 (k6)..."
 	cd loadtest && npm run test:smoke
 
-test-limit:
+test-light:
+	@echo "🧪 執行輕量級測試 (k6)..."
+	cd loadtest && npm run test:light
+
+test-medium:
+	@echo "🧪 執行中量級測試 (k6)..."
+	cd loadtest && npm run test:medium
+
+test-heavy:
 	@echo "🧪 執行極限測試 (k6)..."
-	cd loadtest && npm run test:limit
+	cd loadtest && npm run test:heavy
 
-test-ws:
+test-ws-stress-mixed:
 	@echo "🧪 執行 WebSocket 壓力測試 (k6)..."
-	cd loadtest && npm run test:ws:stress
+	cd loadtest && npm run test:ws:stress-mixed
 
-test-analyze:
-	@echo "📊 分析最新測試結果..."
-	cd loadtest && npm run analyze:limit
+test-ws-stress-connections:
+	@echo "🧪 執行 WebSocket 連線測試 (k6)..."
+	cd loadtest && npm run test:ws:stress-connections
+
+test-ws-stress-messaging:
+	@echo "🧪 執行 WebSocket 消息測試 (k6)..."
+	cd loadtest && npm run test:ws:stress-messaging
+
+test-ws:spike:
+	@echo "🧪 執行 WebSocket 壓力測試 (k6)..."
+	cd loadtest && npm run test:ws:spike
+
+test-ws:soak:
+	@echo "🧪 執行 WebSocket 浸泡測試 (k6)..."
+	cd loadtest && npm run test:ws:soak
+
+test-ws:soak:long:
+	@echo "🧪 執行 WebSocket 浸泡測試 (k6)..."
+	cd loadtest && npm run test:ws:soak:long
+
+test-ws:ladder-mixed:
+	@echo "🧪 執行 WebSocket 梯度測試 (k6)..."
+	cd loadtest && npm run test:ws:ladder-mixed
+
+test-ws:ladder-connections:
+	@echo "🧪 執行 WebSocket 梯度測試 (k6)..."
+	cd loadtest && npm run test:ws:ladder-connections
+
+test-ws:ladder-messaging:
+	@echo "🧪 執行 WebSocket 梯度測試 (k6)..."
+	cd loadtest && npm run test:ws:ladder-messaging
+
+test-ws:reconnect:
+	@echo "🧪 執行 WebSocket 重連測試 (k6)..."
+	cd loadtest && npm run test:ws:reconnect
+
+test-ws:reconnect:storm:
+	@echo "🧪 執行 WebSocket 重連風暴測試 (k6)..."
+	cd loadtest && npm run test:ws:reconnect:storm
+
+test-ws:reconnect:frequent:
+	@echo "🧪 執行 WebSocket 頻繁重連測試 (k6)..."
+	cd loadtest && npm run test:ws:reconnect:frequent
+
+test-all:basic:
+	@echo "🧪 執行 WebSocket 基本測試 (k6)..."
+	cd loadtest && npm run test:all:basic
+
+test-all:websocket:
+	@echo "🧪 執行 WebSocket WebSocket 測試 (k6)..."
+	cd loadtest && npm run test:all:websocket
+
+test-quick:
+	@echo "🧪 執行 WebSocket 快速測試 (k6)..."
+	cd loadtest && npm run test:quick
 
 # ============================================
 # 清理（僅限開發環境）
@@ -260,7 +319,7 @@ env-check:
 env-example:
 	@echo "📝 生成 .env.example..."
 	@echo "# 請參考此範例配置您的 .env.development 文件" > .env.example
-	@echo "SERVER_PORT=8111" >> .env.example
+	@echo "SERVER_PORT=80" >> .env.example
 	@echo "✅ .env.example 已生成"
 
 install-deps:
@@ -289,7 +348,7 @@ scale:
 	@echo "🔄 啟動水平擴展環境 ($(N) 個實例)..."
 	docker-compose -f docker-compose.scale.yml --env-file .env.development up -d --scale app=$(N)
 	@echo "✅ 擴展環境已啟動"
-	@echo "📍 API (via nginx): http://localhost"
+	@echo "📍 API (via nginx): http://localhost:80"
 	@echo "📊 查看實例狀態: make scale-status"
 
 scale-build:
@@ -316,7 +375,7 @@ scale-status:
 	@echo "🔍 測試負載均衡 (訪問 10 次):"
 	@for i in 1 2 3 4 5 6 7 8 9 10; do \
 		echo -n "請求 $$i: "; \
-		curl -s http://localhost/health 2>/dev/null | head -1 || echo "連線失敗"; \
+		curl -s http://localhost:80/health 2>/dev/null | head -1 || echo "連線失敗"; \
 	done
 
 # ============================================
@@ -325,7 +384,7 @@ scale-status:
 
 k8s-build:
 	@echo "🏗️  建置 Docker 映像 (for K8s)..."
-	docker build -t chat_app_backend:latest -f Dockerfile.dev .
+	docker build -t chat_app_backend:latest -f Dockerfile.k8s .
 	@echo "✅ 映像建置完成: chat_app_backend:latest"
 
 k8s-deploy: k8s-build

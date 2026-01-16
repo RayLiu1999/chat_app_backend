@@ -10,6 +10,9 @@
  * k6 run run.js --env SCENARIO=websocket_spike
  * k6 run run.js --env SCENARIO=websocket_soak
  * k6 run run.js --env SCENARIO=websocket_stress_ladder
+ * k6 run run.js --env SCENARIO=websocket_reconnect
+ * k6 run run.js --env SCENARIO=websocket_reconnect --env RECONNECT_TYPE=storm
+ * k6 run run.js --env SCENARIO=websocket_reconnect --env RECONNECT_TYPE=frequent
  *
  * 參數:
  * --env SCENARIO: 要執行的測試場景 (smoke, light, medium, heavy)
@@ -28,6 +31,7 @@ import heavyLoadTest from './scenarios/heavy.js';
 import websocketStressTest from './scenarios/websocket_stress.js';
 import websocketSpikeTest from './scenarios/websocket_spike.js';
 import websocketSoakTest from './scenarios/websocket_soak.js';
+import websocketReconnectTest from './scenarios/websocket_reconnect.js';
 import { logInfo, logSuccess, logError } from './scripts/common/logger.js';
 
 // 自定義metrics用於即時監控
@@ -49,6 +53,7 @@ const scenarios = {
   websocket_spike: websocketSpikeTest,
   websocket_soak: websocketSoakTest,
   websocket_stress_ladder: websocketStressTest, // 使用相同的測試函數，但不同的 stages
+  websocket_reconnect: websocketReconnectTest,
 };
 
 if (!scenarios[scenarioName]) {
