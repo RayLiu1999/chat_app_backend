@@ -31,12 +31,13 @@ func NewMessageHandler(odm providers.ODM, roomManager RoomManager, redisClient *
 // HandleMessage 處理消息邏輯
 // 透過 Redis Pub/Sub 實現跨實例廣播
 func (mh *messageHandler) HandleMessage(message *MessageResponse) {
-	// 先儲存消息到資料庫（不管房間是否存在客戶端）
-	err := mh.saveMessageToDB(message)
-	if err != nil {
-		utils.PrettyPrintf("儲存消息到資料庫失敗: %v", err)
-		return
-	}
+	// 非同步儲存消息到資料庫
+	go func() {
+		err := mh.saveMessageToDB(message)
+		if err != nil {
+			utils.Log.Error("儲存消息到資料庫失敗", "error", err)
+		}
+	}()
 
 	// 構建要發送的訊息結構
 	wsMsg := &WsMessage[*MessageResponse]{
@@ -47,7 +48,7 @@ func (mh *messageHandler) HandleMessage(message *MessageResponse) {
 	// 序列化訊息
 	msgJSON, err := json.Marshal(wsMsg)
 	if err != nil {
-		utils.PrettyPrintf("序列化訊息失敗: %v", err)
+		utils.Log.Error("序列化訊息失敗", "error", err)
 		return
 	}
 
@@ -58,20 +59,17 @@ func (mh *messageHandler) HandleMessage(message *MessageResponse) {
 	// 透過 Redis Publish 發送訊息給所有訂閱的實例
 	ctx := context.Background()
 	if err := mh.redisClient.Publish(ctx, channel, msgJSON).Err(); err != nil {
-		utils.PrettyPrintf("Redis Publish 失敗: %v", err)
+		utils.Log.Error("Redis Publish 失敗", "error", err)
 		// 如果 Redis 失敗，回退到本地廣播
 		mh.localBroadcast(message)
 		return
 	}
-
-	utils.PrettyPrintf("訊息已透過 Redis 發布到 channel: %s", channel)
 }
 
 // localBroadcast 本地廣播（Redis 失敗時的回退方案）
 func (mh *messageHandler) localBroadcast(message *MessageResponse) {
 	room, exists := mh.roomManager.GetRoom(message.RoomType, message.RoomID)
 	if !exists {
-		utils.PrettyPrintf("房間 %s 不存在，消息已儲存到資料庫，但沒有客戶端可廣播", message.RoomID)
 		return
 	}
 
@@ -85,7 +83,6 @@ func (mh *messageHandler) localBroadcast(message *MessageResponse) {
 	for _, client := range clients {
 		go func(c *Client) {
 			if !mh.isClientConnectionValid(c) {
-				utils.PrettyPrintf("客戶端 %s 連線已失效，從房間中移除", c.UserID)
 				go mh.roomManager.LeaveRoom(c, message.RoomType, message.RoomID)
 				return
 			}
@@ -103,7 +100,6 @@ func (mh *messageHandler) localBroadcast(message *MessageResponse) {
 			}
 
 			if err := c.SendMessage(outMsg); err != nil {
-				utils.PrettyPrintf("發送消息失敗: %v", err)
 				go mh.roomManager.LeaveRoom(c, message.RoomType, message.RoomID)
 			}
 		}(client)
@@ -114,13 +110,11 @@ func (mh *messageHandler) localBroadcast(message *MessageResponse) {
 func (mh *messageHandler) saveMessageToDB(data *MessageResponse) error {
 	roomObjectID, err := primitive.ObjectIDFromHex(data.RoomID)
 	if err != nil {
-		utils.PrettyPrintf("解析房間ID失敗: %v", err)
 		return err
 	}
 
 	senderObjectID, err := primitive.ObjectIDFromHex(data.SenderID)
 	if err != nil {
-		utils.PrettyPrintf("解析發送者ID失敗: %v", err)
 		return err
 	}
 
@@ -136,11 +130,8 @@ func (mh *messageHandler) saveMessageToDB(data *MessageResponse) error {
 
 	err = mh.odm.Create(ctx, message)
 	if err != nil {
-		utils.PrettyPrintf("儲存消息失敗: %v", err)
 		return err
 	}
-
-	utils.PrettyPrintf("消息已儲存到資料庫: 房間=%s, 發送者=%s, 內容=%s", data.RoomID, data.SenderID, data.Content)
 
 	mh.updateRoomLastMessage(data.RoomID, data.RoomType)
 	return nil
@@ -150,7 +141,6 @@ func (mh *messageHandler) saveMessageToDB(data *MessageResponse) error {
 func (mh *messageHandler) updateRoomLastMessage(roomID string, roomType models.RoomType) {
 	roomObjectID, err := primitive.ObjectIDFromHex(roomID)
 	if err != nil {
-		utils.PrettyPrintf("解析房間ID失敗: %v", err)
 		return
 	}
 
@@ -161,19 +151,13 @@ func (mh *messageHandler) updateRoomLastMessage(roomID string, roomType models.R
 	case models.RoomTypeDM:
 		// 更新 dm_rooms 的 updated_at
 		dmRoom := &models.DMRoom{}
-		err = mh.odm.UpdateMany(ctx, dmRoom, map[string]any{"room_id": roomObjectID}, map[string]any{"$set": map[string]any{"updated_at": time.Now()}})
-		if err != nil {
-			utils.PrettyPrintf("更新 dm 房間最後訊息時間失敗: %v", err)
-		}
+		mh.odm.UpdateMany(ctx, dmRoom, map[string]any{"room_id": roomObjectID}, map[string]any{"$set": map[string]any{"updated_at": time.Now()}})
 	case models.RoomTypeChannel:
 		// 更新 channels 的 last_message_at
 		now := time.Now()
-		err = mh.odm.UpdateMany(ctx, &models.Channel{},
+		mh.odm.UpdateMany(ctx, &models.Channel{},
 			map[string]any{"_id": roomObjectID},
 			map[string]any{"$set": map[string]any{"last_message_at": now}})
-		if err != nil {
-			utils.PrettyPrintf("更新 channel 房間最後訊息時間失敗: %v", err)
-		}
 	}
 }
 
@@ -191,14 +175,12 @@ func (mh *messageHandler) isClientConnectionValid(client *Client) bool {
 
 	// 檢查最後 pong 時間是否過久（超過 2 分鐘）
 	if time.Since(client.LastPongTime) > 2*time.Minute {
-		utils.PrettyPrintf("客戶端 %s 最後 Pong 時間過久: %v", client.UserID, client.LastPongTime)
 		client.IsActive = false
 		return false
 	}
 
 	// 檢查連線時間是否過久（超過 24 小時）
 	if time.Since(client.ConnectedAt) > 24*time.Hour {
-		utils.PrettyPrintf("客戶端 %s 連線時間過久: %v", client.UserID, client.ConnectedAt)
 		client.IsActive = false
 		return false
 	}
