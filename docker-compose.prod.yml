@@ -17,7 +17,7 @@ services:
     container_name: chat_app_backend_prod
     restart: always
     ports:
-      - "${SERVER_PORT:-8111}:${SERVER_PORT:-8111}"
+      - "${SERVER_PORT:-80}:${SERVER_PORT:-80}"
     env_file: ./.env.production
     environment:
       DOCKER_ENV: "true"
@@ -37,7 +37,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "curl -f http://localhost:${SERVER_PORT:-8111}/health || exit 1",
+          "curl -f http://localhost:${SERVER_PORT:-80}/health || exit 1",
         ]
       interval: 30s
       timeout: 10s

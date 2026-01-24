@@ -10,13 +10,16 @@ services:
     container_name: chat_app_backend_dev
     restart: unless-stopped
     ports:
-      - "${SERVER_PORT:-8111}:${SERVER_PORT:-8111}"
+      - "${SERVER_PORT:-80}:${SERVER_PORT:-80}"
     env_file: ./.env.development
     environment:
       DOCKER_ENV: "true"
       SERVER_MODE: "development"
       GIN_MODE: "debug"
       REDIS_PASSWORD: ${REDIS_PASSWORD}
+      # Go Runtime 效能調校參數
+      GOMEMLIMIT: "900MiB" # 容器限制 1G 的 90%，防止 OOM Kill
+      GOMAXPROCS: "2" # 對應 cpus: "2"，避免過度 context switch
     depends_on:
       mongodb:
         condition: service_healthy
@@ -37,7 +40,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget --spider --quiet http://localhost:${SERVER_PORT:-8111}/health || exit 1",
+          "wget --spider --quiet http://localhost:${SERVER_PORT:-80}/health || exit 1",
         ]
       interval: 30s
       timeout: 5s
