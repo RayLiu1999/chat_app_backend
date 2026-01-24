@@ -25,7 +25,7 @@ import {
   logGroupEnd,
 } from "../scripts/common/logger.js";
 
-export default function (config) {
+export default function (config, session) {
   const testStartTime = Date.now();
   const baseUrl = `${config.BASE_URL}${config.API_PREFIX}`;
 
@@ -39,12 +39,8 @@ export default function (config) {
     randomSleep(0.5, 1);
   });
 
-  // ==================== 階段 2: 取得已認證會話 ====================
-  let session;
-  group("Phase 2: Get Authenticated Session", function () {
-    logInfo("建立認證會話");
-    session = getAuthenticatedSession(baseUrl);
-
+  // ==================== 階段 2: 驗證已認證會話 ====================
+  group("Phase 2: Verify Authenticated Session", function () {
     if (!session) {
       logError("⚠️  無法建立認證會話，跳過需要認證的測試");
       return;

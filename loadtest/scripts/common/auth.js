@@ -34,6 +34,7 @@ export function registerUser(baseUrl, user) {
   const params = {
     headers: {
       "Content-Type": "application/json",
+      "Origin": "http://localhost:3000", // 從 config.DEFAULT_HEADERS 手動帶入或由呼叫端傳入
     },
     // 使用 expectedStatuses 將 200 和 400 標記為成功（避免 http_req_failed 計算錯誤）
     responseType: "text",
@@ -93,6 +94,7 @@ export function login(baseUrl, credentials) {
   const params = {
     headers: {
       "Content-Type": "application/json",
+      "Origin": "http://localhost:3000",
     },
   };
 
@@ -160,9 +162,12 @@ export function login(baseUrl, credentials) {
  */
 export function getAuthenticatedSession(baseUrl) {
   // 取測試用戶或產生臨時用戶
+  // 在 setup() 階段 __VU 為 0 或 undefined，預設使用第一個用戶
+  const vuIndex = (typeof __VU !== 'undefined') ? __VU : 0;
+  
   let user =
     testUsers.length > 0
-      ? testUsers[__VU % testUsers.length]
+      ? testUsers[vuIndex % testUsers.length]
       : {
           username: `user_${randomString(6)}`,
           email: `user_${randomString(6)}@example.com`,

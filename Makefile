@@ -98,6 +98,25 @@ dev-restart:
 	docker-compose -f docker-compose.dev.yml --env-file .env.development restart
 	@echo "✅ 開發環境已重啟"
 
+dev-test:
+	@echo "🚀 啟動開發環境..."
+	docker-compose -f docker-compose.test.yml --env-file .env.development up -d
+	@echo "✅ 開發環境已啟動"
+	@echo "📍 API: http://localhost:80"
+
+dev-test-logs:
+	@echo "🚀 啟動開發環境並顯示日誌..."
+	docker-compose -f docker-compose.test.yml --env-file .env.development up
+
+dev-test-down:
+	@echo "🛑 停止開發環境..."
+	docker-compose -f docker-compose.test.yml --env-file .env.development down
+
+dev-test-restart:
+	@echo "🔄 重啟開發環境..."
+	docker-compose -f docker-compose.test.yml --env-file .env.development restart
+	@echo "✅ 開發環境已重啟"
+
 # ============================================
 # 建置指令
 # ============================================
@@ -181,87 +200,13 @@ test:
 	@echo "🧪 執行單元測試..."
 	go test ./... -v
 
-test-coverage:
-	@echo "🧪 執行測試並生成覆蓋率報告..."
-	go test ./... -coverprofile=coverage.out
-	go tool cover -html=coverage.out -o coverage.html
-	@echo "✅ 覆蓋率報告已生成: coverage.html"
-
 test-smoke:
 	@echo "🧪 執行冒煙測試 (k6)..."
 	cd loadtest && npm run test:smoke
 
-test-light:
-	@echo "🧪 執行輕量級測試 (k6)..."
-	cd loadtest && npm run test:light
-
-test-medium:
-	@echo "🧪 執行中量級測試 (k6)..."
-	cd loadtest && npm run test:medium
-
-test-heavy:
-	@echo "🧪 執行極限測試 (k6)..."
-	cd loadtest && npm run test:heavy
-
-test-ws-stress-mixed:
-	@echo "🧪 執行 WebSocket 壓力測試 (k6)..."
-	cd loadtest && npm run test:ws:stress-mixed
-
-test-ws-stress-connections:
-	@echo "🧪 執行 WebSocket 連線測試 (k6)..."
-	cd loadtest && npm run test:ws:stress-connections
-
-test-ws-stress-messaging:
-	@echo "🧪 執行 WebSocket 消息測試 (k6)..."
-	cd loadtest && npm run test:ws:stress-messaging
-
-test-ws:spike:
-	@echo "🧪 執行 WebSocket 壓力測試 (k6)..."
-	cd loadtest && npm run test:ws:spike
-
-test-ws:soak:
-	@echo "🧪 執行 WebSocket 浸泡測試 (k6)..."
-	cd loadtest && npm run test:ws:soak
-
-test-ws:soak:long:
-	@echo "🧪 執行 WebSocket 浸泡測試 (k6)..."
-	cd loadtest && npm run test:ws:soak:long
-
-test-ws:ladder-mixed:
-	@echo "🧪 執行 WebSocket 梯度測試 (k6)..."
-	cd loadtest && npm run test:ws:ladder-mixed
-
-test-ws:ladder-connections:
-	@echo "🧪 執行 WebSocket 梯度測試 (k6)..."
-	cd loadtest && npm run test:ws:ladder-connections
-
-test-ws:ladder-messaging:
-	@echo "🧪 執行 WebSocket 梯度測試 (k6)..."
-	cd loadtest && npm run test:ws:ladder-messaging
-
-test-ws:reconnect:
-	@echo "🧪 執行 WebSocket 重連測試 (k6)..."
-	cd loadtest && npm run test:ws:reconnect
-
-test-ws:reconnect:storm:
-	@echo "🧪 執行 WebSocket 重連風暴測試 (k6)..."
-	cd loadtest && npm run test:ws:reconnect:storm
-
-test-ws:reconnect:frequent:
-	@echo "🧪 執行 WebSocket 頻繁重連測試 (k6)..."
-	cd loadtest && npm run test:ws:reconnect:frequent
-
-test-all:basic:
-	@echo "🧪 執行 WebSocket 基本測試 (k6)..."
-	cd loadtest && npm run test:all:basic
-
-test-all:websocket:
-	@echo "🧪 執行 WebSocket WebSocket 測試 (k6)..."
-	cd loadtest && npm run test:all:websocket
-
-test-quick:
-	@echo "🧪 執行 WebSocket 快速測試 (k6)..."
-	cd loadtest && npm run test:quick
+test-mixed:
+	@echo "🧪 執行單體混合壓力測試 (k6 300 VU)..."
+	cd loadtest && npm run test:mixed
 
 # ============================================
 # 清理（僅限開發環境）
@@ -388,16 +333,8 @@ k8s-build:
 	@echo "✅ 映像建置完成: chat_app_backend:latest"
 
 k8s-deploy: k8s-build
-	@echo "☸️  部署到 Kubernetes..."
-	kubectl apply -f k8s/namespace.yaml
-	kubectl apply -f k8s/secret.yaml
-	kubectl apply -f k8s/configmap.yaml
-	kubectl apply -f k8s/mongodb.yaml
-	kubectl apply -f k8s/redis.yaml
-	kubectl apply -f k8s/app.yaml
-	kubectl apply -f k8s/service.yaml
-	kubectl apply -f k8s/ingress.yaml
-	kubectl apply -f k8s/hpa.yaml
+	@echo "☸️  部署到 Kubernetes (local overlay)..."
+	kubectl apply -k k8s/overlays/local
 	@echo "✅ K8s 部署完成"
 	@echo "⏳ 等待 pods 就緒..."
 	kubectl -n chat-app wait --for=condition=ready pod -l app=chat-app --timeout=120s || true
@@ -405,7 +342,7 @@ k8s-deploy: k8s-build
 
 k8s-delete:
 	@echo "🗑️  刪除 K8s 部署..."
-	kubectl delete -f k8s/ --ignore-not-found
+	kubectl delete -k k8s/overlays/local --ignore-not-found
 	@echo "✅ K8s 部署已刪除"
 
 k8s-scale:

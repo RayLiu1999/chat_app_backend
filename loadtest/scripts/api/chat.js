@@ -65,7 +65,11 @@ export default function (baseUrl, session) {
       // 不需要認證，直接通過 username 取得用戶 ID
       // 使用完整 URL 避免路徑問題
       const testApiUrl = `${baseUrl}/test/user?username=${user2.username}`;
-      const userRes = http.get(testApiUrl);
+      const userRes = http.get(testApiUrl, {
+        headers: {
+          "Origin": "http://localhost:3000",
+        }
+      });
       let userBody;
       try {
         userBody = userRes.json();
@@ -97,6 +101,7 @@ export default function (baseUrl, session) {
         logInfo('取得私聊房間列表');
         const headers = {
           ...session.headers,
+          "Origin": "http://localhost:3000",
         };
         const res = http.get(`${baseUrl}/dm_rooms`, { headers });
         
@@ -129,7 +134,8 @@ export default function (baseUrl, session) {
         const headers = {
           'Content-Type': 'application/json',
           ...session.headers,
-          ...applyCsrf(url, {}, session.csrfToken),
+          ...applyCsrf(url, {}),
+          'Origin': 'http://localhost:3000',
         };
         const res = http.post(url, payload, { headers });
         
@@ -176,7 +182,8 @@ export default function (baseUrl, session) {
           const headers = {
             'Content-Type': 'application/json',
             ...session.headers,
-            ...applyCsrf(url, {}, session.csrfToken),
+            ...applyCsrf(url, {}),
+            'Origin': 'http://localhost:3000',
           };
           const res = http.put(url, payload, { headers });
           
@@ -202,6 +209,7 @@ export default function (baseUrl, session) {
           
           const headers = {
             ...session.headers,
+            "Origin": "http://localhost:3000",
           };
           const res = http.get(`${baseUrl}/dm_rooms/${dmRoomId}/messages?limit=10`, { headers });
           

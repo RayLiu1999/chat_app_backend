@@ -23,6 +23,7 @@ export default function (baseUrl, session) {
       logInfo('取得伺服器列表');
       const headers = {
         ...session.headers,
+        "Origin": "http://localhost:3000",
       };
       const res = http.get(`${baseUrl}/servers`, { headers });
 
@@ -38,6 +39,7 @@ export default function (baseUrl, session) {
       logInfo('搜尋伺服器: query=test');
       const headers = {
         ...session.headers,
+        "Origin": "http://localhost:3000",
       };
       const res = http.get(`${baseUrl}/servers/search?query=test&page=1&limit=10`, { headers });
       
@@ -61,8 +63,9 @@ export default function (baseUrl, session) {
 
       const headers = {
         ...session.headers,
-        ...applyCsrf(url, {}, session.csrfToken),
-        "Content-Type": `multipart/form-data; boundary=${formData.boundary}`
+        ...applyCsrf(url, {}),
+        "Content-Type": `multipart/form-data; boundary=${formData.boundary}`,
+        "Origin": "http://localhost:3000",
       };
       const res = http.post(url, formData.body(), { headers });
       let body;
@@ -91,6 +94,7 @@ export default function (baseUrl, session) {
         logInfo(`取得伺服器詳細資料: ${serverId}`);
         const headers = {
           ...session.headers,
+          "Origin": "http://localhost:3000",
         };
         const res = http.get(`${baseUrl}/servers/${serverId}`, { headers });
         
@@ -106,6 +110,7 @@ export default function (baseUrl, session) {
         logInfo(`取得伺服器詳細資料含成員: ${serverId}`);
         const headers = {
           ...session.headers,
+          "Origin": "http://localhost:3000",
         };
         const res = http.get(`${baseUrl}/servers/${serverId}/detail`, { headers });
         
@@ -121,6 +126,7 @@ export default function (baseUrl, session) {
         logInfo(`取得伺服器頻道列表: ${serverId}`);
         const headers = {
           ...session.headers,
+          "Origin": "http://localhost:3000",
         };
         const res = http.get(`${baseUrl}/servers/${serverId}/channels`, { headers });
         
@@ -144,7 +150,8 @@ export default function (baseUrl, session) {
         const headers = {
           'Content-Type': 'application/json',
           ...session.headers,
-          ...applyCsrf(url, {}, session.csrfToken),
+          ...applyCsrf(url, {}),
+          'Origin': 'http://localhost:3000',
         };
 
         const res = http.post(url, payload, { headers });
@@ -175,6 +182,7 @@ export default function (baseUrl, session) {
           'Content-Type': 'application/json',
           ...session.headers,
           ...applyCsrf(url, {}, session.csrfToken),
+          'Origin': 'http://localhost:3000',
         };
         const res = http.put(url, payload, { headers });
         

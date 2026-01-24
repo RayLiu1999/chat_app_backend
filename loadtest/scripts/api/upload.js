@@ -33,8 +33,9 @@ export default function (baseUrl, session) {
       };
 
       const headers = {
-        ...applyCsrf(url, session.headers),
+        ...applyCsrf(url, {}),
         Authorization: session.headers["Authorization"],
+        "Origin": "http://localhost:3000",
       };
       // 注意：multipart 請求不需要手動設定 Content-Type
 
@@ -72,8 +73,9 @@ export default function (baseUrl, session) {
       };
 
       const headers = {
-        ...applyCsrf(url, session.headers),
+        ...applyCsrf(url, {}),
         Authorization: session.headers["Authorization"],
+        "Origin": "http://localhost:3000",
       };
 
       const res = http.post(url, data, { headers });
@@ -114,8 +116,9 @@ export default function (baseUrl, session) {
       };
 
       const headers = {
-        ...applyCsrf(url, session.headers),
+        ...applyCsrf(url, {}),
         Authorization: session.headers["Authorization"],
+        "Origin": "http://localhost:3000",
       };
 
       const res = http.post(url, data, { headers });
@@ -147,6 +150,7 @@ export default function (baseUrl, session) {
       const headers = {
         ...session.headers,
         ...applyCsrf(`${baseUrl}/files`, session.headers),
+        "Origin": "http://localhost:3000",
       };
       const res = http.get(`${baseUrl}/files`, { headers });
 

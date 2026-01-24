@@ -23,6 +23,7 @@ export default function (baseUrl, session, targetUsername, friendId) {
       logInfo("取得好友列表");
       const headers = {
         ...session.headers,
+        "Origin": "http://localhost:3000",
       };
       const res = http.get(`${baseUrl}/friends`, { headers });
 
@@ -40,6 +41,7 @@ export default function (baseUrl, session, targetUsername, friendId) {
       logInfo("取得待處理好友請求");
       const headers = {
         ...session.headers,
+        "Origin": "http://localhost:3000",
       };
       const res = http.get(`${baseUrl}/friends/pending`, { headers });
 
@@ -57,6 +59,7 @@ export default function (baseUrl, session, targetUsername, friendId) {
       logInfo("取得封鎖列表");
       const headers = {
         ...session.headers,
+        "Origin": "http://localhost:3000",
       };
       const res = http.get(`${baseUrl}/friends/blocked`, { headers });
 
@@ -80,7 +83,8 @@ export default function (baseUrl, session, targetUsername, friendId) {
         const headers = {
           "Content-Type": "application/json",
           ...session.headers,
-          ...applyCsrf(url, {}, session.csrfToken),
+          ...applyCsrf(url, {}),
+          "Origin": "http://localhost:3000",
         };
         const res = http.post(url, payload, { headers });
 
@@ -127,7 +131,8 @@ export default function (baseUrl, session, targetUsername, friendId) {
         const url = `${baseUrl}/friends/requests/${friendId}/accept`;
         const headers = {
           ...session.headers,
-          ...applyCsrf(url, {}, session.csrfToken),
+          ...applyCsrf(url, {}),
+          "Origin": "http://localhost:3000",
         };
         const res = http.put(url, null, { headers });
 
