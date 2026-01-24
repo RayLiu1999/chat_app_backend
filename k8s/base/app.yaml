@@ -19,9 +19,9 @@ spec:
       containers:
         - name: chat-app
           image: chat_app_backend:latest
-          imagePullPolicy: Never  # 使用本地 image
+          imagePullPolicy: Never # 使用本地 image
           ports:
-            - containerPort: 8111
+            - containerPort: 80
           envFrom:
             - configMapRef:
                 name: chat-app-config
@@ -45,7 +45,7 @@ spec:
           livenessProbe:
             httpGet:
               path: /health
-              port: 8111
+              port: 80
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
@@ -53,7 +53,7 @@ spec:
           readinessProbe:
             httpGet:
               path: /health
-              port: 8111
+              port: 80
             initialDelaySeconds: 5
             periodSeconds: 5
             timeoutSeconds: 3

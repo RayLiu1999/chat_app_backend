@@ -1,0 +1,23 @@
+# Production Overlay (VPS/ArgoCD)
+# 使用 GHCR image 與 ClusterIP Service
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+  - service.yaml
+  - ingress.yaml
+
+images:
+  - name: chat_app_backend
+    newName: ghcr.io/rayliu1999/chat_app_backend
+    newTag: latest
+
+patches:
+  - target:
+      kind: Deployment
+      name: chat-app
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Always

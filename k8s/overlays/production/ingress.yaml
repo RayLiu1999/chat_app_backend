@@ -1,0 +1,34 @@
+# Ingress for Chat App (Production - Traefik)
+# 支援 WebSocket 連線和 sticky session
+# TODO: 請將 chat.example.com 替換為您的實際網域
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: chat-app-ingress
+  namespace: chat-app
+  annotations:
+    # Traefik IngressRoute 配置
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    # Sticky session (基於 cookie)
+    traefik.ingress.kubernetes.io/service.sticky.cookie: "true"
+    traefik.ingress.kubernetes.io/service.sticky.cookie.name: CHAT_AFFINITY
+    traefik.ingress.kubernetes.io/service.sticky.cookie.httponly: "true"
+    # TLS (如果使用 cert-manager)
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: traefik
+  # tls:
+  #   - hosts:
+  #       - chat.example.com
+  #     secretName: chat-app-tls
+  rules:
+    - host: chat.example.com # TODO: 替換為您的實際網域
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: chat-app
+                port:
+                  number: 80
