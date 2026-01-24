@@ -38,7 +38,7 @@ func (mw *MongoWrapper) Close() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := mw.Client.Disconnect(ctx); err != nil {
-		utils.PrettyPrintf("Error disconnecting from MongoDB: %v", err)
+		utils.Log.Error("Error disconnecting from MongoDB", "error", err)
 	}
 }
 

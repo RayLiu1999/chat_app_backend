@@ -299,7 +299,7 @@ func (cs *channelService) DeleteChannel(userID string, channelID string) *models
 	err = cs.chatRepo.DeleteMessagesByRoomID(channelID)
 	if err != nil {
 		// 記錄錯誤但不阻止頻道刪除
-		utils.PrettyPrintf("刪除頻道 %s 的訊息失敗: %v", channelID, err)
+		utils.Log.Error("刪除頻道訊息失敗", "channel_id", channelID, "error", err)
 	}
 
 	// 然後刪除頻道本身

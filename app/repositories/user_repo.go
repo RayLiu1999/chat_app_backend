@@ -37,7 +37,7 @@ func (ur *userRepository) GetUserById(userID string) (*models.User, error) {
 		// 紀錄快取錯誤但繼續從資料庫獲取
 	}
 
-	utils.PrettyPrintf("Cache hit for user %s: %v\n", userID, cachedUser != "")
+	utils.Log.Debug("Cache hit for user", "user_id", userID, "hit", cachedUser != "")
 
 	if cachedUser != "" {
 		var user models.User
@@ -91,7 +91,7 @@ func (ur *userRepository) GetUserListByIds(userIds []string) ([]models.User, err
 			if err := utils.JSONToStruct(cachedUser, &user); err == nil {
 				users = append(users, user)
 
-				utils.PrettyPrintf("Cache hit for user %s: %v\n", userId, cachedUser != "")
+				utils.Log.Debug("Cache hit for user", "user_id", userId, "hit", true)
 			}
 		}
 

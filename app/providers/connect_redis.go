@@ -23,11 +23,11 @@ func NewRedisClient(cfg *config.Config) (*RedisWrapper, error) {
 
 	// 測試連線
 	if _, err := redisClient.Ping(context.Background()).Result(); err != nil {
-		utils.PrettyPrintf("Redis連線失敗: %v", err)
+		utils.Log.Error("Redis連線失敗", "error", err)
 		return nil, err
 	}
 
-	utils.PrettyPrintf("Redis連線成功")
+	utils.Log.Info("Redis連線成功")
 	return &RedisWrapper{Client: redisClient}, nil
 }
 

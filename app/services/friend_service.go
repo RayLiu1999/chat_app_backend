@@ -350,7 +350,7 @@ func (fs *friendService) AcceptFriendRequest(userID string, requestID string) *m
 	qb.Where("friend_id", userObjectID)
 	qb.Where("status", FriendStatusPending)
 
-	utils.PrettyPrint("qb.GetFilter(): ", qb.GetFilter())
+	utils.Log.Debug("查詢好友請求 Filter", "filter", qb.GetFilter())
 
 	var friendRequest models.Friend
 	err = fs.odm.FindOne(context.Background(), qb.GetFilter(), &friendRequest)

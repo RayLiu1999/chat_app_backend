@@ -88,7 +88,9 @@ func SafeGoroutine(fn func(), onPanic ...func(any)) {
 				// 記錄 panic 堆棧
 				stack := make([]byte, 4096)
 				stack = stack[:runtime.Stack(stack, false)]
-				PrettyPrintf("Goroutine panic: %v\n%s", r, stack)
+				if Log != nil {
+					Log.Error("Goroutine panic", "panic", r, "stack", string(stack))
+				}
 
 				// 調用自定義 panic 處理
 				if len(onPanic) > 0 && onPanic[0] != nil {
@@ -147,7 +149,9 @@ func (p *WorkerPool) worker() {
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
-						PrettyPrintf("工作池工作 panic: %v", r)
+						if Log != nil {
+							Log.Error("工作池工作 panic", "panic", r)
+						}
 					}
 				}()
 

@@ -24,11 +24,11 @@ func (bt *BackgroundTasks) StartOfflineUserChecker(intervalMinutes, offlineThres
 	ticker := time.NewTicker(time.Duration(intervalMinutes) * time.Minute)
 	defer ticker.Stop()
 
-	utils.PrettyPrintf("離線用戶檢查任務已啟動: 每 %d 分鐘檢查一次，閾值 %d 分鐘", intervalMinutes, offlineThresholdMinutes)
+	utils.Log.Info("離線用戶檢查任務已啟動", "interval_minutes", intervalMinutes, "threshold_minutes", offlineThresholdMinutes)
 
 	for range ticker.C {
 		if err := bt.userService.CheckAndSetOfflineUsers(offlineThresholdMinutes); err != nil {
-			utils.PrettyPrintf("離線用戶檢查失敗: %v", err)
+			utils.Log.Error("離線用戶檢查失敗", "error", err)
 		}
 	}
 }
