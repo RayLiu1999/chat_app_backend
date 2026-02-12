@@ -1,0 +1,73 @@
+# Docker Compose - 統一開發與測試環境
+# 使用方式:
+#   開發: docker-compose up
+#   壓測: docker-compose --profile test up
+
+services:
+  # 聊天應用後端服務
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ${DOCKER_TARGET:-dev} # 預設使用 dev stage，壓測時設為 prod
+      args:
+        VERSION: ${VERSION:-1.0.0}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+        GIT_BRANCH: ${GIT_BRANCH:-unknown}
+    container_name: chat_app_backend
+    restart: unless-stopped
+    ports:
+      - "${SERVER_PORT:-80}:${SERVER_PORT:-80}"
+    env_file:
+      - .env.${ENV:-development}
+    environment:
+      DOCKER_ENV: "true"
+      SERVER_MODE: ${SERVER_MODE:-development}
+      GIN_MODE: ${GIN_MODE:-debug}
+      # Go Runtime 效能調校參數
+      GOMEMLIMIT: ${GOMEMLIMIT:-900MiB}
+      GOMAXPROCS: ${GOMAXPROCS:-2}
+    volumes:
+      # 開發模式：掛載整個專案目錄（實現熱重載）
+      - .:/app
+      # Go modules 快取
+      - go-modules:/go/pkg/mod
+      # 編譯快取
+      - go-build-cache:/root/.cache/go-build
+      # 靜態檔案
+      - ./uploads:/app/uploads
+    networks:
+      - chat-network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --spider --quiet http://localhost:${SERVER_PORT:-80}/health || exit 1",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    deploy:
+      resources:
+        limits:
+          cpus: ${CPU_LIMIT:-2}
+          memory: ${MEMORY_LIMIT:-1G}
+        reservations:
+          cpus: ${CPU_RESERVATION:-0.5}
+          memory: ${MEMORY_RESERVATION:-512M}
+
+volumes:
+  go-modules:
+    driver: local
+  go-build-cache:
+    driver: local
+
+networks:
+  chat-network:
+    driver: bridge
