@@ -1,250 +1,79 @@
-name: CI/CD Pipeline
+name: Build and Deploy Backend
 
 on:
   push:
-    branches:
-      - main # 推送到 main 時執行 CI（測試）
-    tags:
-      - "v*" # 推送 v 開頭的 tag 時觸發 CD（部署）
-  pull_request:
-    branches:
-      - main # PR 到 main 時執行 CI（測試）
+    branches: ["main"]
+  workflow_dispatch:
 
 env:
-  GO_VERSION: "1.25.3"
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
+  OPS_REPO: rayliu1999/side_project_ops
+  KUSTOMIZATION_PATH: projects/chat-backend
 
 jobs:
-  # ============================================
-  # CI 階段 - 測試（PR、推送 main、推送 tag 都會執行）
-  # ============================================
   test:
     name: Run Tests
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    uses: ./.github/workflows/test.yml
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        continue-on-error: true
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: Install dependencies
-        run: go mod tidy
-
-      - name: Run tests
-        run: |
-          echo "執行單元測試（使用 Mock）..."
-          go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
-
-      - name: Generate coverage report
-        run: |
-          go tool cover -html=coverage.out -o coverage.html
-          go tool cover -func=coverage.out
-
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: test-results
-          path: |
-            coverage.out
-            coverage.html
-          retention-days: 30
-
-      - name: Check test coverage threshold
-        run: |
-          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-          echo "總覆蓋率: ${COVERAGE}%"
-
-          # 設定最低覆蓋率門檻（可調整）
-          THRESHOLD=30
-
-          if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
-            echo "❌ 測試覆蓋率 ${COVERAGE}% 低於門檻 ${THRESHOLD}%"
-            exit 1
-          else
-            echo "✅ 測試覆蓋率 ${COVERAGE}% 符合門檻 ${THRESHOLD}%"
-          fi
-
-  # ============================================
-  # CD 階段 - 部署（僅限版本標籤 v* 觸發）
-  # ============================================
-  deploy:
-    name: Build and Deploy
+  build-and-push:
     needs: test
+    name: Build and Push Docker Image
+    uses: ./.github/workflows/docker-build-reusable.yml
+    with:
+      image_name: ghcr.io/${{ github.repository }}
+      version: ${{ github.run_number }}
+    secrets:
+      github_token: ${{ secrets.GITHUB_TOKEN }}
+
+  update-gitops:
+    needs: build-and-push
+    name: Update GitOps Repository
     runs-on: ubuntu-latest
-    # 只在推送版本標籤時執行部署
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get short SHA
+        id: sha
+        run: echo "short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Checkout Ops Repo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # 獲取完整歷史以取得 tag 資訊
+          repository: ${{ env.OPS_REPO }}
+          token: ${{ secrets.OPS_REPO_PAT }}
+          path: ops-repo
 
-      - name: Extract version info
-        id: version
+      - name: Update Image Tag in Ops Repo
         run: |
-          if [[ $GITHUB_REF == refs/tags/v* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/v}
-            echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-            echo "IS_RELEASE=true" >> $GITHUB_OUTPUT
-            echo "📦 部署版本: v$VERSION"
-          else
-            VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
-            echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-            echo "IS_RELEASE=false" >> $GITHUB_OUTPUT
-            echo "🔄 部署開發版本: $VERSION"
-          fi
-          echo "BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
-          echo "GIT_COMMIT=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-          # GIT_BRANCH: tag 部署時使用 main，避免 detached HEAD 返回 "HEAD"
-          if [[ $GITHUB_REF == refs/tags/v* ]]; then
-            echo "GIT_BRANCH=main" >> $GITHUB_OUTPUT
-          else
-            echo "GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_OUTPUT
+          cd ops-repo/${{ env.KUSTOMIZATION_PATH }}
+
+          # 使用 sed 更新 image tag（假設使用 kustomization.yaml）
+          if [ -f kustomization.yaml ]; then
+            # 更新 newTag
+            sed -i "s|newTag:.*|newTag: ${{ steps.sha.outputs.short }}|g" kustomization.yaml
+          elif [ -f deployment.yaml ]; then
+            # 直接更新 deployment 中的 image tag
+            sed -i "s|image: ${{ env.IMAGE_NAME }}:.*|image: ${{ env.IMAGE_NAME }}:${{ steps.sha.outputs.short }}|g" deployment.yaml
           fi
 
-      - name: Set up SSH key
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.VPS_DEPLOY_KEY }}
-
-      - name: Add remote host to known_hosts
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
-          chmod 644 ~/.ssh/known_hosts
-
-      - name: Create remote directory
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_DEPLOY_KEY }}
-          script: |
-            mkdir -p ~/docker_pj/chat_app_backend/
-
-      - name: Copy project to server
-        run: |
-          echo "Deploying to VPS..."
-          rsync -avz --delete \
-            --exclude='.git/' \
-            --exclude='.gitignore' \
-            --exclude='.github/' \
-            --exclude='tmp/' \
-            --exclude='test_results/' \
-            --exclude='.env.example' \
-            --exclude='.env.development' \
-            --exclude='.env.production' \
-            --exclude='uploads/' \
-            --exclude='Makefile' \
-            --exclude='loadtest/' \
-            --exclude='*_test.go' \
-            --exclude='docs/' \
-            --exclude='README.md' \
-            --exclude='Dockerfile.dev' \
-            --exclude='docker-compose.dev.yml' \
-            --exclude='coverage.out' \
-            --exclude='coverage.html' \
-            --exclude='backups/' \
-            . ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:~/docker_pj/chat_app_backend/
-
-      - name: Deploy with version info
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_DEPLOY_KEY }}
-          script: |
-            cd ~/docker_pj/chat_app_backend
-            echo "=========================================="
-            echo "🚀 部署版本: v${{ steps.version.outputs.VERSION }}"
-            echo "📅 建置時間: ${{ steps.version.outputs.BUILD_TIME }}"
-            echo "🔖 Git Commit: ${{ steps.version.outputs.GIT_COMMIT }}"
-            echo "=========================================="
-
-            mkdir -p uploads
-
-            # 使用 ldflags 注入版本資訊
-            export VERSION="${{ steps.version.outputs.VERSION }}"
-            export BUILD_TIME="${{ steps.version.outputs.BUILD_TIME }}"
-            export GIT_COMMIT="${{ steps.version.outputs.GIT_COMMIT }}"
-            export GIT_BRANCH="${{ steps.version.outputs.GIT_BRANCH }}"
-
-            # 載入環境變數供 docker-compose 使用
-            set -a && source .env.production && set +a
-
-            docker-compose --env-file .env.production -f docker-compose.prod.yml down
-            docker-compose --env-file .env.production -f docker-compose.prod.yml build --no-cache \
-              --build-arg VERSION=$VERSION \
-              --build-arg BUILD_TIME=$BUILD_TIME \
-              --build-arg GIT_COMMIT=$GIT_COMMIT \
-              --build-arg GIT_BRANCH=$GIT_BRANCH
-            docker-compose --env-file .env.production -f docker-compose.prod.yml up -d
-
-            echo "✅ 部署成功！版本: v$VERSION"
-
-  # ============================================
-  # 發布階段 (僅限版本標籤)
-  # ============================================
-  release:
-    name: Create GitHub Release
-    needs: deploy
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    permissions:
-      contents: write # 允許建立 Release
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Extract version
-        id: version
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Generate changelog
-        id: changelog
-        run: |
-          # 取得上一個 tag
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-
-          if [ -n "$PREV_TAG" ]; then
-            echo "📝 生成 $PREV_TAG 到 v${{ steps.version.outputs.VERSION }} 的變更日誌"
-            CHANGELOG=$(git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges)
-          else
-            echo "📝 生成首次發布的變更日誌"
-            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges -20)
+          # 更新 timestamp 以觸發滾動更新
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          if [ -f deployment.yaml ]; then
+            sed -i "s/deploy-timestamp:.*/deploy-timestamp: \"$TIMESTAMP\"/g" deployment.yaml
           fi
 
-          # 將變更日誌寫入檔案（處理多行）
-          echo "$CHANGELOG" > changelog.txt
+          # 設定 git 使用者
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: "Chat App Backend v${{ steps.version.outputs.VERSION }}"
-          body_path: changelog.txt
-          draft: false
-          prerelease: ${{ contains(steps.version.outputs.VERSION, '-') }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 提交變更
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "ci(chat-backend): update image tag to ${{ steps.sha.outputs.short }}"
+            git push
+          fi
