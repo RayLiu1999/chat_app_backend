@@ -4,7 +4,7 @@
   "description": "k6 Load Testing for Chat Application",
   "scripts": {
     "test:smoke": "k6 run run.js --env SCENARIO=smoke",
-    "test:mixed": "k6 run run.js --env SCENARIO=monolith_mixed"
+    "test:capacity": "k6 run run.js --env SCENARIO=monolith_capacity"
   },
   "keywords": [
     "k6",

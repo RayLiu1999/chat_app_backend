@@ -165,15 +165,21 @@ export function getAuthenticatedSession(baseUrl) {
   // 在 setup() 階段 __VU 為 0 或 undefined，預設使用第一個用戶
   const vuIndex = (typeof __VU !== 'undefined') ? __VU : 0;
   
-  let user =
-    testUsers.length > 0
-      ? testUsers[vuIndex % testUsers.length]
-      : {
-          username: `user_${randomString(6)}`,
-          email: `user_${randomString(6)}@example.com`,
-          password: "Password123!",
-          nickname: `User ${randomString(6)}`,
-        };
+  let user;
+  
+  // 如果 VU 索引小於預定義用戶數，使用預定義用戶
+  if (testUsers.length > 0 && vuIndex > 0 && vuIndex <= testUsers.length) {
+    user = testUsers[vuIndex - 1];
+  } else {
+    // 否則動態生成用戶（基於 VU 索引確保每個 VU 有唯一帳號）
+    const id = vuIndex > 0 ? vuIndex : randomString(6);
+    user = {
+      username: `testuser_${id}`,
+      email: `testuser_${id}@example.com`,
+      password: "Password123!",
+      nickname: `Test User ${id}`,
+    };
+  }
 
   // 先嘗試登入
   let loginResult = login(baseUrl, {

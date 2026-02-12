@@ -3,10 +3,10 @@
  *
  * 使用方法:
  * k6 run run.js --env SCENARIO=smoke
- * k6 run run.js --env SCENARIO=monolith_mixed
+ * k6 run run.js --env SCENARIO=monolith_capacity
  *
  * 參數:
- * --env SCENARIO: 要執行的測試場景 (smoke, monolith_mixed)
+ * --env SCENARIO: 要執行的測試場景 (smoke, monolith_capacity)
  * --env BASE_URL: 覆蓋 config.js 中的 API URL (預設: http://localhost:80)
  * --env WS_URL: 覆蓋 WebSocket URL (預設: ws://localhost:80/ws)
  * --env VERBOSE: 啟用詳細日誌模式 (1 為啟用)
@@ -18,7 +18,7 @@ import { group, sleep } from "k6";
 import { Counter, Rate } from 'k6/metrics';
 import * as config from './config.js';
 import smokeTest from './scenarios/smoke.js';
-import monolithMixedTest from './scenarios/monolith_mixed.js';
+import monolithCapacityTest from './scenarios/monolith_capacity.js';
 import { getAuthenticatedSession } from './scripts/common/auth.js';
 import { logInfo, logSuccess, logError } from './scripts/common/logger.js';
 
@@ -34,7 +34,7 @@ const VERBOSE_MODE = __ENV.VERBOSE === '1';
 const scenarioName = __ENV.SCENARIO || 'smoke';
 const scenarios = {
   smoke: smokeTest,
-  monolith_mixed: monolithMixedTest,
+  monolith_capacity: monolithCapacityTest,
 };
 
 if (!scenarios[scenarioName]) {

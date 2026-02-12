@@ -67,17 +67,14 @@ export const TEST_CONFIG = {
       { duration: "5s", target: 0 }, // 5 秒內降到 0 個 VU
     ],
 
-    // 單體混合階梯測試:模擬真實負載並逐步加壓
-    monolith_mixed: [
-      { duration: "1m", target: 50 },  // 第一階:50 VU (基準)
-      { duration: "2m", target: 50 },
-      { duration: "1m", target: 100 }, // 第二階:100 VU (上次測試的效能牆)
-      { duration: "2m", target: 100 },
-      { duration: "1m", target: 200 }, // 第三階:200 VU (驗證優化效果)
-      { duration: "2m", target: 200 },
-      { duration: "1m", target: 300 }, // 第四階:300 VU (尋找新極限)
-      { duration: "2m", target: 300 },
-      { duration: "1m", target: 0 },   // 結束
+    // 單體容量測試:使用極度平緩的爬升 (1000 VU)
+    // 目的：徹底避開 Bcrypt 的 CPU 瓶頸，讓伺服器能從容地處理每一位新用戶的註冊/登入
+    monolith_capacity: [
+      { duration: "3m", target: 500 },    // 3 分鐘先到 500 VU (熱身)
+      { duration: "5m", target: 1000 },   // 5 分鐘到 1000 VU
+      { duration: "12m", target: 5000 },  // 12 分鐘快速衝刺到 5000 VU (考驗極限)
+      { duration: "10m", target: 5000 },  // 維持 10 分鐘高壓測試
+      { duration: "3m", target: 0 },     // 快速結束
     ],
   },
 };
