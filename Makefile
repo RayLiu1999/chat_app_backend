@@ -172,7 +172,13 @@ tidy:
 	go mod tidy
 
 test:
+	@echo "🧪 執行測試..."
 	go test ./... -v
+
+test-coverage:
+	@echo "🧪 執行測試並生成覆蓋率報告..."
+	go test -v -race -coverprofile=coverage.out ./...
+	go tool cover -func=coverage.out
 
 test-smoke:
 	@echo "🧪 執行冒煙測試..."

@@ -62,7 +62,9 @@ func (wsh *webSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) 
 	}
 
 	// 3. 更新 Redis 快取狀態(未來拓展用)
-	wsh.cache.Set(utils.UserStatusCacheKey(userID), "online", 24*time.Hour)
+	if wsh.cache != nil {
+		wsh.cache.Set(utils.UserStatusCacheKey(userID), "online", 24*time.Hour)
+	}
 
 	// 啟動讀寫協程
 	go wsh.clientWritePump(client)
@@ -83,15 +85,20 @@ func (wsh *webSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) 
 	}
 
 	// 3. 更新 Redis 快取狀態(未來拓展用)
-	wsh.cache.Set(utils.UserStatusCacheKey(userID), "offline", 24*time.Hour)
+	if wsh.cache != nil {
+		wsh.cache.Set(utils.UserStatusCacheKey(userID), "offline", 24*time.Hour)
+	}
 }
 
 // handleDMRoomCreation 處理私聊房間創建邏輯
 func (wsh *webSocketHandler) handleDMRoomCreation(roomID, userID string) {
-	// 1. 先檢查快取，如果已存在則直接返回 (Hot Path Optimization)
 	cacheKey := "dm_room_exists:" + roomID
-	if exists, _ := wsh.cache.Get(cacheKey); exists != "" {
-		return
+
+	// 1. 先檢查快取，如果已存在則直接返回 (Hot Path Optimization)
+	if wsh.cache != nil {
+		if exists, _ := wsh.cache.Get(cacheKey); exists != "" {
+			return
+		}
 	}
 
 	roomObjectID, err := primitive.ObjectIDFromHex(roomID)
@@ -116,7 +123,9 @@ func (wsh *webSocketHandler) handleDMRoomCreation(roomID, userID string) {
 
 	// 如果房間已存在（通常會有兩個 entry，雙方各一個），則寫入快取並返回
 	if len(dmRoomList) >= 2 {
-		wsh.cache.Set(cacheKey, "1", 24*time.Hour)
+		if wsh.cache != nil {
+			wsh.cache.Set(cacheKey, "1", 24*time.Hour)
+		}
 		return
 	}
 
@@ -163,7 +172,9 @@ func (wsh *webSocketHandler) handleDMRoomCreation(roomID, userID string) {
 	}
 
 	// 成功處理後寫入快取
-	wsh.cache.Set(cacheKey, "1", 24*time.Hour)
+	if wsh.cache != nil {
+		wsh.cache.Set(cacheKey, "1", 24*time.Hour)
+	}
 }
 
 // clientReadPump 處理客戶端讀取
@@ -220,6 +231,12 @@ func (wsh *webSocketHandler) clientReadPump(client *Client) {
 
 // updateActivityWithThrottle 使用 Redis 節流閥來更新資料庫中的用戶活動時間
 func (wsh *webSocketHandler) updateActivityWithThrottle(userID string) {
+	if wsh.cache == nil {
+		// 如果沒有快取，直接更新資料庫（不節流，或是依賴服務層自身的邏輯）
+		_ = wsh.userService.UpdateUserActivity(userID)
+		return
+	}
+
 	throttleKey := utils.UserActivityThrottleCacheKey(userID)
 
 	// 1. 檢查節流閥是否存在
@@ -242,7 +259,9 @@ func (wsh *webSocketHandler) updateActivityWithThrottle(userID string) {
 		}
 
 		// 3b. 設置節流閥，冷卻時間 3 分鐘
-		wsh.cache.Set(throttleKey, "1", 3*time.Minute)
+		if wsh.cache != nil {
+			wsh.cache.Set(throttleKey, "1", 3*time.Minute)
+		}
 	}()
 }
 

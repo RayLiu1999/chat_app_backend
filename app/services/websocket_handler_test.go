@@ -19,6 +19,26 @@ import (
 
 // --- Test Helpers ---
 
+// mockCache 模擬 providers.CacheProvider
+type mockCache struct {
+	mock.Mock
+}
+
+func (m *mockCache) Get(key string) (string, error) {
+	args := m.Called(key)
+	return args.String(0), args.Error(1)
+}
+
+func (m *mockCache) Set(key string, value string, expiration time.Duration) error {
+	args := m.Called(key, value, expiration)
+	return args.Error(0)
+}
+
+func (m *mockCache) Delete(key string) error {
+	args := m.Called(key)
+	return args.Error(0)
+}
+
 // mockClientManager 模擬 ClientManager
 type mockClientManager struct {
 	mock.Mock
