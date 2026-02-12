@@ -58,7 +58,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo \
 # ---------------------------------------------------
 # 4. Production Stage: 生產環境運行
 # ---------------------------------------------------
-FROM alpine:latest AS prod
+FROM alpine:3.20 AS prod
 
 RUN apk --no-cache add ca-certificates curl tzdata
 

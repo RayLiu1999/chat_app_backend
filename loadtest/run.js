@@ -14,7 +14,6 @@
  */
 import { SharedArray } from 'k6/data';
 import http from "k6/http";
-import { group, sleep } from "k6";
 import { Counter, Rate } from 'k6/metrics';
 import * as config from './config.js';
 import smokeTest from './scenarios/smoke.js';
@@ -74,7 +73,11 @@ export function setup() {
   let session = null;
   try {
      session = getAuthenticatedSession(`${config.TEST_CONFIG.BASE_URL}${config.TEST_CONFIG.API_PREFIX}`);
-     console.log(`🔑 身份驗證成功，Token: ${session.token.substring(0, 10)}...`);
+      if (session && session.token) {
+       console.log(`🔑 身份驗證成功，Token: ${session.token.substring(0, 10)}...`);
+      } else {
+       console.warn(`⚠️ 身份驗證未返回有效 Session`);
+      }
   } catch (e) {
      console.error(`❌ 身份驗證失敗: ${e.message}`);
   }

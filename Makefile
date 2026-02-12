@@ -1,11 +1,14 @@
 # Makefile for Chat App Backend
 # 用於本地開發環境的指令集
 
+# 預設擴展實例數
+N ?= 3
+
 .PHONY: help dev dev-logs dev-down dev-restart build logs status ps restart stop start
-.PHONY: shell test test-smoke test-limit test-ws test-analyze
+.PHONY: shell test test-coverage test-env test-env-down test-smoke test-capacity rebuild
 .PHONY: clean clean-dev fmt lint tidy run env-check install-deps init
-.PHONY: scale scale-up scale-down scale-logs scale-status scale-build
-.PHONY: k8s-deploy k8s-delete k8s-scale k8s-status k8s-logs k8s-pods
+.PHONY: scale scale-up scale-down scale-logs scale-status
+.PHONY: k8s-build k8s-deploy k8s-redeploy k8s-delete k8s-scale k8s-status k8s-logs k8s-pods k8s-health
 
 # 預設顯示幫助訊息
 help:

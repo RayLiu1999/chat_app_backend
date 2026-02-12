@@ -6,10 +6,9 @@
  * - 10% API 操作 (讀取伺服器、好友、訊息)
  * - 移除重複登入 (僅在無 Session 時登入)
  */
-import { group, sleep, check } from 'k6';
-import http from 'k6/http';
+import { group, sleep } from 'k6';
 import { randomSleep } from '../scripts/common/utils.js';
-import { login, getAuthenticatedSession } from '../scripts/common/auth.js';
+import { getAuthenticatedSession } from '../scripts/common/auth.js';
 import apiServers from '../scripts/api/servers.js';
 import apiFriends from '../scripts/api/friends.js';
 import apiChat from '../scripts/api/chat.js';
@@ -52,13 +51,19 @@ export default function (config, preAuthSession) {
         vuRoomId = serverData.channelId;
         logInfo(`[Env] VU ${__VU} 已就緒，使用房間: ${vuRoomId}`);
       } else {
-        logError(`[Env] VU ${__VU} 無法取得測試房間，使用 Dummy 降級`);
-        vuRoomId = '000000000000000000000000';
+        logError(`[Env] VU ${__VU} 無法取得測試房間，跳過本次迭代`);
+        vuRoomId = null;
       }
     } catch (e) {
       logError(`[Env] 獲取房間失敗: ${e.message}`);
-      vuRoomId = '000000000000000000000000';
+      vuRoomId = null;
     }
+  }
+
+  if (!vuRoomId) {
+    logError(`[WS] VU ${__VU} 無可用房間，跳過本次迭代`);
+    sleep(5);
+    return;
   }
 
   const randomValue = Math.random();

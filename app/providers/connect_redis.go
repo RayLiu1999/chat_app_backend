@@ -23,11 +23,15 @@ func NewRedisClient(cfg *config.Config) (*RedisWrapper, error) {
 
 	// 測試連線
 	if _, err := redisClient.Ping(context.Background()).Result(); err != nil {
-		utils.Log.Error("Redis連線失敗", "error", err)
+		if utils.Log != nil {
+			utils.Log.Error("Redis連線失敗", "error", err)
+		}
 		return nil, err
 	}
 
-	utils.Log.Info("Redis連線成功")
+	if utils.Log != nil {
+		utils.Log.Info("Redis連線成功")
+	}
 	return &RedisWrapper{Client: redisClient}, nil
 }
 

@@ -34,7 +34,7 @@ services:
       # Go modules 快取
       - go-modules:/go/pkg/mod
       # 編譯快取
-      - go-build-cache:/root/.cache/go-build
+      - go-build-cache:/app/.cache/go-build
       # 靜態檔案
       - ./uploads:/app/uploads
     networks:

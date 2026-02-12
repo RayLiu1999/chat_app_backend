@@ -84,6 +84,11 @@ func (rm *roomManager) InitRoom(roomType models.RoomType, roomID string) *Room {
 		go rm.broadcastWorker(room)
 	}
 
+	if rm.redisClient == nil {
+		utils.Log.Warn("Redis 未配置，跳過房間 Pub/Sub 訂閱", "room_key", key.String())
+		return room
+	}
+
 	// 設置 Redis Pub/Sub - 用於跨實例訊息廣播
 	go func() {
 		pubsub := rm.redisClient.Subscribe(context.Background(), "room:"+key.String())
@@ -107,7 +112,17 @@ func (rm *roomManager) InitRoom(roomType models.RoomType, roomID string) *Room {
 			}
 			room.Mutex.RLock()
 			for client := range room.Clients {
-				go rm.safelyBroadcastToClient(client, message)
+				go func(c *Client) {
+					outMsg := &WsMessage[MessageResponse]{
+						Data: message.Data,
+					}
+					if c.UserID == message.Data.SenderID {
+						outMsg.Action = "message_sent"
+					} else {
+						outMsg.Action = "new_message"
+					}
+					rm.safelyBroadcastToClient(c, outMsg)
+				}(client)
 			}
 			room.Mutex.RUnlock()
 		}
@@ -175,11 +190,11 @@ func (rm *roomManager) LeaveRoom(client *Client, roomType models.RoomType, roomI
 func (rm *roomManager) CheckUserAllowedJoinRoom(userID string, roomID string, roomType models.RoomType) (bool, error) {
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 	roomObjectID, err := primitive.ObjectIDFromHex(roomID)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 
 	ctx := context.Background()
