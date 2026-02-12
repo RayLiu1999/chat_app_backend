@@ -23,7 +23,7 @@ on:
         type: string
         default: "Dockerfile"
     secrets:
-      github_token:
+      registry_token:
         description: "GitHub Token for GHCR"
         required: true
 
@@ -46,7 +46,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.github_token }}
+          password: ${{ secrets.registry_token }}
 
       - name: Get build metadata
         id: build_meta

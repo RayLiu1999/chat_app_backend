@@ -11,6 +11,10 @@ env:
   OPS_REPO: rayliu1999/side_project_ops
   KUSTOMIZATION_PATH: projects/chat-backend
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   test:
     name: Run Tests
@@ -24,7 +28,7 @@ jobs:
       image_name: ghcr.io/${{ github.repository }}
       version: ${{ github.run_number }}
     secrets:
-      github_token: ${{ secrets.GITHUB_TOKEN }}
+      registry_token: ${{ secrets.GITHUB_TOKEN }}
 
   update-gitops:
     needs: build-and-push
