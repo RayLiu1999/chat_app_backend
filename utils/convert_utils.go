@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strconv"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // StructToJSON 將結構體轉換為 JSON 字串
@@ -123,4 +125,20 @@ func ToStr(value any) string {
 		}
 		return jsonStr
 	}
+}
+
+// ToObjectID 嘗試將字串轉換為 ObjectID，若格式錯誤回傳零值與 false
+// 主要是為了統一處理 primitive.ObjectIDFromHex 的錯誤，避免直接拋出底層 Error
+func ToObjectID(id string) (primitive.ObjectID, bool) {
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return primitive.NilObjectID, false
+	}
+	return objID, true
+}
+
+// MustObjectID 嘗試將字串轉換為 ObjectID，若格式錯誤回傳零值 (用於已驗證過格式的場景)
+func MustObjectID(id string) primitive.ObjectID {
+	objID, _ := primitive.ObjectIDFromHex(id)
+	return objID
 }

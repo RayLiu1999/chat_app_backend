@@ -175,11 +175,11 @@ func (rm *roomManager) LeaveRoom(client *Client, roomType models.RoomType, roomI
 func (rm *roomManager) CheckUserAllowedJoinRoom(userID string, roomID string, roomType models.RoomType) (bool, error) {
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return false, err
+		return false, nil
 	}
 	roomObjectID, err := primitive.ObjectIDFromHex(roomID)
 	if err != nil {
-		return false, err
+		return false, nil
 	}
 
 	ctx := context.Background()
@@ -189,6 +189,7 @@ func (rm *roomManager) CheckUserAllowedJoinRoom(userID string, roomID string, ro
 		err := rm.odm.FindOne(ctx, bson.M{"room_id": roomObjectID, "user_id": userObjectID}, dmRoom)
 		if err != nil {
 			if err == providers.ErrDocumentNotFound {
+				utils.Log.Debug("私聊房間未找到", "room_id", roomID, "user_id", userID)
 				return false, nil
 			}
 			return false, err
@@ -199,6 +200,7 @@ func (rm *roomManager) CheckUserAllowedJoinRoom(userID string, roomID string, ro
 		err := rm.odm.FindOne(ctx, bson.M{"_id": roomObjectID}, channel)
 		if err != nil {
 			if err == providers.ErrDocumentNotFound {
+				utils.Log.Debug("頻道未找到", "room_id", roomID)
 				return false, nil
 			}
 			return false, err
@@ -208,6 +210,7 @@ func (rm *roomManager) CheckUserAllowedJoinRoom(userID string, roomID string, ro
 		err = rm.odm.FindOne(ctx, bson.M{"_id": channel.ServerID}, server)
 		if err != nil {
 			if err == providers.ErrDocumentNotFound {
+				utils.Log.Debug("伺服器未找到", "server_id", channel.ServerID.Hex(), "channel_id", roomID)
 				return false, nil
 			}
 			return false, err
@@ -220,6 +223,9 @@ func (rm *roomManager) CheckUserAllowedJoinRoom(userID string, roomID string, ro
 			return false, err
 		}
 
+		if !isMember {
+			utils.Log.Debug("用戶非伺服器成員", "server_id", channel.ServerID.Hex(), "user_id", userID)
+		}
 		return isMember, nil
 	}
 	return false, nil
