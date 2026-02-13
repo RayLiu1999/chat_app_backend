@@ -85,10 +85,10 @@ func (uc *UserController) Login(c *gin.Context) {
 	}
 
 	// 將 refresh token 寫入 cookie
-	utils.SetCookie(c, uc.config, "refresh_token", response.RefreshToken, uc.config.Server.RefreshExpireHours*3600, true)
+	utils.SetCookie(c, uc.config, "refresh_token", response.RefreshToken, uc.config.JWT.RefreshExpireHours*3600, true)
 
 	// 將 CSRF token 寫入 cookie（不設定 HttpOnly，讓前端可以讀取）
-	utils.SetCookie(c, uc.config, "csrf_token", response.CSRFToken, uc.config.Server.RefreshExpireHours*3600, false)
+	utils.SetCookie(c, uc.config, "csrf_token", response.CSRFToken, uc.config.JWT.RefreshExpireHours*3600, false)
 
 	// 返回 access token 給客戶端
 	SuccessResponse(c, gin.H{"access_token": response.AccessToken}, "登入成功")
@@ -173,7 +173,7 @@ func (uc *UserController) RefreshToken(c *gin.Context) {
 	}
 
 	// 將新的 csrf token 寫入 cookie
-	utils.SetCookie(c, uc.config, "csrf_token", response.CSRFToken, uc.config.Server.RefreshExpireHours*3600, false)
+	utils.SetCookie(c, uc.config, "csrf_token", response.CSRFToken, uc.config.JWT.RefreshExpireHours*3600, false)
 
 	SuccessResponse(c, gin.H{"access_token": response.AccessToken}, "令牌刷新成功")
 }

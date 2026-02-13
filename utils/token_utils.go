@@ -34,10 +34,9 @@ func GenAccessToken(userID string) (TokenResponse, error) {
 	}
 
 	accessTokenJwtSecret := []byte(config.AppConfig.JWT.AccessSecret)
-	accessTokenExpireHours := config.AppConfig.JWT.AccessExpireHours
+	accessTokenExpireMinutes := config.AppConfig.JWT.AccessExpireMinutes
 
-	// 將小時轉換為分鐘
-	accessTokenExpireDuration := time.Duration(accessTokenExpireHours*60) * time.Minute
+	accessTokenExpireDuration := time.Duration(accessTokenExpireMinutes) * time.Minute
 	expireTime := time.Now().Add(accessTokenExpireDuration)
 	expiresAt := jwt.NewNumericDate(expireTime)
 
@@ -72,8 +71,7 @@ func GenRefreshToken(userID string) (TokenResponse, error) {
 	refreshTokenJwtSecret := []byte(config.AppConfig.JWT.RefreshSecret)
 	refreshTokenExpireHours := config.AppConfig.JWT.RefreshExpireHours
 
-	// 將小時轉換為分鐘
-	refreshTokenExpireDuration := time.Duration(refreshTokenExpireHours*60) * time.Minute
+	refreshTokenExpireDuration := time.Duration(refreshTokenExpireHours) * time.Hour
 	expireTime := time.Now().Add(refreshTokenExpireDuration)
 	expiresAt := jwt.NewNumericDate(expireTime)
 

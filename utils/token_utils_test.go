@@ -14,10 +14,10 @@ import (
 func setupTokenConfig() {
 	config.AppConfig = &config.Config{
 		JWT: config.JWTConfig{
-			AccessSecret:       "test_access_secret",
-			RefreshSecret:      "test_refresh_secret",
-			AccessExpireHours:  1,
-			RefreshExpireHours: 24 * 7,
+			AccessSecret:        "test_access_secret",
+			RefreshSecret:       "test_refresh_secret",
+			AccessExpireMinutes: 60,
+			RefreshExpireHours:  24 * 7,
 		},
 	}
 }
@@ -85,9 +85,9 @@ func TestValidateAccessToken(t *testing.T) {
 
 	t.Run("過期令牌", func(t *testing.T) {
 		// 建立過期的令牌
-		config.AppConfig.JWT.AccessExpireHours = -1
+		config.AppConfig.JWT.AccessExpireMinutes = -1
 		expiredTokenRes, _ := GenAccessToken(userID)
-		config.AppConfig.JWT.AccessExpireHours = 1 // 重置
+		config.AppConfig.JWT.AccessExpireMinutes = 60 // 重置
 
 		valid, err := ValidateAccessToken(expiredTokenRes.Token)
 		assert.Error(t, err)

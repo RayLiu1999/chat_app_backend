@@ -20,10 +20,12 @@ func setupTestConfig() {
 	if config.AppConfig == nil {
 		config.AppConfig = &config.Config{
 			Server: config.ServerConfig{
-				MainDomain:          "localhost",
-				Port:                "8080",
-				BaseURL:             "http://localhost:8080",
-				Mode:                config.TestMode,
+				MainDomain: "localhost",
+				Port:       "8080",
+				BaseURL:    "http://localhost:8080",
+				Mode:       config.TestMode,
+			},
+			JWT: config.JWTConfig{
 				AccessExpireMinutes: 15,
 				RefreshExpireHours:  24,
 			},
@@ -37,12 +39,16 @@ func setupTestRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
-		c.Set("config", &config.ServerConfig{
-			MainDomain:          "localhost",
-			Port:                "8080",
-			BaseURL:             "http://localhost:8080",
-			AccessExpireMinutes: 15,
-			RefreshExpireHours:  24,
+		c.Set("config", &config.Config{
+			Server: config.ServerConfig{
+				MainDomain: "localhost",
+				Port:       "8080",
+				BaseURL:    "http://localhost:8080",
+			},
+			JWT: config.JWTConfig{
+				AccessExpireMinutes: 15,
+				RefreshExpireHours:  24,
+			},
 		})
 		c.Next()
 	})
@@ -182,7 +188,7 @@ func TestUserController_Login(t *testing.T) {
 		mockUserService.On("Login", mock.AnythingOfType("models.User")).Return(loginResponse, nil)
 
 		cfg := &config.Config{
-			Server: config.ServerConfig{
+			JWT: config.JWTConfig{
 				RefreshExpireHours: 24,
 			},
 		}

@@ -26,15 +26,13 @@ const (
 )
 
 type ServerConfig struct {
-	MainDomain          string
-	Port                string
-	BaseURL             string
-	Mode                ModeConfig
-	Timezone            string
-	AllowedOrigins      []string
-	TrustedProxies      []string
-	AccessExpireMinutes int
-	RefreshExpireHours  int
+	MainDomain     string
+	Port           string
+	BaseURL        string
+	Mode           ModeConfig
+	Timezone       string
+	AllowedOrigins []string
+	TrustedProxies []string
 }
 
 type DatabaseConfig struct {
@@ -51,10 +49,10 @@ type RedisConfig struct {
 }
 
 type JWTConfig struct {
-	AccessSecret       string
-	RefreshSecret      string
-	AccessExpireHours  int
-	RefreshExpireHours int
+	AccessSecret        string
+	RefreshSecret       string
+	AccessExpireMinutes int
+	RefreshExpireHours  int
 }
 
 type UploadConfig struct {
@@ -78,15 +76,13 @@ func LoadConfig() {
 
 	AppConfig = &Config{
 		Server: ServerConfig{
-			MainDomain:          getEnv("SERVER_MAIN_DOMAIN", "localhost"),
-			Port:                getEnv("SERVER_PORT", "8080"),
-			BaseURL:             getEnv("SERVER_BASE_URL", "http://localhost"),
-			Mode:                ModeConfig(getEnv("SERVER_MODE", "development")),
-			Timezone:            getEnv("TIMEZONE", "Asia/Taipei"),
-			AllowedOrigins:      strings.Split(getEnv("ALLOWED_ORIGINS", "http://localhost:3000"), ","),
-			TrustedProxies:      strings.Split(getEnv("TRUSTED_PROXIES", "127.0.0.1,::1,172.16.0.0/12,10.0.0.0/8,192.168.0.0/16"), ","),
-			AccessExpireMinutes: getEnvAsInt("ACCESS_TOKEN_EXPIRE_MINUTES", 30),
-			RefreshExpireHours:  getEnvAsInt("REFRESH_TOKEN_EXPIRE_HOURS", 72),
+			MainDomain:     getEnv("SERVER_MAIN_DOMAIN", "localhost"),
+			Port:           getEnv("SERVER_PORT", "8080"),
+			BaseURL:        getEnv("SERVER_BASE_URL", "http://localhost"),
+			Mode:           ModeConfig(getEnv("SERVER_MODE", "development")),
+			Timezone:       getEnv("TIMEZONE", "Asia/Taipei"),
+			AllowedOrigins: strings.Split(getEnv("ALLOWED_ORIGINS", "http://localhost:3000"), ","),
+			TrustedProxies: strings.Split(getEnv("TRUSTED_PROXIES", "127.0.0.1,::1,172.16.0.0/12,10.0.0.0/8,192.168.0.0/16"), ","),
 		},
 		Database: DatabaseConfig{
 			MongoURI:        getEnv("MONGO_URI", "localhost:27017"),
@@ -100,10 +96,10 @@ func LoadConfig() {
 			Password: getEnv("REDIS_PASSWORD", ""),
 		},
 		JWT: JWTConfig{
-			AccessSecret:       getEnv("JWT_ACCESS_SECRET", ""),
-			RefreshSecret:      getEnv("JWT_REFRESH_SECRET", ""),
-			AccessExpireHours:  getEnvAsInt("JWT_ACCESS_EXPIRE_HOURS", 24),
-			RefreshExpireHours: getEnvAsInt("JWT_REFRESH_EXPIRE_HOURS", 168),
+			AccessSecret:        getEnv("JWT_ACCESS_SECRET", ""),
+			RefreshSecret:       getEnv("JWT_REFRESH_SECRET", ""),
+			AccessExpireMinutes: getEnvAsInt("JWT_ACCESS_EXPIRE_MINUTES", 30),
+			RefreshExpireHours:  getEnvAsInt("JWT_REFRESH_EXPIRE_HOURS", 168),
 		},
 		Upload: UploadConfig{
 			MaxSize:      getEnvAsInt64("UPLOAD_MAX_SIZE", 10485760),

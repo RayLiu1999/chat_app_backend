@@ -24,8 +24,8 @@ func setupTestRouter(req *http.Request) (*gin.Context, *httptest.ResponseRecorde
 func setupTestAppConfig() {
 	config.AppConfig = &config.Config{
 		JWT: config.JWTConfig{
-			AccessSecret:      "test_secret",
-			AccessExpireHours: 1,
+			AccessSecret:        "test_secret",
+			AccessExpireMinutes: 60,
 		},
 	}
 }
