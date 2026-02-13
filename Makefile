@@ -83,7 +83,7 @@ dev-restart:
 
 test-env:
 	@echo "🚀 啟動壓測環境 (Prod Image)..."
-	DOCKER_TARGET=prod CPU_LIMIT=4 MEMORY_LIMIT=2G GOMEMLIMIT=1800MiB docker-compose --profile test up -d
+	DOCKER_TARGET=prod ENV_FILE=.env CPU_LIMIT=4 MEMORY_LIMIT=2G GOMEMLIMIT=1800MiB docker-compose --profile test up -d
 	@echo "✅ 壓測環境已啟動"
 
 test-env-down:

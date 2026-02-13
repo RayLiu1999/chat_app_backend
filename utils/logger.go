@@ -11,7 +11,7 @@ import (
 // development: Text 格式, Debug Level
 func InitLogger(env string) {
 	if env == "" {
-		env = os.Getenv("SERVER_MODE")
+		env = os.Getenv("ENV")
 	}
 
 	var handler slog.Handler

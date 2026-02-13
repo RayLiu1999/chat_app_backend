@@ -33,10 +33,11 @@ services:
     # 不暴露固定端口，由 nginx 負載均衡
     expose:
       - "${SERVER_PORT:-80}"
-    env_file: .env.${ENV:-development}
+    env_file: 
+      - ${ENV_FILE:-.env.development}
     environment:
       DOCKER_ENV: "true"
-      SERVER_MODE: "development"
+      ENV: "development"
       GIN_MODE: "debug"
       # 用於識別不同實例
       INSTANCE_ID: "${HOSTNAME:-unknown}"

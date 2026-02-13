@@ -2,7 +2,11 @@
 set -euo pipefail
 
 ENV_NAME="${1:-development}"
-ENV_FILE=".env.${ENV_NAME}"
+if [[ "${ENV_NAME}" == "production" ]]; then
+  ENV_FILE=".env"
+else
+  ENV_FILE=".env.${ENV_NAME}"
+fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 

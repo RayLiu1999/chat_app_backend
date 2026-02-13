@@ -64,14 +64,28 @@ var AppConfig *Config
 
 func LoadConfig() {
 	// 根據環境載入對應的 .env 檔案
-	// Docker 環境會透過 docker-compose 的 env_file 載入，這裡是給本地開發用
-	envFile := ".env.development"
-	if os.Getenv("SERVER_MODE") == string(ProductionMode) {
-		envFile = ".env.production"
+	// 優先順序：ENV_FILE > 預設檔案
+	// - production: 預設 .env（可向下相容 fallback .env.production）
+	// - others:     預設 .env.development
+	envFile := os.Getenv("ENV_FILE")
+	if envFile == "" {
+		if os.Getenv("ENV") == string(ProductionMode) {
+			envFile = ".env"
+		} else {
+			envFile = ".env.development"
+		}
 	}
 
 	if err := godotenv.Load(envFile); err != nil {
-		log.Printf("未找到 %s 檔案，使用系統環境變數", envFile)
+		if envFile == ".env" {
+			if fallbackErr := godotenv.Load(".env.production"); fallbackErr != nil {
+				log.Printf("未找到 %s / .env.production，使用系統環境變數", envFile)
+			} else {
+				log.Printf("未找到 %s，已 fallback 載入 .env.production", envFile)
+			}
+		} else {
+			log.Printf("未找到 %s 檔案，使用系統環境變數", envFile)
+		}
 	}
 
 	AppConfig = &Config{
@@ -79,7 +93,7 @@ func LoadConfig() {
 			MainDomain:     getEnv("SERVER_MAIN_DOMAIN", "localhost"),
 			Port:           getEnv("SERVER_PORT", "8080"),
 			BaseURL:        getEnv("SERVER_BASE_URL", "http://localhost"),
-			Mode:           ModeConfig(getEnv("SERVER_MODE", "development")),
+			Mode:           ModeConfig(getEnv("ENV", "development")),
 			Timezone:       getEnv("TIMEZONE", "Asia/Taipei"),
 			AllowedOrigins: strings.Split(getEnv("ALLOWED_ORIGINS", "http://localhost:3000"), ","),
 			TrustedProxies: strings.Split(getEnv("TRUSTED_PROXIES", "127.0.0.1,::1,172.16.0.0/12,10.0.0.0/8,192.168.0.0/16"), ","),

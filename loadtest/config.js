@@ -6,7 +6,7 @@ export const TEST_CONFIG = {
   API_PREFIX: "",
   WS_URL: __ENV.WS_URL || "ws://localhost:80/ws",
   RESULTS_DIR: "test_results",
-  // 增加預設 Header 供所有測試請求使用，解決 SERVER_MODE=production 時的 VerifyOrigin 驗證問題
+  // 增加預設 Header 供所有測試請求使用，解決 ENV=production 時的 VerifyOrigin 驗證問題
   DEFAULT_HEADERS: {
     "Origin": "http://localhost:3000",
   },
