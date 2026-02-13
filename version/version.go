@@ -10,7 +10,7 @@ import (
 // 版本資訊變數，可在編譯時透過 -ldflags 覆蓋
 var (
 	// Version 應用程式版本號 (語義化版本)
-	Version = "1.0.0"
+	Version = "1.0.6"
 
 	// BuildTime 編譯時間 (ISO 8601 格式)
 	BuildTime = "unknown"
