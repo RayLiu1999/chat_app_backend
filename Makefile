@@ -6,7 +6,7 @@ N ?= 3
 
 .PHONY: help dev dev-logs dev-down dev-restart build logs status ps restart stop start
 .PHONY: shell test test-coverage test-env test-env-down test-smoke test-prepare-users test-capacity test-capacity-prepared rebuild
-.PHONY: clean clean-dev fmt lint tidy run env-check install-deps init
+.PHONY: clean clean-dev fmt lint tidy run env-check install-deps init mongo-init
 .PHONY: scale scale-up scale-down scale-logs scale-status
 .PHONY: k8s-build k8s-deploy k8s-redeploy k8s-delete k8s-scale k8s-status k8s-logs k8s-pods k8s-health
 
@@ -201,6 +201,12 @@ test-capacity-prepared:
 	@echo "🧪 先準備用戶，再執行容量測試..."
 	cd loadtest && k6 run prepare_users.js --env USER_COUNT=$(USER_COUNT)
 	cd loadtest && k6 run run.js --env SCENARIO=monolith_capacity --env PREPARE_USERS=1 --env PREPARE_USER_COUNT=$(USER_COUNT)
+
+mongo-init:
+	@echo "🗄️  初始化 MongoDB (ENV=$(ENV))..."
+	ADMIN_USERNAME="$(ADMIN_USERNAME)" \
+	ADMIN_PASSWORD="$(ADMIN_PASSWORD)" \
+	bash scripts/mongo-init.sh $(ENV)
 
 env-check:
 	@if [ ! -f .env.development ]; then \
