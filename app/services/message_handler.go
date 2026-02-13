@@ -3,9 +3,9 @@ package services
 import (
 	"chat_app_backend/app/models"
 	"chat_app_backend/app/providers"
-	"chat_app_backend/utils"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -32,7 +32,7 @@ func NewMessageHandler(odm providers.ODM, roomManager RoomManager, redisClient *
 // 透過 Redis Pub/Sub 實現跨實例廣播
 func (mh *messageHandler) HandleMessage(message *MessageResponse) {
 	if err := mh.saveMessageToDB(message); err != nil {
-		utils.Log.Error("儲存消息到資料庫失敗", "error", err)
+		slog.Error("儲存消息到資料庫失敗", "error", err)
 		return
 	}
 
@@ -45,7 +45,7 @@ func (mh *messageHandler) HandleMessage(message *MessageResponse) {
 	// 序列化訊息
 	msgJSON, err := json.Marshal(wsMsg)
 	if err != nil {
-		utils.Log.Error("序列化訊息失敗", "error", err)
+		slog.Error("序列化訊息失敗", "error", err)
 		return
 	}
 
@@ -60,7 +60,7 @@ func (mh *messageHandler) HandleMessage(message *MessageResponse) {
 		return
 	}
 	if err := mh.redisClient.Publish(ctx, channel, msgJSON).Err(); err != nil {
-		utils.Log.Error("Redis Publish 失敗", "error", err)
+		slog.Error("Redis Publish 失敗", "error", err)
 		// 如果 Redis 失敗，回退到本地廣播
 		mh.localBroadcast(message)
 		return
@@ -153,7 +153,7 @@ func (mh *messageHandler) updateRoomLastMessage(roomID string, roomType models.R
 		// 更新 dm_rooms 的 updated_at
 		dmRoom := &models.DMRoom{}
 		if err := mh.odm.UpdateMany(ctx, dmRoom, map[string]any{"room_id": roomObjectID}, map[string]any{"$set": map[string]any{"updated_at": time.Now()}}); err != nil {
-			utils.Log.Warn("更新 dm 房間最後訊息時間失敗", "room_id", roomID, "error", err)
+			slog.Warn("更新 dm 房間最後訊息時間失敗", "room_id", roomID, "error", err)
 		}
 	case models.RoomTypeChannel:
 		// 更新 channels 的 last_message_at
@@ -161,7 +161,7 @@ func (mh *messageHandler) updateRoomLastMessage(roomID string, roomType models.R
 		if err := mh.odm.UpdateMany(ctx, &models.Channel{},
 			map[string]any{"_id": roomObjectID},
 			map[string]any{"$set": map[string]any{"last_message_at": now}}); err != nil {
-			utils.Log.Warn("更新 channel 房間最後訊息時間失敗", "channel_id", roomID, "error", err)
+			slog.Warn("更新 channel 房間最後訊息時間失敗", "channel_id", roomID, "error", err)
 		}
 	}
 }

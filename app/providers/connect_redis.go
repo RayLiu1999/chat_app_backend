@@ -2,8 +2,8 @@ package providers
 
 import (
 	"chat_app_backend/config"
-	"chat_app_backend/utils"
 	"context"
+	"log/slog"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -23,15 +23,11 @@ func NewRedisClient(cfg *config.Config) (*RedisWrapper, error) {
 
 	// 測試連線
 	if _, err := redisClient.Ping(context.Background()).Result(); err != nil {
-		if utils.Log != nil {
-			utils.Log.Error("Redis連線失敗", "error", err)
-		}
+		slog.Error("Redis連線失敗", "error", err)
 		return nil, err
 	}
 
-	if utils.Log != nil {
-		utils.Log.Info("Redis連線成功")
-	}
+	slog.Info("Redis連線成功")
 	return &RedisWrapper{Client: redisClient}, nil
 }
 

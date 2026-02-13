@@ -6,6 +6,7 @@ import (
 	"chat_app_backend/utils"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -58,7 +59,7 @@ func (wsh *webSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) 
 
 	// 2. 更新資料庫狀態
 	if err := wsh.userService.SetUserOnline(userID); err != nil {
-		utils.Log.Warn("無法將用戶設定為在線", "user_id", userID, "error", err)
+		slog.Warn("無法將用戶設定為在線", "user_id", userID, "error", err)
 	}
 
 	// 3. 更新 Redis 快取狀態(未來拓展用)
@@ -81,7 +82,7 @@ func (wsh *webSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) 
 
 	// 2. 更新資料庫狀態
 	if err := wsh.userService.SetUserOffline(userID); err != nil {
-		utils.Log.Warn("無法將用戶設定為離線", "user_id", userID, "error", err)
+		slog.Warn("無法將用戶設定為離線", "user_id", userID, "error", err)
 	}
 
 	// 3. 更新 Redis 快取狀態(未來拓展用)
@@ -103,13 +104,13 @@ func (wsh *webSocketHandler) handleDMRoomCreation(roomID, userID string) {
 
 	roomObjectID, err := primitive.ObjectIDFromHex(roomID)
 	if err != nil {
-		utils.Log.Error("無法解析房間 ID", "error", err)
+		slog.Error("無法解析房間 ID", "error", err)
 		return
 	}
 
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		utils.Log.Error("無法解析用戶 ID", "error", err)
+		slog.Error("無法解析用戶 ID", "error", err)
 		return
 	}
 
@@ -117,7 +118,7 @@ func (wsh *webSocketHandler) handleDMRoomCreation(roomID, userID string) {
 	var dmRoomList []models.DMRoom
 	err = wsh.odm.Find(ctx, map[string]any{"room_id": roomObjectID}, &dmRoomList)
 	if err != nil {
-		utils.Log.Warn("無法找到私聊房間", "room_id", roomID)
+		slog.Warn("無法找到私聊房間", "room_id", roomID)
 		return
 	}
 
@@ -150,10 +151,10 @@ func (wsh *webSocketHandler) handleDMRoomCreation(roomID, userID string) {
 		}
 		err := wsh.odm.Create(ctx, newRoom)
 		if err != nil {
-			utils.Log.Error("無法為用戶創建私聊房間", "user_id", userID, "error", err)
+			slog.Error("無法為用戶創建私聊房間", "user_id", userID, "error", err)
 			return
 		}
-		utils.Log.Debug("已為用戶創建私聊房間記錄", "user_id", userID, "room_id", roomID)
+		slog.Debug("已為用戶創建私聊房間記錄", "user_id", userID, "room_id", roomID)
 	}
 
 	if partnerUserRoom == nil && currentUserRoom != nil {
@@ -165,10 +166,10 @@ func (wsh *webSocketHandler) handleDMRoomCreation(roomID, userID string) {
 		}
 		err := wsh.odm.Create(ctx, newRoom)
 		if err != nil {
-			utils.Log.Error("無法為對方創建私聊房間", "error", err)
+			slog.Error("無法為對方創建私聊房間", "error", err)
 			return
 		}
-		utils.Log.Debug("已為對方創建私聊房間記錄", "room_id", roomID)
+		slog.Debug("已為對方創建私聊房間記錄", "room_id", roomID)
 	}
 
 	// 成功處理後寫入快取
@@ -185,7 +186,7 @@ func (wsh *webSocketHandler) clientReadPump(client *Client) {
 			if client != nil {
 				userID = client.UserID
 			}
-			utils.Log.Error("讀取泵 panic", "user_id", userID, "panic", r)
+			slog.Error("讀取泵 panic", "user_id", userID, "panic", r)
 		}
 		if client != nil {
 			client.Cancel() // 取消所有協程
@@ -209,10 +210,10 @@ func (wsh *webSocketHandler) clientReadPump(client *Client) {
 			if err != nil {
 				// 只在意外關閉時印日誌，避免大量 EOF/Close 刷屏
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-					utils.Log.Warn("WebSocket 意外關閉", "user_id", client.UserID, "error", err)
+					slog.Warn("WebSocket 意外關閉", "user_id", client.UserID, "error", err)
 				} else {
 					// 讀取失敗通常意味著斷線，使用 Debug 等級
-					utils.Log.Debug("讀取訊息失敗", "user_id", client.UserID, "error", err)
+					slog.Debug("讀取訊息失敗", "user_id", client.UserID, "error", err)
 				}
 				return
 			}
@@ -254,7 +255,7 @@ func (wsh *webSocketHandler) updateActivityWithThrottle(userID string) {
 	go func() {
 		// 3a. 更新資料庫
 		if err := wsh.userService.UpdateUserActivity(userID); err != nil {
-			utils.Log.Warn("無法更新用戶活動時間", "user_id", userID, "error", err)
+			slog.Warn("無法更新用戶活動時間", "user_id", userID, "error", err)
 			return // 如果更新失敗，則不設置節流閥，以便下次重試
 		}
 
@@ -271,7 +272,7 @@ func (wsh *webSocketHandler) clientWritePump(client *Client) {
 	defer func() {
 		ticker.Stop()
 		if r := recover(); r != nil {
-			utils.Log.Error("寫入泵 panic", "user_id", client.UserID, "panic", r)
+			slog.Error("寫入泵 panic", "user_id", client.UserID, "panic", r)
 		}
 		client.Conn.Close()
 	}()
@@ -293,14 +294,14 @@ func (wsh *webSocketHandler) clientWritePump(client *Client) {
 			}
 
 			if err := client.Conn.WriteMessage(websocket.TextMessage, message); err != nil {
-				utils.Log.Debug("寫入訊息失敗", "user_id", client.UserID, "error", err)
+				slog.Debug("寫入訊息失敗", "user_id", client.UserID, "error", err)
 				return
 			}
 
 		case <-ticker.C:
 			client.Conn.SetWriteDeadline(time.Now().Add(WriteWait))
 			if err := client.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				utils.Log.Debug("發送 Ping 失敗", "user_id", client.UserID, "error", err)
+				slog.Debug("發送 Ping 失敗", "user_id", client.UserID, "error", err)
 				return
 			}
 		}
@@ -320,7 +321,7 @@ func (wsh *webSocketHandler) handleClientMessage(client *Client, msg WsMessage[j
 		// 處理客戶端ping
 		wsh.handlePing(client)
 	default:
-		utils.Log.Warn("未知動作", "user_id", client.UserID, "action", msg.Action)
+		slog.Warn("未知動作", "user_id", client.UserID, "action", msg.Action)
 		client.SendError("unknown_action", "未知的動作類型")
 	}
 }
@@ -337,7 +338,7 @@ func (wsh *webSocketHandler) handleJoinRoom(client *Client, data json.RawMessage
 	}
 	err := json.Unmarshal(data, &requestData)
 	if err != nil {
-		utils.Log.Error("無法解析加入房間數據", "error", err)
+		slog.Error("無法解析加入房間數據", "error", err)
 		client.SendError(action, "無法解析加入房間數據")
 		return
 	}
@@ -379,7 +380,7 @@ func (wsh *webSocketHandler) handleLeaveRoom(client *Client, data json.RawMessag
 	}
 	err := json.Unmarshal(data, &requestData)
 	if err != nil {
-		utils.Log.Error("無法解析離開房間數據", "error", err)
+		slog.Error("無法解析離開房間數據", "error", err)
 		client.SendError(action, "無法解析離開房間數據")
 		return
 	}
@@ -407,7 +408,7 @@ func (wsh *webSocketHandler) handleSendMessage(client *Client, data json.RawMess
 	}
 	err := json.Unmarshal(data, &requestData)
 	if err != nil {
-		utils.Log.Error("無法解析發送訊息數據", "error", err)
+		slog.Error("無法解析發送訊息數據", "error", err)
 		client.SendError(action, "無法解析發送訊息數據")
 		return
 	}
@@ -444,6 +445,6 @@ func (wsh *webSocketHandler) handlePing(client *Client) {
 
 	if err := client.SendMessage(pongMsg); err != nil {
 		client.SendError("ping", "無法發送 pong 訊息")
-		utils.Log.Debug("無法向客戶端發送 pong", "user_id", client.UserID, "error", err)
+		slog.Debug("無法向客戶端發送 pong", "user_id", client.UserID, "error", err)
 	}
 }

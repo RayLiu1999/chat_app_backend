@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"runtime"
 	"sync"
 	"time"
@@ -88,9 +89,7 @@ func SafeGoroutine(fn func(), onPanic ...func(any)) {
 				// 記錄 panic 堆棧
 				stack := make([]byte, 4096)
 				stack = stack[:runtime.Stack(stack, false)]
-				if Log != nil {
-					Log.Error("Goroutine panic", "panic", r, "stack", string(stack))
-				}
+				slog.Error("Goroutine panic", "panic", r, "stack", string(stack))
 
 				// 調用自定義 panic 處理
 				if len(onPanic) > 0 && onPanic[0] != nil {
@@ -149,9 +148,7 @@ func (p *WorkerPool) worker() {
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
-						if Log != nil {
-							Log.Error("工作池工作 panic", "panic", r)
-						}
+						slog.Error("工作池工作 panic", "panic", r)
 					}
 				}()
 

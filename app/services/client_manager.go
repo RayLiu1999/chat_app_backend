@@ -1,8 +1,8 @@
 package services
 
 import (
-	"chat_app_backend/utils"
 	"context"
+	"log/slog"
 	"maps"
 	"sync"
 	"time"
@@ -84,18 +84,18 @@ func (cm *clientManager) GetAllClients() map[*Client]bool {
 // handleRegister 處理客戶端註冊
 func (cm *clientManager) handleRegister() {
 	for client := range cm.register {
-		utils.Log.Debug("正在處理用戶註冊事件", "user_id", client.UserID)
+		slog.Debug("正在處理用戶註冊事件", "user_id", client.UserID)
 		cm.registerClient(client)
-		utils.Log.Debug("用戶註冊事件已完成", "user_id", client.UserID)
+		slog.Debug("用戶註冊事件已完成", "user_id", client.UserID)
 	}
 }
 
 // handleUnregister 處理客戶端註銷
 func (cm *clientManager) handleUnregister() {
 	for client := range cm.unregister {
-		utils.Log.Debug("正在處理用戶註銷事件", "user_id", client.UserID)
+		slog.Debug("正在處理用戶註銷事件", "user_id", client.UserID)
 		cm.unregisterClient(client)
-		utils.Log.Debug("用戶註銷事件已完成", "user_id", client.UserID)
+		slog.Debug("用戶註銷事件已完成", "user_id", client.UserID)
 	}
 }
 
@@ -108,7 +108,7 @@ func (cm *clientManager) registerClient(client *Client) {
 	cm.clients[client] = true
 	cm.clientsByUserID[client.UserID] = client
 
-	utils.Log.Info("客戶端已註冊", "user_id", client.UserID, "total_connections", len(cm.clients))
+	slog.Info("客戶端已註冊", "user_id", client.UserID, "total_connections", len(cm.clients))
 }
 
 // unregisterClient 註銷客戶端
@@ -135,7 +135,7 @@ func (cm *clientManager) unregisterClient(client *Client) {
 		client.Conn.Close()
 	}
 
-	utils.Log.Info("客戶端已註銷", "user_id", client.UserID, "total_connections", len(cm.clients))
+	slog.Info("客戶端已註銷", "user_id", client.UserID, "total_connections", len(cm.clients))
 }
 
 // CheckClientsHealth 檢查所有客戶端的健康狀態
@@ -152,7 +152,7 @@ func (cm *clientManager) CheckClientsHealth() {
 
 	// 移除不健康的客戶端
 	for _, client := range unhealthyClients {
-		utils.Log.Warn("客戶端健康檢查失敗，強制斷開", "user_id", client.UserID)
+		slog.Warn("客戶端健康檢查失敗，強制斷開", "user_id", client.UserID)
 		cm.Unregister(client)
 	}
 }

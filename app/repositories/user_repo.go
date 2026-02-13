@@ -7,6 +7,7 @@ import (
 	"chat_app_backend/utils"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -37,7 +38,7 @@ func (ur *userRepository) GetUserById(userID string) (*models.User, error) {
 		// 紀錄快取錯誤但繼續從資料庫獲取
 	}
 
-	utils.Log.Debug("Cache hit for user", "user_id", userID, "hit", cachedUser != "")
+	slog.Debug("Cache hit for user", "user_id", userID, "hit", cachedUser != "")
 
 	if cachedUser != "" {
 		var user models.User
@@ -91,7 +92,7 @@ func (ur *userRepository) GetUserListByIds(userIds []string) ([]models.User, err
 			if err := utils.JSONToStruct(cachedUser, &user); err == nil {
 				users = append(users, user)
 
-				utils.Log.Debug("Cache hit for user", "user_id", userId, "hit", true)
+				slog.Debug("Cache hit for user", "user_id", userId, "hit", true)
 			}
 		}
 

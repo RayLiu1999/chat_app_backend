@@ -5,14 +5,14 @@ import (
 	"os"
 )
 
-var Log *slog.Logger
-
 // InitLogger 初始化日誌系統
-// 根據環境變數 GO_ENV 決定輸出格式
+// 根據參數 env 決定輸出格式
 // production: JSON 格式, Info Level
 // development: Text 格式, Debug Level
-func InitLogger() {
-	env := os.Getenv("GO_ENV")
+func InitLogger(env string) {
+	if env == "" {
+		env = os.Getenv("SERVER_MODE")
+	}
 
 	var handler slog.Handler
 
@@ -30,13 +30,13 @@ func InitLogger() {
 		handler = slog.NewTextHandler(os.Stdout, opts)
 	}
 
-	Log = slog.New(handler)
+	logger := slog.New(handler)
 
 	// 設置為預設 logger
-	slog.SetDefault(Log)
+	slog.SetDefault(logger)
 }
 
 // 確保在包初始化時就可用，但建議在 main 中再次調用 InitLogger 以正確讀取 ENV
 func init() {
-	InitLogger()
+	InitLogger("development")
 }

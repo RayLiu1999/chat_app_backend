@@ -4,9 +4,9 @@ import (
 	"chat_app_backend/app/models"
 	"chat_app_backend/app/providers"
 	"chat_app_backend/app/repositories"
-	"chat_app_backend/utils"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -85,7 +85,7 @@ func (rm *roomManager) InitRoom(roomType models.RoomType, roomID string) *Room {
 	}
 
 	if rm.redisClient == nil {
-		utils.Log.Warn("Redis 未配置，跳過房間 Pub/Sub 訂閱", "room_key", key.String())
+		slog.Warn("Redis 未配置，跳過房間 Pub/Sub 訂閱", "room_key", key.String())
 		return room
 	}
 
@@ -107,7 +107,7 @@ func (rm *roomManager) InitRoom(roomType models.RoomType, roomID string) *Room {
 		for msg := range pubsub.Channel() {
 			var message *WsMessage[MessageResponse]
 			if err := json.Unmarshal([]byte(msg.Payload), &message); err != nil {
-				utils.Log.Error("解析消息失敗", "error", err)
+				slog.Error("解析消息失敗", "error", err)
 				continue
 			}
 			room.Mutex.RLock()
@@ -204,7 +204,7 @@ func (rm *roomManager) CheckUserAllowedJoinRoom(userID string, roomID string, ro
 		err := rm.odm.FindOne(ctx, bson.M{"room_id": roomObjectID, "user_id": userObjectID}, dmRoom)
 		if err != nil {
 			if err == providers.ErrDocumentNotFound {
-				utils.Log.Debug("私聊房間未找到", "room_id", roomID, "user_id", userID)
+				slog.Debug("私聊房間未找到", "room_id", roomID, "user_id", userID)
 				return false, nil
 			}
 			return false, err
@@ -215,7 +215,7 @@ func (rm *roomManager) CheckUserAllowedJoinRoom(userID string, roomID string, ro
 		err := rm.odm.FindOne(ctx, bson.M{"_id": roomObjectID}, channel)
 		if err != nil {
 			if err == providers.ErrDocumentNotFound {
-				utils.Log.Debug("頻道未找到", "room_id", roomID)
+				slog.Debug("頻道未找到", "room_id", roomID)
 				return false, nil
 			}
 			return false, err
@@ -225,7 +225,7 @@ func (rm *roomManager) CheckUserAllowedJoinRoom(userID string, roomID string, ro
 		err = rm.odm.FindOne(ctx, bson.M{"_id": channel.ServerID}, server)
 		if err != nil {
 			if err == providers.ErrDocumentNotFound {
-				utils.Log.Debug("伺服器未找到", "server_id", channel.ServerID.Hex(), "channel_id", roomID)
+				slog.Debug("伺服器未找到", "server_id", channel.ServerID.Hex(), "channel_id", roomID)
 				return false, nil
 			}
 			return false, err
@@ -234,12 +234,12 @@ func (rm *roomManager) CheckUserAllowedJoinRoom(userID string, roomID string, ro
 		// 使用 ServerMemberRepository 檢查用戶是否為伺服器成員
 		isMember, err := rm.serverMemberRepo.IsMemberOfServer(channel.ServerID.Hex(), userID)
 		if err != nil {
-			utils.Log.Error("檢查伺服器成員失敗", "error", err)
+			slog.Error("檢查伺服器成員失敗", "error", err)
 			return false, err
 		}
 
 		if !isMember {
-			utils.Log.Debug("用戶非伺服器成員", "server_id", channel.ServerID.Hex(), "user_id", userID)
+			slog.Debug("用戶非伺服器成員", "server_id", channel.ServerID.Hex(), "user_id", userID)
 		}
 		return isMember, nil
 	}
@@ -281,7 +281,7 @@ func (rm *roomManager) broadcastWorker(room *Room) {
 func (rm *roomManager) safelyBroadcastToClient(client *Client, message *WsMessage[MessageResponse]) {
 	// 使用統一的發送機制，而不是直接寫入 WebSocket
 	if err := client.SendMessage(message); err != nil {
-		utils.Log.Debug("發送消息失敗", "user_id", client.UserID, "error", err)
+		slog.Debug("發送消息失敗", "user_id", client.UserID, "error", err)
 		// 標記客戶端為非活躍，讓健康檢查清理
 		client.IsActive = false
 		return

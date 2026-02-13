@@ -5,8 +5,8 @@ import (
 	"chat_app_backend/app/providers"
 	"chat_app_backend/app/repositories"
 	"chat_app_backend/config"
-	"chat_app_backend/utils"
 	"context"
+	"log/slog"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -350,7 +350,7 @@ func (fs *friendService) AcceptFriendRequest(userID string, requestID string) *m
 	qb.Where("friend_id", userObjectID)
 	qb.Where("status", FriendStatusPending)
 
-	utils.Log.Debug("查詢好友請求 Filter", "filter", qb.GetFilter())
+	slog.Debug("查詢好友請求 Filter", "filter", qb.GetFilter())
 
 	var friendRequest models.Friend
 	err = fs.odm.FindOne(context.Background(), qb.GetFilter(), &friendRequest)

@@ -5,6 +5,7 @@ import (
 	"chat_app_backend/app/services"
 	"chat_app_backend/config"
 	"chat_app_backend/utils"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -65,7 +66,7 @@ func (cc *ChatController) HandleConnections(c *gin.Context) {
 		return
 	}
 
-	utils.Log.Info("用戶 WebSocket 連線已建立", "user_id", userID)
+	slog.Info("用戶 WebSocket 連線已建立", "user_id", userID)
 	// 使用聊天服務處理連接
 	cc.chatService.HandleWebSocket(ws, userID)
 }
