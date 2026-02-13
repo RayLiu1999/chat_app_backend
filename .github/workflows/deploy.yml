@@ -9,7 +9,7 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ghcr.io/${{ github.repository }}
   OPS_REPO: rayliu1999/side_project_ops
-  KUSTOMIZATION_PATH: projects/chat-backend
+  KUSTOMIZATION_PATH: projects/chat-app/backend
 
 permissions:
   contents: read
