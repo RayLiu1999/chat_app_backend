@@ -11,47 +11,6 @@ export const TEST_CONFIG = {
     "Origin": "http://localhost:3000",
   },
 
-  // 測試用戶配置（根據 API.md 規範）
-  TEST_USERS: [
-    {
-      username: "testuser1",
-      nickname: "Test User 1",
-      email: "testuser1@example.com",
-      password: "Password123!",
-    },
-    {
-      username: "testuser2",
-      nickname: "Test User 2",
-      email: "testuser2@example.com",
-      password: "Password123!",
-    },
-    {
-      username: "testuser3",
-      nickname: "Test User 3",
-      email: "testuser3@example.com",
-      password: "Password123!",
-    },
-    {
-      username: "testuser4",
-      nickname: "Test User 4",
-      email: "testuser4@example.com",
-      password: "Password123!",
-    },
-    {
-      username: "testuser5",
-      nickname: "Test User 5",
-      email: "testuser5@example.com",
-      password: "Password123!",
-    },
-  ],
-
-  // 測試房間配置
-  TEST_ROOMS: [
-    { id: "test_room_001", name: "測試房間 1", type: "channel" },
-    { id: "test_room_002", name: "測試房間 2", type: "channel" },
-    { id: "test_room_003", name: "測試房間 3", type: "dm" },
-  ],
-
   // 效能閾值
   THRESHOLDS: {
     http_req_duration: ["p(95)<200", "p(99)<500"],

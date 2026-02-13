@@ -8,7 +8,7 @@
  */
 import { group, sleep } from 'k6';
 import { randomSleep } from '../scripts/common/utils.js';
-import { getAuthenticatedSession } from '../scripts/common/auth.js';
+import { getAuthenticatedSessionWithOptions } from '../scripts/common/auth.js';
 import apiServers from '../scripts/api/servers.js';
 import apiFriends from '../scripts/api/friends.js';
 import apiChat from '../scripts/api/chat.js';
@@ -29,10 +29,18 @@ export default function (config, preAuthSession) {
   
   // 1. 確保有 Session (每個 VU 使用獨立的 Session)
   if (!vuSession) {
-    const jitter = Math.random() * 5000;
-    sleep(jitter / 1000);
-    logInfo(`[Auth] VU ${__VU} 正在初始化獨立 Session (Jitter: ${jitter.toFixed(0)}ms)`);
-    vuSession = getAuthenticatedSession(baseUrl);
+    if (preAuthSession && preAuthSession.token) {
+      vuSession = preAuthSession;
+      logInfo(`[Auth] VU ${__VU} 使用預先準備 Session`);
+    } else {
+      const jitter = Math.random() * 5000;
+      sleep(jitter / 1000);
+      logInfo(`[Auth] VU ${__VU} 無預備 Session，嘗試登入既有帳號 (Jitter: ${jitter.toFixed(0)}ms)`);
+      vuSession = getAuthenticatedSessionWithOptions(baseUrl, {
+        userIndex: __VU,
+        registerIfMissing: false,
+      });
+    }
   }
   
   const session = vuSession;

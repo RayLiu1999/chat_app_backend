@@ -3,8 +3,10 @@
   "version": "1.0.0",
   "description": "k6 Load Testing for Chat Application",
   "scripts": {
+    "test:prepare-users": "k6 run prepare_users.js",
     "test:smoke": "k6 run run.js --env SCENARIO=smoke",
-    "test:capacity": "k6 run run.js --env SCENARIO=monolith_capacity"
+    "test:capacity": "k6 run run.js --env SCENARIO=monolith_capacity",
+    "test:capacity:prepared": "k6 run run.js --env SCENARIO=monolith_capacity --env PREPARE_USERS=1"
   },
   "keywords": [
     "k6",

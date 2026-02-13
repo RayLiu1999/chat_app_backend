@@ -161,9 +161,24 @@ export function login(baseUrl, credentials) {
  * @returns {Object|null} 包含 token, csrfToken 和 headers 的 session 物件
  */
 export function getAuthenticatedSession(baseUrl) {
+  return getAuthenticatedSessionWithOptions(baseUrl, {});
+}
+
+/**
+ * 獲取一個已認證的用戶 session（可控制是否允許註冊）
+ * @param {string} baseUrl - API 基礎 URL
+ * @param {Object} options - { userIndex?: number, registerIfMissing?: boolean }
+ * @returns {Object|null} 包含 token, csrfToken 和 headers 的 session 物件
+ */
+export function getAuthenticatedSessionWithOptions(baseUrl, options = {}) {
+  const registerIfMissing = options.registerIfMissing !== false;
+  const customIndex = Number.isInteger(options.userIndex) ? options.userIndex : null;
+
   // 取測試用戶或產生臨時用戶
   // 在 setup() 階段 __VU 為 0 或 undefined，預設使用第一個用戶
-  const vuIndex = (typeof __VU !== 'undefined') ? __VU : 0;
+  const vuIndex = customIndex !== null
+    ? customIndex
+    : ((typeof __VU !== 'undefined') ? __VU : 0);
   
   let user;
   
@@ -187,7 +202,7 @@ export function getAuthenticatedSession(baseUrl) {
     password: user.password,
   });
 
-  if (!loginResult) {
+  if (!loginResult && registerIfMissing) {
     // 嘗試註冊後再登入
     registerUser(baseUrl, user);
     loginResult = login(baseUrl, {

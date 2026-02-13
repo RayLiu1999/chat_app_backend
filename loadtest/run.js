@@ -12,13 +12,12 @@
  * --env VERBOSE: 啟用詳細日誌模式 (1 為啟用)
  * --out json=test_results/load_tests/api/output.json: 將結果輸出到檔案
  */
-import { SharedArray } from 'k6/data';
 import http from "k6/http";
 import { Counter, Rate } from 'k6/metrics';
 import * as config from './config.js';
 import smokeTest from './scenarios/smoke.js';
 import monolithCapacityTest from './scenarios/monolith_capacity.js';
-import { getAuthenticatedSession } from './scripts/common/auth.js';
+import { getAuthenticatedSessionWithOptions } from './scripts/common/auth.js';
 import { logInfo, logSuccess, logError } from './scripts/common/logger.js';
 
 // 自定義metrics用於即時監控
@@ -31,6 +30,8 @@ const VERBOSE_MODE = __ENV.VERBOSE === '1';
 
 // 選擇測試場景
 const scenarioName = __ENV.SCENARIO || 'smoke';
+const PREPARE_USERS = __ENV.PREPARE_USERS !== '0';
+const PREPARE_USER_COUNT = parseInt(__ENV.PREPARE_USER_COUNT || '0', 10);
 const scenarios = {
   smoke: smokeTest,
   monolith_capacity: monolithCapacityTest,
@@ -69,23 +70,64 @@ export function setup() {
   console.log(`📝 詳細日誌模式: ${VERBOSE_MODE ? '啟用' : '停用'}`);
   console.log('=' .repeat(60));
   
-  // 在這裡執行一次性的身份驗證，避免 VUs 重複執行 Bcrypt
-  let session = null;
+  const baseUrl = `${config.TEST_CONFIG.BASE_URL}${config.TEST_CONFIG.API_PREFIX}`;
+  
+  // 嘗試讀取預定義用戶數，若失敗則預設為 5
+  let defaultPrepareCount = 5;
   try {
-     session = getAuthenticatedSession(`${config.TEST_CONFIG.BASE_URL}${config.TEST_CONFIG.API_PREFIX}`);
-      if (session && session.token) {
-       console.log(`🔑 身份驗證成功，Token: ${session.token.substring(0, 10)}...`);
-      } else {
-       console.warn(`⚠️ 身份驗證未返回有效 Session`);
-      }
+    const usersData = JSON.parse(open('./data/users.json'));
+    defaultPrepareCount = (usersData && usersData.length) || 5;
   } catch (e) {
-     console.error(`❌ 身份驗證失敗: ${e.message}`);
+    // 忽略讀取錯誤，使用預設值
+  }
+  
+  const prepareCount = Number.isInteger(PREPARE_USER_COUNT) && PREPARE_USER_COUNT > 0 ? PREPARE_USER_COUNT : defaultPrepareCount;
+
+  // 1) 資料準備：預先建立/登入指定數量用戶，避免測試期產生註冊風暴
+  const sessions = [];
+  if (PREPARE_USERS) {
+    console.log(`🧰 預先準備測試用戶: ${prepareCount} 位`);
+    for (let index = 1; index <= prepareCount; index++) {
+      try {
+        const preparedSession = getAuthenticatedSessionWithOptions(baseUrl, {
+          userIndex: index,
+          registerIfMissing: true,
+        });
+        if (preparedSession && preparedSession.token) {
+          sessions.push(preparedSession);
+        }
+      } catch (e) {
+        console.error(`❌ 準備用戶 ${index} 失敗: ${e.message}`);
+      }
+    }
+    console.log(`✅ 預備完成，可用 session: ${sessions.length}/${prepareCount}`);
+  }
+
+  // 2) 相容 fallback：若未啟用預備流程或全失敗，至少準備一組 session
+  let session = null;
+  if (sessions.length > 0) {
+    session = sessions[0];
+  } else {
+    try {
+      session = getAuthenticatedSessionWithOptions(baseUrl, {
+        userIndex: 1,
+        registerIfMissing: true,
+      });
+      if (session && session.token) {
+        console.log(`🔑 身份驗證成功，Token: ${session.token.substring(0, 10)}...`);
+      } else {
+        console.warn(`⚠️ 身份驗證未返回有效 Session`);
+      }
+    } catch (e) {
+      console.error(`❌ 身份驗證失敗: ${e.message}`);
+    }
   }
 
   return {
     startTime: Date.now(),
     scenario: scenarioName,
     verbose: VERBOSE_MODE,
+    sessions: sessions,
     session: session,
     config: config.TEST_CONFIG
   };
@@ -94,11 +136,17 @@ export function setup() {
 // 主執行函數
 export default function (data) {
   const iterationStart = Date.now();
+
+  let session = data.session || null;
+  if (data.sessions && data.sessions.length > 0) {
+    const idx = (__VU - 1) % data.sessions.length;
+    session = data.sessions[idx];
+  }
   
   // 同步 CSRF Cookie 到當前 VU 的 Cookie Jar (解決 setup() 資料不會自動同步 Cookie 的問題)
-  if (data.session && data.session.csrfToken) {
+  if (session && session.csrfToken) {
     const jar = http.cookieJar();
-    jar.set(data.config.BASE_URL, "csrf_token", data.session.csrfToken);
+    jar.set(data.config.BASE_URL, "csrf_token", session.csrfToken);
   }
 
   logInfo(`開始執行迭代 - 場景: ${data?.scenario || scenarioName}`);
@@ -106,7 +154,7 @@ export default function (data) {
   try {
     // 傳入 config 和 session，保持腳本相容性
     // 注意: session 可能為 null，由各場景自行處理
-    scenarios[scenarioName](data.config, data.session);
+    scenarios[scenarioName](data.config, session);
     
     const duration = Date.now() - iterationStart;
     logSuccess(`迭代完成`, null, duration);

@@ -5,7 +5,7 @@
 N ?= 3
 
 .PHONY: help dev dev-logs dev-down dev-restart build logs status ps restart stop start
-.PHONY: shell test test-coverage test-env test-env-down test-smoke test-capacity rebuild
+.PHONY: shell test test-coverage test-env test-env-down test-smoke test-prepare-users test-capacity test-capacity-prepared rebuild
 .PHONY: clean clean-dev fmt lint tidy run env-check install-deps init
 .PHONY: scale scale-up scale-down scale-logs scale-status
 .PHONY: k8s-build k8s-deploy k8s-redeploy k8s-delete k8s-scale k8s-status k8s-logs k8s-pods k8s-health
@@ -25,8 +25,10 @@ help:
 	@echo "🧪 壓測環境 (Stress Test):"
 	@echo "  make test-env         - 啟動壓測環境 (prod build)"
 	@echo "  make test-env-down    - 停止壓測環境"
+	@echo "  make test-prepare-users USER_COUNT=500 - 預先建立測試用戶"
 	@echo "  make test-smoke       - 執行冒煙測試 (k6)"
 	@echo "  make test-capacity    - 執行單體容量測試 (k6)"
+	@echo "  make test-capacity-prepared USER_COUNT=500 - 先準備用戶再壓測"
 	@echo ""
 	@echo "🔄 水平擴展測試 (Horizontal Scaling):"
 	@echo "  make scale            - 啟動 3 個實例 (nginx + 3x app)"
@@ -139,7 +141,7 @@ shell:
 
 scale:
 	@echo "🔄 啟動水平擴展環境 ($(N) 個實例)..."
-	docker-compose -f docker-compose.scale.yml up -d --scale app=$(N)
+	docker-compose -f docker-compose.scale.yml up -d --scale app=$(N?=3) --no-recreate
 	@echo "✅ 擴展環境已啟動"
 	@echo "📍 API (via nginx): http://localhost:80"
 
@@ -187,9 +189,18 @@ test-smoke:
 	@echo "🧪 執行冒煙測試..."
 	cd loadtest && k6 run run.js --env SCENARIO=smoke
 
+test-prepare-users:
+	@echo "🧪 預先建立測試用戶..."
+	cd loadtest && k6 run prepare_users.js --env USER_COUNT=$(USER_COUNT)
+
 test-capacity:
 	@echo "🧪 執行容量測試..."
 	cd loadtest && k6 run run.js --env SCENARIO=monolith_capacity
+
+test-capacity-prepared:
+	@echo "🧪 先準備用戶，再執行容量測試..."
+	cd loadtest && k6 run prepare_users.js --env USER_COUNT=$(USER_COUNT)
+	cd loadtest && k6 run run.js --env SCENARIO=monolith_capacity --env PREPARE_USERS=1 --env PREPARE_USER_COUNT=$(USER_COUNT)
 
 env-check:
 	@if [ ! -f .env.development ]; then \
