@@ -3,31 +3,21 @@
  *
  * 使用方法:
  * k6 run run.js --env SCENARIO=smoke
- * k6 run run.js --env SCENARIO=light
- * k6 run run.js --env SCENARIO=medium
- * k6 run run.js --env SCENARIO=heavy
- * k6 run run.js --env SCENARIO=websocket_stress
- * k6 run run.js --env SCENARIO=websocket_spike
- * k6 run run.js --env SCENARIO=websocket_soak
- * k6 run run.js --env SCENARIO=websocket_stress_ladder
+ * k6 run run.js --env SCENARIO=monolith_capacity
  *
  * 參數:
- * --env SCENARIO: 要執行的測試場景 (smoke, light, medium, heavy)
- * --env BASE_URL: 覆蓋 config.js 中的 API URL (預設: http://localhost:8080)
- * --env WS_URL: 覆蓋 WebSocket URL (預設: ws://localhost:8080/ws)
+ * --env SCENARIO: 要執行的測試場景 (smoke, monolith_capacity)
+ * --env BASE_URL: 覆蓋 config.js 中的 API URL (預設: http://localhost:80)
+ * --env WS_URL: 覆蓋 WebSocket URL (預設: ws://localhost:80/ws)
  * --env VERBOSE: 啟用詳細日誌模式 (1 為啟用)
  * --out json=test_results/load_tests/api/output.json: 將結果輸出到檔案
  */
-import { SharedArray } from 'k6/data';
+import http from "k6/http";
 import { Counter, Rate } from 'k6/metrics';
 import * as config from './config.js';
 import smokeTest from './scenarios/smoke.js';
-import lightLoadTest from './scenarios/light.js';
-import mediumLoadTest from './scenarios/medium.js';
-import heavyLoadTest from './scenarios/heavy.js';
-import websocketStressTest from './scenarios/websocket_stress.js';
-import websocketSpikeTest from './scenarios/websocket_spike.js';
-import websocketSoakTest from './scenarios/websocket_soak.js';
+import monolithCapacityTest from './scenarios/monolith_capacity.js';
+import { getAuthenticatedSessionWithOptions } from './scripts/common/auth.js';
 import { logInfo, logSuccess, logError } from './scripts/common/logger.js';
 
 // 自定義metrics用於即時監控
@@ -40,15 +30,11 @@ const VERBOSE_MODE = __ENV.VERBOSE === '1';
 
 // 選擇測試場景
 const scenarioName = __ENV.SCENARIO || 'smoke';
+const PREPARE_USERS = __ENV.PREPARE_USERS !== '0';
+const PREPARE_USER_COUNT = parseInt(__ENV.PREPARE_USER_COUNT || '0', 10);
 const scenarios = {
   smoke: smokeTest,
-  light: lightLoadTest,
-  medium: mediumLoadTest,
-  heavy: heavyLoadTest,
-  websocket_stress: websocketStressTest,
-  websocket_spike: websocketSpikeTest,
-  websocket_soak: websocketSoakTest,
-  websocket_stress_ladder: websocketStressTest, // 使用相同的測試函數，但不同的 stages
+  monolith_capacity: monolithCapacityTest,
 };
 
 if (!scenarios[scenarioName]) {
@@ -76,7 +62,7 @@ export const options = {
   summaryTimeUnit: 'ms',
 };
 
-// 設置迭代初始化（每個 VU 開始時執行一次）
+// 設置迭代初始化（所有 VU 開始前執行一次）
 export function setup() {
   console.log(`🚀 開始執行 ${scenarioName} 測試場景`);
   console.log(`📍 API 基礎 URL: ${config.TEST_CONFIG.BASE_URL}`);
@@ -84,21 +70,91 @@ export function setup() {
   console.log(`📝 詳細日誌模式: ${VERBOSE_MODE ? '啟用' : '停用'}`);
   console.log('=' .repeat(60));
   
+  const baseUrl = `${config.TEST_CONFIG.BASE_URL}${config.TEST_CONFIG.API_PREFIX}`;
+  
+  // 嘗試讀取預定義用戶數，若失敗則預設為 5
+  let defaultPrepareCount = 5;
+  try {
+    const usersData = JSON.parse(open('./data/users.json'));
+    defaultPrepareCount = (usersData && usersData.length) || 5;
+  } catch (e) {
+    // 忽略讀取錯誤，使用預設值
+  }
+  
+  const prepareCount = Number.isInteger(PREPARE_USER_COUNT) && PREPARE_USER_COUNT > 0 ? PREPARE_USER_COUNT : defaultPrepareCount;
+
+  // 1) 資料準備：預先建立/登入指定數量用戶，避免測試期產生註冊風暴
+  const sessions = [];
+  if (PREPARE_USERS) {
+    console.log(`🧰 預先準備測試用戶: ${prepareCount} 位`);
+    for (let index = 1; index <= prepareCount; index++) {
+      try {
+        const preparedSession = getAuthenticatedSessionWithOptions(baseUrl, {
+          userIndex: index,
+          registerIfMissing: true,
+        });
+        if (preparedSession && preparedSession.token) {
+          sessions.push(preparedSession);
+        }
+      } catch (e) {
+        console.error(`❌ 準備用戶 ${index} 失敗: ${e.message}`);
+      }
+    }
+    console.log(`✅ 預備完成，可用 session: ${sessions.length}/${prepareCount}`);
+  }
+
+  // 2) 相容 fallback：若未啟用預備流程或全失敗，至少準備一組 session
+  let session = null;
+  if (sessions.length > 0) {
+    session = sessions[0];
+  } else {
+    try {
+      session = getAuthenticatedSessionWithOptions(baseUrl, {
+        userIndex: 1,
+        registerIfMissing: true,
+      });
+      if (session && session.token) {
+        console.log(`🔑 身份驗證成功，Token: ${session.token.substring(0, 10)}...`);
+      } else {
+        console.warn(`⚠️ 身份驗證未返回有效 Session`);
+      }
+    } catch (e) {
+      console.error(`❌ 身份驗證失敗: ${e.message}`);
+    }
+  }
+
   return {
     startTime: Date.now(),
     scenario: scenarioName,
-    verbose: VERBOSE_MODE
+    verbose: VERBOSE_MODE,
+    sessions: sessions,
+    session: session,
+    config: config.TEST_CONFIG
   };
 }
 
 // 主執行函數
 export default function (data) {
   const iterationStart = Date.now();
+
+  let session = data.session || null;
+  if (data.sessions && data.sessions.length > 0) {
+    const idx = (__VU - 1) % data.sessions.length;
+    session = data.sessions[idx];
+  }
   
+  // 同步 CSRF Cookie 到當前 VU 的 Cookie Jar (解決 setup() 資料不會自動同步 Cookie 的問題)
+  if (session && session.csrfToken) {
+    const jar = http.cookieJar();
+    jar.set(data.config.BASE_URL, "csrf_token", session.csrfToken);
+  }
+
   logInfo(`開始執行迭代 - 場景: ${data?.scenario || scenarioName}`);
   
   try {
-    scenarios[scenarioName](config.TEST_CONFIG);
+    // 傳入 config 和 session，保持腳本相容性
+    // 注意: session 可能為 null，由各場景自行處理
+    scenarios[scenarioName](data.config, session);
     
     const duration = Date.now() - iterationStart;
     logSuccess(`迭代完成`, null, duration);
@@ -126,25 +182,39 @@ export function handleSummary(data) {
   const scenario = __ENV.SCENARIO || 'smoke';
   const outputDir = config.TEST_CONFIG.RESULTS_DIR;
 
-  const passes = data.metrics.checks.values.passes || 0;
-  const fails = data.metrics.checks.values.fails || 0;
+  const getMetricValue = (metricName, type = 'value') => {
+    if (data.metrics[metricName] && data.metrics[metricName].values) {
+      return data.metrics[metricName].values[type] || 0;
+    }
+    return 0;
+  };
+
+  const passes = getMetricValue('checks', 'passes');
+  const fails = getMetricValue('checks', 'fails');
   const total = passes + fails;
-  const totalRequests = data.metrics.http_reqs.values.count || 0;
-  const failedRequests = data.metrics.http_req_failed.values.fails || 0;
+  const totalRequests = getMetricValue('http_reqs', 'count');
+  const successRequests = getMetricValue('http_req_failed', 'fails');
+  const failureRate = getMetricValue('http_req_failed', 'rate');
+  const failedRequests = totalRequests - successRequests;
+  const avgDuration = getMetricValue('http_req_duration', 'avg');
+  const p95Duration = getMetricValue('http_req_duration', 'p(95)');
 
   // 建立一個基本的 markdown 報告
   let report = `# k6 測試報告: ${scenario}\n\n`;
   report += `**測試時間:** ${new Date().toLocaleString()}\n\n`;
   report += '## 測試結果摘要\n\n';
   report += `* **check 成功/總數:** ${passes}/${total}\n`;
-  report += `* **check 成功率:** ${((passes / total) * 100).toFixed(2)}%\n`;
+  report += `* **check 成功率:** ${(total > 0 ? (passes / total) * 100 : 0).toFixed(2)}%\n`;
   report += `* **HTTP 總請求數:** ${totalRequests}\n`;
+  report += `* **HTTP 成功請求數:** ${successRequests}\n`;
   report += `* **HTTP 失敗請求數:** ${failedRequests}\n`;
-  report += `* **HTTP 請求失敗率:** ${(data.metrics.http_req_failed.values.rate * 100).toFixed(2)}%\n`;
-  report += `* **HTTP 平均響應時間:** ${data.metrics.http_req_duration.values.avg.toFixed(2)}ms\n`;
-  report += `* **HTTP p(95) 響應時間:** ${data.metrics.http_req_duration.values['p(95)'].toFixed(2)}ms\n`;
-  if (data.metrics.ws_connecting) {
-    report += `* **WebSocket p(95) 連接時間:** ${data.metrics.ws_connecting.values['p(95)'].toFixed(2)}ms\n`;
+  report += `* **HTTP 請求失敗率:** ${(failureRate * 100).toFixed(2)}%\n`;
+  report += `* **HTTP 平均響應時間:** ${avgDuration.toFixed(2)}ms\n`;
+  report += `* **HTTP p(95) 響應時間:** ${p95Duration.toFixed(2)}ms\n`;
+  
+  if (data.metrics.ws_connecting && data.metrics.ws_connecting.values) {
+    const wsP95 = data.metrics.ws_connecting.values['p(95)'] || 0;
+    report += `* **WebSocket p(95) 連接時間:** ${wsP95.toFixed(2)}ms\n`;
   }
 
   return {

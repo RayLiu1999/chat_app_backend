@@ -16,6 +16,7 @@ import { applyCsrf } from '../common/csrf.js';
 import { registerUser } from '../common/auth.js';
 import { logHttpResponse, logGroupStart, logGroupEnd, logInfo, logError } from '../common/logger.js';
 import { SharedArray } from 'k6/data';
+import { TEST_CONFIG } from '../../config.js';
 
 // 載入測試用戶
 const testUsers = new SharedArray('testUsers', function () {
@@ -65,7 +66,11 @@ export default function (baseUrl, session) {
       // 不需要認證，直接通過 username 取得用戶 ID
       // 使用完整 URL 避免路徑問題
       const testApiUrl = `${baseUrl}/test/user?username=${user2.username}`;
-      const userRes = http.get(testApiUrl);
+      const userRes = http.get(testApiUrl, {
+        headers: {
+          ...TEST_CONFIG.DEFAULT_HEADERS,
+        }
+      });
       let userBody;
       try {
         userBody = userRes.json();
@@ -97,6 +102,7 @@ export default function (baseUrl, session) {
         logInfo('取得私聊房間列表');
         const headers = {
           ...session.headers,
+          ...TEST_CONFIG.DEFAULT_HEADERS,
         };
         const res = http.get(`${baseUrl}/dm_rooms`, { headers });
         
@@ -129,7 +135,8 @@ export default function (baseUrl, session) {
         const headers = {
           'Content-Type': 'application/json',
           ...session.headers,
-          ...applyCsrf(url, {}, session.csrfToken),
+          ...applyCsrf(url, {}),
+          ...TEST_CONFIG.DEFAULT_HEADERS,
         };
         const res = http.post(url, payload, { headers });
         
@@ -176,7 +183,8 @@ export default function (baseUrl, session) {
           const headers = {
             'Content-Type': 'application/json',
             ...session.headers,
-            ...applyCsrf(url, {}, session.csrfToken),
+            ...applyCsrf(url, {}),
+            ...TEST_CONFIG.DEFAULT_HEADERS,
           };
           const res = http.put(url, payload, { headers });
           
@@ -202,6 +210,7 @@ export default function (baseUrl, session) {
           
           const headers = {
             ...session.headers,
+            ...TEST_CONFIG.DEFAULT_HEADERS,
           };
           const res = http.get(`${baseUrl}/dm_rooms/${dmRoomId}/messages?limit=10`, { headers });
           

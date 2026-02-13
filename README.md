@@ -46,33 +46,27 @@
 ## 主要功能
 
 - **使用者帳號管理**
-
   - 註冊、登入、登出
   - JWT（Access/Refresh Token）驗證
   - CSRF Token 驗證（自訂 Gin Middleware）
 
 - **好友系統**
-
   - 好友清單、邀請、狀態更新
 
 - **即時聊天（WebSocket）**
-
   - 私訊（DM）與群組頻道
   - 房間動態建立與清理
   - 訊息歷史查詢
   - WebSocket 即時訊息推播
 
 - **伺服器（Server/Guild）與頻道（Channel/Room）**
-
   - 伺服器/頻道建立、查詢
   - 權限與成員管理（預留）
 
 - **檔案上傳**
-
   - 靜態路徑 `uploads/`，支援多檔案類型
 
 - **系統架構**
-
   - 採用 `app` 目錄封裝核心業務邏輯
   - 三層分層架構：Controller → Service → Repository
   - 依賴注入（手寫 DI Container）
@@ -80,7 +74,6 @@
   - 集中化 Mock 測試架構（`app/mocks/`）
 
 - **測試與品質保證**
-
   - 21 個測試文件，151 個測試函數，519 個測試場景
   - 整體測試覆蓋率 ~40%，100% 測試通過率
   - Controller 層：44.7% 覆蓋（7/8 已完成）
@@ -110,6 +103,24 @@
   - Docker Compose（開發環境）
   - CORS 支援（gin-contrib/cors）
   - 密碼加密（golang.org/x/crypto）
+  - Air（熱重載開發工具）
+
+---
+
+## 生產環境部署 (K3s)
+
+本專案生產環境部署於 **K3s Kubernetes Cluster**，採用 **GitOps** 流程管理。
+
+### 部署架構
+
+- **CI/CD**: GitHub Actions 自動建置 Image 並更新 GitOps Repo。
+- **GitOps**: ArgoCD 監聽 Ops Repo 變更並同步到 K3s Cluster。
+- **Image**: `ghcr.io/rayliu1999/chat_app_backend:prod-<sha>`
+
+### 注意事項
+
+> [!IMPORTANT]
+> **圖片儲存**：K3s 環境中，Pod 是無狀態的。請務必將圖片上傳邏輯修改為使用 **外部物件儲存服務** (如 MinIO, AWS S3, GCS)，以避免 Pod 重啟或擴展時遺失資料。目前開發環境使用本地存儲 (`uploads/`)，僅適用於單機或 Volume 掛載場景。
 
 ---
 
@@ -156,8 +167,6 @@ graph TD
 
 ---
 
----
-
 ## 開發環境快速啟動
 
 ### 🎯 使用 Makefile（推薦）
@@ -168,7 +177,7 @@ make init
 
 # 2. 配置環境變數
 cp .env.example .env.development
-# 編輯 .env.development 文件
+# 編輯 .env.development 文件，確保 MONGO_URI 和 REDIS_ADDR 指向正確的服務
 
 # 3. 啟動開發環境
 make dev
@@ -183,74 +192,53 @@ make test
 make help
 ```
 
-### 🐳 傳統方式（Docker Compose）
+### 🐳 Docker Compose 直接操作
 
 ```bash
-# 1. 安裝依賴
-go mod tidy
+# 1. 啟動服務（開發環境）
+# 預設使用 .env.development 和 dev stage
+docker-compose up -d
 
-# 2. 配置環境變數
-cp .env.example .env.development
+# 2. 啟動壓測環境
+# 使用 prod stage 並模擬生產環境資源限制
+make test-env
+# 或手動執行：
+# DOCKER_TARGET=prod docker-compose --profile test up -d
 
-# 3. 啟動服務（開發環境）
-docker-compose -f docker-compose.dev.yml up -d
-
-# 4. 查看日誌
-docker-compose -f docker-compose.dev.yml logs -f
-```
-
-> **注意**：生產環境由 CI/CD 自動部署，不建議在本地執行生產環境。
-
-### 💻 本地運行
-
-```bash
-# 1. 安裝依賴
-go mod tidy
-
-# 2. 確保 MongoDB 和 Redis 運行中
-
-# 3. 配置環境變數
-cp .env.example .env.development
-
-# 4. 啟動應用
-go run main.go
-
-# 5. 運行測試
-go test ./... -v
+# 3. 查看日誌
+docker-compose logs -f
 ```
 
 ---
 
 ## ⚡ Makefile 指令速查
 
-本專案提供完整的 Makefile **用於本地開發環境**。生產環境部署由 CI/CD 自動處理。
+本專案提供完整的 Makefile **用於本地開發環境**。生產環境部署由 **K3s + GitOps** 自動處理。
 
 ### 🔥 常用指令
 
 ```bash
 # 環境管理
-make dev              # 啟動開發環境
+make dev              # 啟動開發環境 (docker-compose up -d)
 make dev-down         # 停止開發環境
 make dev-restart      # 重啟開發環境
 make logs             # 查看日誌
 make status           # 查看容器狀態
+make clean            # 清理所有容器和卷
 
 # 測試
 make test             # 執行單元測試
-make test-coverage    # 執行測試並生成覆蓋率報告
-make test-smoke       # k6 冒煙測試
-make test-limit       # k6 極限測試
-make test-ws          # WebSocket 壓力測試
+make test-smoke       # k6 冒煙測試 (Load Test)
+make test-capacity    # k6 容量測試 (Load Test)
+make test-env         # 啟動壓測環境 (Prod Image)
 
 # 開發工具
-make shell            # 進入應用容器
-make mongo-shell      # 進入 MongoDB shell
-make redis-cli        # 進入 Redis CLI
-make health           # 健康檢查
+make shell            # 進入應用容器 (sh)
+make health           # 健康檢查 (curl localhost/health)
 
 # 建置與 Go 開發
 make build            # 建置映像
-make rebuild          # 強制重建（無快取）
+make rebuild          # 強制重建（無快取，修復 Image Cache 問題）
 make fmt              # 格式化程式碼
 make lint             # 程式碼檢查
 make tidy             # 整理依賴
@@ -258,6 +246,51 @@ make tidy             # 整理依賴
 # 初始化
 make init             # 初始化專案
 make install-deps     # 安裝依賴
+
+# 本地 K8s 測試
+make k8s-deploy       # 部署到本地 K8s (OrbStack/Minikube)
+make k8s-scale N=3    # K8s 水平擴展測試
+make k8s-delete       # 移除 K8s 部署
+```
+
+---
+
+## 水平擴展測試 (Horizontal Scaling)
+
+本專案支援兩種水平擴展測試方式，用於比較不同架構下的負載均衡與狀態管理。
+
+### 1. Docker Compose (輕量級模擬)
+
+使用 Nginx 作為負載均衡器，簡單快速。
+
+```bash
+# 啟動 3 個應用實例
+make scale N=3
+
+# 查看實例狀態
+make scale-status
+
+# 執行負載測試 (k6)
+make test-capacity
+```
+
+### 2. Kubernetes (接近生產環境)
+
+使用 K8s Service/Ingress 進行負載均衡，更接近真實生產環境行為。
+(需預先安裝 OrbStack 或 Minikube)
+
+```bash
+# 部署應用到本地 K8s
+make k8s-deploy
+
+# 擴展到 5 個 Pods
+make k8s-scale N=5
+
+# 觀察 Pod 狀態與漂移
+make k8s-pods
+
+# 移除部署
+make k8s-delete
 ```
 
 完整指令列表：`make help`
@@ -284,9 +317,15 @@ chat_app_backend/
 ├── docs/                     # API 與測試文檔
 ├── backup/                   # 歷史文檔與優化記錄
 ├── loadtest/                 # K6 負載測試腳本
-├── uploads/                  # 靜態檔案上傳目錄
-├── docker-compose.dev.yml    # Docker 開發環境配置
-├── docker-compose.prod.yml   # Docker 生產環境配置
+├── scripts/                  # 腳本 (如 mongo-init.js)
+├── tmp/                      # 臨時目錄 (air build output)
+├── uploads/                  # 靜態檔案上傳目錄 (開發環境)
+├── .env.development          # 開發環境配置
+├── .air.toml                 # Air 熱重載配置
+├── Dockerfile                # 統一 Dockerfile (Multi-stage)
+├── Makefile                  # 開發指令集
+├── docker-compose.yml        # 開發與壓測環境配置
+├── docker-compose.scale.yml  # 水平擴展測試配置
 └── main.go                   # 程式入口點
 ```
 

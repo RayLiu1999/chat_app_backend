@@ -12,7 +12,7 @@ import (
 // TestNewMessageHandler 測試創建消息處理器
 func TestNewMessageHandler(t *testing.T) {
 	// 由於 NewMessageHandler 需要 ODM 和 RoomManager，我們傳入 nil 進行基本測試
-	handler := NewMessageHandler(nil, nil)
+	handler := NewMessageHandler(nil, nil, nil)
 
 	assert.NotNil(t, handler)
 }
@@ -20,7 +20,7 @@ func TestNewMessageHandler(t *testing.T) {
 // TestIsClientConnectionValid 測試檢查客戶端連線有效性
 func TestIsClientConnectionValid(t *testing.T) {
 	mockConn := &websocket.Conn{}
-	handler := NewMessageHandler(nil, nil)
+	handler := NewMessageHandler(nil, nil, nil)
 
 	tests := []struct {
 		name     string
@@ -107,7 +107,7 @@ func TestIsClientConnectionValid(t *testing.T) {
 // TestIsClientConnectionValid_WithRealTime 測試實際時間場景
 func TestIsClientConnectionValid_WithRealTime(t *testing.T) {
 	mockConn := &websocket.Conn{}
-	handler := NewMessageHandler(nil, nil)
+	handler := NewMessageHandler(nil, nil, nil)
 
 	t.Run("剛連線的客戶端應該有效", func(t *testing.T) {
 		client := &Client{

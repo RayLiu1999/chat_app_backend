@@ -5,6 +5,7 @@ import (
 	"chat_app_backend/app/services"
 	"chat_app_backend/config"
 	"chat_app_backend/utils"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -50,7 +51,6 @@ var upgrader = websocket.Upgrader{
 func (cc *ChatController) HandleConnections(c *gin.Context) {
 	// 解析參數
 	token := c.Query("token")
-	utils.PrettyPrint("用戶的 WebSocket token:", token)
 
 	// 取得 userID
 	userID, _, err := utils.GetUserFromToken(token)
@@ -66,7 +66,7 @@ func (cc *ChatController) HandleConnections(c *gin.Context) {
 		return
 	}
 
-	utils.PrettyPrintf("用戶 %s 的 WebSocket 連線已建立", userID)
+	slog.Info("用戶 WebSocket 連線已建立", "user_id", userID)
 	// 使用聊天服務處理連接
 	cc.chatService.HandleWebSocket(ws, userID)
 }

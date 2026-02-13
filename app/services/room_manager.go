@@ -4,8 +4,9 @@ import (
 	"chat_app_backend/app/models"
 	"chat_app_backend/app/providers"
 	"chat_app_backend/app/repositories"
-	"chat_app_backend/utils"
 	"context"
+	"encoding/json"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -16,21 +17,21 @@ import (
 
 // roomManager 管理房間的創建、加入、離開等操作
 type roomManager struct {
-	odm   providers.ODM
-	rooms map[string]*Room
-	// roomPubSubs      map[string]*redis.PubSub
+	odm              providers.ODM
+	rooms            map[string]*Room
+	roomPubSubs      map[string]*redis.PubSub
 	redisClient      *redis.Client
 	serverMemberRepo repositories.ServerMemberRepository
 	mutex            sync.RWMutex
-	// pubSubMutex      sync.RWMutex
+	pubSubMutex      sync.RWMutex
 }
 
 // NewRoomManager 創建新的房間管理器
 func NewRoomManager(odm providers.ODM, redisClient *redis.Client, serverMemberRepo repositories.ServerMemberRepository) *roomManager {
 	return &roomManager{
-		odm:   odm,
-		rooms: make(map[string]*Room, 1000),
-		// roomPubSubs:      make(map[string]*redis.PubSub),
+		odm:              odm,
+		rooms:            make(map[string]*Room, 1000),
+		roomPubSubs:      make(map[string]*redis.PubSub),
 		redisClient:      redisClient,
 		serverMemberRepo: serverMemberRepo,
 	}
@@ -83,34 +84,49 @@ func (rm *roomManager) InitRoom(roomType models.RoomType, roomID string) *Room {
 		go rm.broadcastWorker(room)
 	}
 
-	// 設置 Redis Pub/Sub
-	// go func() {
-	// 	pubsub := rm.redisClient.Subscribe(context.Background(), "room:"+key.String())
+	if rm.redisClient == nil {
+		slog.Warn("Redis 未配置，跳過房間 Pub/Sub 訂閱", "room_key", key.String())
+		return room
+	}
 
-	// 	// rm.pubSubMutex.Lock()
-	// 	// rm.roomPubSubs[key.String()] = pubsub
-	// 	// rm.pubSubMutex.Unlock()
+	// 設置 Redis Pub/Sub - 用於跨實例訊息廣播
+	go func() {
+		pubsub := rm.redisClient.Subscribe(context.Background(), "room:"+key.String())
 
-	// 	defer func() {
-	// 		pubsub.Close()
-	// 		// rm.pubSubMutex.Lock()
-	// 		// delete(rm.roomPubSubs, key.String())
-	// 		// rm.pubSubMutex.Unlock()
-	// 	}()
+		rm.pubSubMutex.Lock()
+		rm.roomPubSubs[key.String()] = pubsub
+		rm.pubSubMutex.Unlock()
 
-	// 	for msg := range pubsub.Channel() {
-	// 		var message *WsMessage[MessageResponse]
-	// 		if err := json.Unmarshal([]byte(msg.Payload), &message); err != nil {
-	// 			utils.PrettyPrintf("解析消息失敗: %v", err)
-	// 			continue
-	// 		}
-	// 		room.Mutex.RLock()
-	// 		for client := range room.Clients {
-	// 			go rm.safelyBroadcastToClient(client, message)
-	// 		}
-	// 		room.Mutex.RUnlock()
-	// 	}
-	// }()
+		defer func() {
+			pubsub.Close()
+			rm.pubSubMutex.Lock()
+			delete(rm.roomPubSubs, key.String())
+			rm.pubSubMutex.Unlock()
+		}()
+
+		for msg := range pubsub.Channel() {
+			var message *WsMessage[MessageResponse]
+			if err := json.Unmarshal([]byte(msg.Payload), &message); err != nil {
+				slog.Error("解析消息失敗", "error", err)
+				continue
+			}
+			room.Mutex.RLock()
+			for client := range room.Clients {
+				go func(c *Client) {
+					outMsg := &WsMessage[MessageResponse]{
+						Data: message.Data,
+					}
+					if c.UserID == message.Data.SenderID {
+						outMsg.Action = "message_sent"
+					} else {
+						outMsg.Action = "new_message"
+					}
+					rm.safelyBroadcastToClient(c, outMsg)
+				}(client)
+			}
+			room.Mutex.RUnlock()
+		}
+	}()
 
 	return room
 }
@@ -122,7 +138,7 @@ func (rm *roomManager) JoinRoom(client *Client, roomType models.RoomType, roomID
 	room, exists := rm.rooms[key.String()]
 	rm.mutex.RUnlock()
 	if !exists {
-		utils.PrettyPrintf("房間 %s 未找到", key.String())
+		// utils.PrettyPrintf("房間 %s 未找到", key.String())
 		return
 	}
 
@@ -147,7 +163,7 @@ func (rm *roomManager) LeaveRoom(client *Client, roomType models.RoomType, roomI
 	room, exists := rm.rooms[key.String()]
 	rm.mutex.RUnlock()
 	if !exists {
-		utils.PrettyPrintf("房間 %s 未找到", key.String())
+		// utils.PrettyPrintf("房間 %s 未找到", key.String())
 		return
 	}
 
@@ -188,6 +204,7 @@ func (rm *roomManager) CheckUserAllowedJoinRoom(userID string, roomID string, ro
 		err := rm.odm.FindOne(ctx, bson.M{"room_id": roomObjectID, "user_id": userObjectID}, dmRoom)
 		if err != nil {
 			if err == providers.ErrDocumentNotFound {
+				slog.Debug("私聊房間未找到", "room_id", roomID, "user_id", userID)
 				return false, nil
 			}
 			return false, err
@@ -198,6 +215,7 @@ func (rm *roomManager) CheckUserAllowedJoinRoom(userID string, roomID string, ro
 		err := rm.odm.FindOne(ctx, bson.M{"_id": roomObjectID}, channel)
 		if err != nil {
 			if err == providers.ErrDocumentNotFound {
+				slog.Debug("頻道未找到", "room_id", roomID)
 				return false, nil
 			}
 			return false, err
@@ -207,6 +225,7 @@ func (rm *roomManager) CheckUserAllowedJoinRoom(userID string, roomID string, ro
 		err = rm.odm.FindOne(ctx, bson.M{"_id": channel.ServerID}, server)
 		if err != nil {
 			if err == providers.ErrDocumentNotFound {
+				slog.Debug("伺服器未找到", "server_id", channel.ServerID.Hex(), "channel_id", roomID)
 				return false, nil
 			}
 			return false, err
@@ -215,10 +234,13 @@ func (rm *roomManager) CheckUserAllowedJoinRoom(userID string, roomID string, ro
 		// 使用 ServerMemberRepository 檢查用戶是否為伺服器成員
 		isMember, err := rm.serverMemberRepo.IsMemberOfServer(channel.ServerID.Hex(), userID)
 		if err != nil {
-			utils.PrettyPrintf("檢查伺服器成員失敗: %v", err)
+			slog.Error("檢查伺服器成員失敗", "error", err)
 			return false, err
 		}
 
+		if !isMember {
+			slog.Debug("用戶非伺服器成員", "server_id", channel.ServerID.Hex(), "user_id", userID)
+		}
 		return isMember, nil
 	}
 	return false, nil
@@ -232,12 +254,13 @@ func (rm *roomManager) cleanupRoom(roomKey string) {
 	if room, exists := rm.rooms[roomKey]; exists && len(room.Clients) == 0 {
 		close(room.Broadcast)
 
-		// rm.pubSubMutex.Lock()
-		// if pubsub, exists := rm.roomPubSubs[roomKey]; exists {
-		// 	pubsub.Unsubscribe(context.Background(), "room:"+roomKey)
-		// 	delete(rm.roomPubSubs, roomKey)
-		// }
-		// rm.pubSubMutex.Unlock()
+		// 清理 Redis Pub/Sub 訂閱
+		rm.pubSubMutex.Lock()
+		if pubsub, exists := rm.roomPubSubs[roomKey]; exists {
+			pubsub.Unsubscribe(context.Background(), "room:"+roomKey)
+			delete(rm.roomPubSubs, roomKey)
+		}
+		rm.pubSubMutex.Unlock()
 
 		delete(rm.rooms, roomKey)
 	}
@@ -258,7 +281,7 @@ func (rm *roomManager) broadcastWorker(room *Room) {
 func (rm *roomManager) safelyBroadcastToClient(client *Client, message *WsMessage[MessageResponse]) {
 	// 使用統一的發送機制，而不是直接寫入 WebSocket
 	if err := client.SendMessage(message); err != nil {
-		utils.PrettyPrintf("發送消息失敗: %v", err)
+		slog.Debug("發送消息失敗", "user_id", client.UserID, "error", err)
 		// 標記客戶端為非活躍，讓健康檢查清理
 		client.IsActive = false
 		return

@@ -1,32 +1,32 @@
 [
   {
-    "username": "testuser1",
-    "nickname": "Test User 1",
-    "email": "testuser1@example.com",
+    "username": "system_admin",
+    "nickname": "系統管理者",
+    "email": "admin@example.com",
     "password": "Password123!"
   },
   {
-    "username": "testuser2",
-    "nickname": "Test User 2",
-    "email": "testuser2@example.com",
+    "username": "server_owner",
+    "nickname": "伺服器擁有者",
+    "email": "owner@example.com",
     "password": "Password123!"
   },
   {
-    "username": "testuser3",
-    "nickname": "Test User 3",
-    "email": "testuser3@example.com",
+    "username": "active_chat_user",
+    "nickname": "活躍聊天者",
+    "email": "active@example.com",
     "password": "Password123!"
   },
   {
-    "username": "testuser4",
-    "nickname": "Test User 4",
-    "email": "testuser4@example.com",
+    "username": "friend_connector",
+    "nickname": "社交達人",
+    "email": "social@example.com",
     "password": "Password123!"
   },
   {
-    "username": "testuser5",
-    "nickname": "Test User 5",
-    "email": "testuser5@example.com",
+    "username": "normal_test_user",
+    "nickname": "一般測試用戶",
+    "email": "test@example.com",
     "password": "Password123!"
   }
 ]

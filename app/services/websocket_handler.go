@@ -6,6 +6,7 @@ import (
 	"chat_app_backend/utils"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -46,7 +47,9 @@ func (wsh *webSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) 
 	// 設置 pong 處理器
 	ws.SetPongHandler(func(string) error {
 		ws.SetReadDeadline(time.Now().Add(PongWait))
-		client.UpdateLastSeen()
+		if client != nil {
+			client.UpdateLastSeen()
+		}
 		return nil
 	})
 
@@ -56,18 +59,22 @@ func (wsh *webSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) 
 
 	// 2. 更新資料庫狀態
 	if err := wsh.userService.SetUserOnline(userID); err != nil {
-		utils.PrettyPrintf("無法將用戶 %s 設定為在線：%v", userID, err)
+		slog.Warn("無法將用戶設定為在線", "user_id", userID, "error", err)
 	}
 
 	// 3. 更新 Redis 快取狀態(未來拓展用)
-	wsh.cache.Set(utils.UserStatusCacheKey(userID), "online", 24*time.Hour)
+	if wsh.cache != nil {
+		wsh.cache.Set(utils.UserStatusCacheKey(userID), "online", 24*time.Hour)
+	}
 
 	// 啟動讀寫協程
 	go wsh.clientWritePump(client)
 	go wsh.clientReadPump(client)
 
 	// 等待客戶端 context 結束 (連線關閉)
-	<-client.Context.Done()
+	if client != nil && client.Context != nil {
+		<-client.Context.Done()
+	}
 
 	// --- 連線關閉時的清理工作 ---
 	// 1. 從記憶體中註銷客戶端
@@ -75,24 +82,35 @@ func (wsh *webSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) 
 
 	// 2. 更新資料庫狀態
 	if err := wsh.userService.SetUserOffline(userID); err != nil {
-		utils.PrettyPrintf("無法將用戶 %s 設定為離線：%v", userID, err)
+		slog.Warn("無法將用戶設定為離線", "user_id", userID, "error", err)
 	}
 
 	// 3. 更新 Redis 快取狀態(未來拓展用)
-	wsh.cache.Set(utils.UserStatusCacheKey(userID), "offline", 24*time.Hour)
+	if wsh.cache != nil {
+		wsh.cache.Set(utils.UserStatusCacheKey(userID), "offline", 24*time.Hour)
+	}
 }
 
 // handleDMRoomCreation 處理私聊房間創建邏輯
 func (wsh *webSocketHandler) handleDMRoomCreation(roomID, userID string) {
+	cacheKey := "dm_room_exists:" + roomID
+
+	// 1. 先檢查快取，如果已存在則直接返回 (Hot Path Optimization)
+	if wsh.cache != nil {
+		if exists, _ := wsh.cache.Get(cacheKey); exists != "" {
+			return
+		}
+	}
+
 	roomObjectID, err := primitive.ObjectIDFromHex(roomID)
 	if err != nil {
-		utils.PrettyPrintf("無法解析房間 ID：%v", err)
+		slog.Error("無法解析房間 ID", "error", err)
 		return
 	}
 
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		utils.PrettyPrintf("無法解析用戶 ID：%v", err)
+		slog.Error("無法解析用戶 ID", "error", err)
 		return
 	}
 
@@ -100,7 +118,15 @@ func (wsh *webSocketHandler) handleDMRoomCreation(roomID, userID string) {
 	var dmRoomList []models.DMRoom
 	err = wsh.odm.Find(ctx, map[string]any{"room_id": roomObjectID}, &dmRoomList)
 	if err != nil {
-		utils.PrettyPrintf("無法找到私聊房間：%v", err)
+		slog.Warn("無法找到私聊房間", "room_id", roomID)
+		return
+	}
+
+	// 如果房間已存在（通常會有兩個 entry，雙方各一個），則寫入快取並返回
+	if len(dmRoomList) >= 2 {
+		if wsh.cache != nil {
+			wsh.cache.Set(cacheKey, "1", 24*time.Hour)
+		}
 		return
 	}
 
@@ -125,10 +151,10 @@ func (wsh *webSocketHandler) handleDMRoomCreation(roomID, userID string) {
 		}
 		err := wsh.odm.Create(ctx, newRoom)
 		if err != nil {
-			utils.PrettyPrintf("無法為用戶 %s 創建私聊房間：%v", userID, err)
+			slog.Error("無法為用戶創建私聊房間", "user_id", userID, "error", err)
 			return
 		}
-		utils.PrettyPrintf("已為用戶 %s 在房間 %s 中創建私聊房間記錄", userID, roomID)
+		slog.Debug("已為用戶創建私聊房間記錄", "user_id", userID, "room_id", roomID)
 	}
 
 	if partnerUserRoom == nil && currentUserRoom != nil {
@@ -140,10 +166,15 @@ func (wsh *webSocketHandler) handleDMRoomCreation(roomID, userID string) {
 		}
 		err := wsh.odm.Create(ctx, newRoom)
 		if err != nil {
-			utils.PrettyPrintf("無法為對方創建私聊房間：%v", err)
+			slog.Error("無法為對方創建私聊房間", "error", err)
 			return
 		}
-		utils.PrettyPrintf("已為對方在房間 %s 中創建私聊房間記錄", roomID)
+		slog.Debug("已為對方創建私聊房間記錄", "room_id", roomID)
+	}
+
+	// 成功處理後寫入快取
+	if wsh.cache != nil {
+		wsh.cache.Set(cacheKey, "1", 24*time.Hour)
 	}
 }
 
@@ -151,12 +182,21 @@ func (wsh *webSocketHandler) handleDMRoomCreation(roomID, userID string) {
 func (wsh *webSocketHandler) clientReadPump(client *Client) {
 	defer func() {
 		if r := recover(); r != nil {
-			utils.PrettyPrintf("讀取泵 panic 已恢復，用戶 %s：%v", client.UserID, r)
+			userID := "unknown"
+			if client != nil {
+				userID = client.UserID
+			}
+			slog.Error("讀取泵 panic", "user_id", userID, "panic", r)
 		}
-		client.Cancel() // 取消所有協程
+		if client != nil {
+			client.Cancel() // 取消所有協程
+		}
 	}()
 
 	for {
+		if client == nil || client.Context == nil {
+			return
+		}
 		select {
 		case <-client.Context.Done():
 			return
@@ -168,10 +208,12 @@ func (wsh *webSocketHandler) clientReadPump(client *Client) {
 
 			err := client.Conn.ReadJSON(&msg)
 			if err != nil {
+				// 只在意外關閉時印日誌，避免大量 EOF/Close 刷屏
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-					utils.PrettyPrintf("WebSocket 意外關閉錯誤，用戶 %s：%v", client.UserID, err)
+					slog.Warn("WebSocket 意外關閉", "user_id", client.UserID, "error", err)
 				} else {
-					utils.PrettyPrintf("讀取訊息失敗，用戶 %s：%v", client.UserID, err)
+					// 讀取失敗通常意味著斷線，使用 Debug 等級
+					slog.Debug("讀取訊息失敗", "user_id", client.UserID, "error", err)
 				}
 				return
 			}
@@ -190,6 +232,12 @@ func (wsh *webSocketHandler) clientReadPump(client *Client) {
 
 // updateActivityWithThrottle 使用 Redis 節流閥來更新資料庫中的用戶活動時間
 func (wsh *webSocketHandler) updateActivityWithThrottle(userID string) {
+	if wsh.cache == nil {
+		// 如果沒有快取，直接更新資料庫（不節流，或是依賴服務層自身的邏輯）
+		_ = wsh.userService.UpdateUserActivity(userID)
+		return
+	}
+
 	throttleKey := utils.UserActivityThrottleCacheKey(userID)
 
 	// 1. 檢查節流閥是否存在
@@ -207,12 +255,14 @@ func (wsh *webSocketHandler) updateActivityWithThrottle(userID string) {
 	go func() {
 		// 3a. 更新資料庫
 		if err := wsh.userService.UpdateUserActivity(userID); err != nil {
-			utils.PrettyPrintf("無法更新用戶 %s 的活動：%v", userID, err)
+			slog.Warn("無法更新用戶活動時間", "user_id", userID, "error", err)
 			return // 如果更新失敗，則不設置節流閥，以便下次重試
 		}
 
 		// 3b. 設置節流閥，冷卻時間 3 分鐘
-		wsh.cache.Set(throttleKey, "1", 3*time.Minute)
+		if wsh.cache != nil {
+			wsh.cache.Set(throttleKey, "1", 3*time.Minute)
+		}
 	}()
 }
 
@@ -222,12 +272,15 @@ func (wsh *webSocketHandler) clientWritePump(client *Client) {
 	defer func() {
 		ticker.Stop()
 		if r := recover(); r != nil {
-			utils.PrettyPrintf("寫入泵 panic 已恢復，用戶 %s：%v", client.UserID, r)
+			slog.Error("寫入泵 panic", "user_id", client.UserID, "panic", r)
 		}
 		client.Conn.Close()
 	}()
 
 	for {
+		if client == nil || client.Context == nil {
+			return
+		}
 		select {
 		case <-client.Context.Done():
 			return
@@ -241,14 +294,14 @@ func (wsh *webSocketHandler) clientWritePump(client *Client) {
 			}
 
 			if err := client.Conn.WriteMessage(websocket.TextMessage, message); err != nil {
-				utils.PrettyPrintf("寫入訊息失敗 for user %s: %v", client.UserID, err)
+				slog.Debug("寫入訊息失敗", "user_id", client.UserID, "error", err)
 				return
 			}
 
 		case <-ticker.C:
 			client.Conn.SetWriteDeadline(time.Now().Add(WriteWait))
 			if err := client.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				utils.PrettyPrintf("發送 Ping 失敗 for user %s: %v", client.UserID, err)
+				slog.Debug("發送 Ping 失敗", "user_id", client.UserID, "error", err)
 				return
 			}
 		}
@@ -259,18 +312,16 @@ func (wsh *webSocketHandler) clientWritePump(client *Client) {
 func (wsh *webSocketHandler) handleClientMessage(client *Client, msg WsMessage[json.RawMessage]) {
 	switch msg.Action {
 	case "join_room":
-		utils.PrettyPrintf("用戶 %s 正在加入房間：%s", client.UserID, msg.Data)
 		wsh.handleJoinRoom(client, msg.Data)
 	case "leave_room":
 		wsh.handleLeaveRoom(client, msg.Data)
 	case "send_message":
-		utils.PrettyPrintf("用戶 %s 正在發送訊息到房間：%s", client.UserID, msg.Data)
 		wsh.handleSendMessage(client, msg.Data)
 	case "ping":
 		// 處理客戶端ping
 		wsh.handlePing(client)
 	default:
-		utils.PrettyPrintf("來自用戶 %s 的未知動作：%s", client.UserID, msg.Action)
+		slog.Warn("未知動作", "user_id", client.UserID, "action", msg.Action)
 		client.SendError("unknown_action", "未知的動作類型")
 	}
 }
@@ -287,7 +338,7 @@ func (wsh *webSocketHandler) handleJoinRoom(client *Client, data json.RawMessage
 	}
 	err := json.Unmarshal(data, &requestData)
 	if err != nil {
-		utils.PrettyPrintf("無法解析加入房間數據：%v", err)
+		slog.Error("無法解析加入房間數據", "error", err)
 		client.SendError(action, "無法解析加入房間數據")
 		return
 	}
@@ -329,7 +380,7 @@ func (wsh *webSocketHandler) handleLeaveRoom(client *Client, data json.RawMessag
 	}
 	err := json.Unmarshal(data, &requestData)
 	if err != nil {
-		utils.PrettyPrintf("無法解析離開房間數據：%v", err)
+		slog.Error("無法解析離開房間數據", "error", err)
 		client.SendError(action, "無法解析離開房間數據")
 		return
 	}
@@ -357,7 +408,7 @@ func (wsh *webSocketHandler) handleSendMessage(client *Client, data json.RawMess
 	}
 	err := json.Unmarshal(data, &requestData)
 	if err != nil {
-		utils.PrettyPrintf("無法解析發送訊息數據：%v", err)
+		slog.Error("無法解析發送訊息數據", "error", err)
 		client.SendError(action, "無法解析發送訊息數據")
 		return
 	}
@@ -394,6 +445,6 @@ func (wsh *webSocketHandler) handlePing(client *Client) {
 
 	if err := client.SendMessage(pongMsg); err != nil {
 		client.SendError("ping", "無法發送 pong 訊息")
-		utils.PrettyPrintf("無法向客戶端 %s 發送 pong：%v", client.UserID, err)
+		slog.Debug("無法向客戶端發送 pong", "user_id", client.UserID, "error", err)
 	}
 }

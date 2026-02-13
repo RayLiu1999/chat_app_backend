@@ -39,9 +39,9 @@ export function extractCSRFToken(response, url) {
           const token = match[1];
           logInfo(`✅ CSRF Token 提取成功: ${token.substring(0, 20)}...`);
           
-          // 將 token 儲存到 k6 的 cookie jar
+          // 將 token 儲存到 k6 的 cookie jar，並確保路徑為 / 使其對所有 API 有效
           const jar = http.cookieJar();
-          jar.set(url, 'csrf_token', token);
+          jar.set(url, 'csrf_token', token, { path: "/" });
           
           return token;
         }

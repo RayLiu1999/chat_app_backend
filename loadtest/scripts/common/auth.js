@@ -34,6 +34,7 @@ export function registerUser(baseUrl, user) {
   const params = {
     headers: {
       "Content-Type": "application/json",
+      "Origin": "http://localhost:3000", // 從 config.DEFAULT_HEADERS 手動帶入或由呼叫端傳入
     },
     // 使用 expectedStatuses 將 200 和 400 標記為成功（避免 http_req_failed 計算錯誤）
     responseType: "text",
@@ -93,6 +94,7 @@ export function login(baseUrl, credentials) {
   const params = {
     headers: {
       "Content-Type": "application/json",
+      "Origin": "http://localhost:3000",
     },
   };
 
@@ -159,16 +161,40 @@ export function login(baseUrl, credentials) {
  * @returns {Object|null} 包含 token, csrfToken 和 headers 的 session 物件
  */
 export function getAuthenticatedSession(baseUrl) {
+  return getAuthenticatedSessionWithOptions(baseUrl, {});
+}
+
+/**
+ * 獲取一個已認證的用戶 session（可控制是否允許註冊）
+ * @param {string} baseUrl - API 基礎 URL
+ * @param {Object} options - { userIndex?: number, registerIfMissing?: boolean }
+ * @returns {Object|null} 包含 token, csrfToken 和 headers 的 session 物件
+ */
+export function getAuthenticatedSessionWithOptions(baseUrl, options = {}) {
+  const registerIfMissing = options.registerIfMissing !== false;
+  const customIndex = Number.isInteger(options.userIndex) ? options.userIndex : null;
+
   // 取測試用戶或產生臨時用戶
-  let user =
-    testUsers.length > 0
-      ? testUsers[__VU % testUsers.length]
-      : {
-          username: `user_${randomString(6)}`,
-          email: `user_${randomString(6)}@example.com`,
-          password: "Password123!",
-          nickname: `User ${randomString(6)}`,
-        };
+  // 在 setup() 階段 __VU 為 0 或 undefined，預設使用第一個用戶
+  const vuIndex = customIndex !== null
+    ? customIndex
+    : ((typeof __VU !== 'undefined') ? __VU : 0);
+  
+  let user;
+  
+  // 如果 VU 索引小於預定義用戶數，使用預定義用戶
+  if (testUsers.length > 0 && vuIndex > 0 && vuIndex <= testUsers.length) {
+    user = testUsers[vuIndex - 1];
+  } else {
+    // 否則動態生成用戶（基於 VU 索引確保每個 VU 有唯一帳號）
+    const id = vuIndex > 0 ? vuIndex : randomString(6);
+    user = {
+      username: `testuser_${id}`,
+      email: `testuser_${id}@example.com`,
+      password: "Password123!",
+      nickname: `Test User ${id}`,
+    };
+  }
 
   // 先嘗試登入
   let loginResult = login(baseUrl, {
@@ -176,7 +202,7 @@ export function getAuthenticatedSession(baseUrl) {
     password: user.password,
   });
 
-  if (!loginResult) {
+  if (!loginResult && registerIfMissing) {
     // 嘗試註冊後再登入
     registerUser(baseUrl, user);
     loginResult = login(baseUrl, {

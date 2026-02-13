@@ -10,6 +10,7 @@ import (
 	"chat_app_backend/config"
 	"chat_app_backend/di"
 	"chat_app_backend/routes"
+	"chat_app_backend/utils"
 
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
@@ -18,6 +19,9 @@ import (
 func init() {
 	// 載入環境變數配置
 	config.LoadConfig()
+
+	// 初始化日誌系統
+	utils.InitLogger(string(config.AppConfig.Server.Mode))
 
 	// 設置時區
 	location, err := time.LoadLocation(config.AppConfig.Server.Timezone)

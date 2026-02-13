@@ -1,0 +1,21 @@
+# Chat App Service
+# 使用 LoadBalancer 類型，OrbStack 會自動映射到 localhost
+apiVersion: v1
+kind: Service
+metadata:
+  name: chat-app
+  namespace: chat-app
+spec:
+  selector:
+    app: chat-app
+  ports:
+    - port: 80 # 對外暴露的端口
+      targetPort: 80 # 應用實際端口
+      name: http
+  type: LoadBalancer
+  # sessionAffinity 確保同一 IP 的請求導向同一 Pod（對 WebSocket 重要）
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600 # 1 小時
+
