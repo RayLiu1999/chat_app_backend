@@ -64,25 +64,16 @@ var AppConfig *Config
 
 func LoadConfig() {
 	// 根據環境載入對應的 .env 檔案
-	// 優先順序：ENV_FILE > 預設檔案
-	// - production: 預設 .env（可向下相容 fallback .env.production）
+	// - production: 預設 .env
 	// - others:     預設 .env.development
-	envFile := os.Getenv("ENV_FILE")
-	if envFile == "" {
-		if os.Getenv("ENV") == string(ProductionMode) {
-			envFile = ".env"
-		} else {
-			envFile = ".env.development"
-		}
+	envFile := ".env"
+	if os.Getenv("ENV") == string(DevelopmentMode) {
+		envFile = ".env.development"
 	}
 
 	if err := godotenv.Load(envFile); err != nil {
 		if envFile == ".env" {
-			if fallbackErr := godotenv.Load(".env.production"); fallbackErr != nil {
-				log.Printf("未找到 %s / .env.production，使用系統環境變數", envFile)
-			} else {
-				log.Printf("未找到 %s，已 fallback 載入 .env.production", envFile)
-			}
+			log.Printf("未找到 %s 檔案，請確保在生產環境中已正確設置環境變數", envFile)
 		} else {
 			log.Printf("未找到 %s 檔案，使用系統環境變數", envFile)
 		}
