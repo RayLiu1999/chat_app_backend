@@ -9,7 +9,6 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -459,7 +458,7 @@ func (fs *fileUploadService) ScanFileForMalware(filePath string) *models.Message
 	// 這裡可以整合第三方防毒引擎，如 ClamAV
 	// 目前實現基本的檔案檢查
 
-	file, err := os.Open(filePath)
+	file, err := fs.fileProvider.GetFile(filePath)
 	if err != nil {
 		return &models.MessageOptions{
 			Code:    models.ErrInternalServer,

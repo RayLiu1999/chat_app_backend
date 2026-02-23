@@ -5,6 +5,7 @@ import (
 	"chat_app_backend/app/models"
 	"chat_app_backend/app/providers"
 	"errors"
+	"io"
 	"mime/multipart"
 	"net/textproto"
 	"os"
@@ -44,6 +45,14 @@ func (m *mockFileProvider) GetFileInfo(filepath string) (os.FileInfo, error) {
 func (m *mockFileProvider) GetFileURL(filePath string) string {
 	args := m.Called(filePath)
 	return args.String(0)
+}
+
+func (m *mockFileProvider) GetFile(filepath string) (io.ReadCloser, error) {
+	args := m.Called(filepath)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(io.ReadCloser), args.Error(1)
 }
 
 // mockFileRepository 模擬 FileRepository
@@ -383,7 +392,11 @@ func TestCheckFileContent(t *testing.T) {
 
 func TestScanFileForMalware(t *testing.T) {
 	t.Run("無法開啟檔案", func(t *testing.T) {
-		service := &fileUploadService{}
+		mockFileProvider := new(mockFileProvider)
+		mockFileProvider.On("GetFile", "/nonexistent/file.txt").Return(nil, errors.New("file not found")).Once()
+		service := &fileUploadService{
+			fileProvider: mockFileProvider,
+		}
 		msgOpt := service.ScanFileForMalware("/nonexistent/file.txt")
 		assert.NotNil(t, msgOpt)
 		assert.Equal(t, models.ErrInternalServer, msgOpt.Code)

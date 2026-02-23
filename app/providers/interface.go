@@ -2,6 +2,7 @@ package providers
 
 import (
 	"context"
+	"io"
 	"mime/multipart"
 	"os"
 
@@ -15,6 +16,7 @@ type FileProvider interface {
 	DeleteFile(filepath string) error
 	GetFileInfo(filepath string) (os.FileInfo, error)
 	GetFileURL(filePath string) string
+	GetFile(filepath string) (io.ReadCloser, error)
 }
 
 // ODM - 提供對模型的資料庫操作介面

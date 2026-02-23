@@ -16,6 +16,7 @@ type Config struct {
 	Redis    RedisConfig
 	JWT      JWTConfig
 	Upload   UploadConfig
+	MinIO    MinIOConfig
 }
 type ModeConfig string
 
@@ -58,6 +59,15 @@ type JWTConfig struct {
 type UploadConfig struct {
 	MaxSize      int64
 	AllowedTypes []string
+}
+
+type MinIOConfig struct {
+	Endpoint        string
+	AccessKeyID     string
+	SecretAccessKey string
+	UseSSL          bool
+	BucketName      string
+	PublicURL       string
 }
 
 var AppConfig *Config
@@ -109,6 +119,14 @@ func LoadConfig() {
 		Upload: UploadConfig{
 			MaxSize:      getEnvAsInt64("UPLOAD_MAX_SIZE", 10485760),
 			AllowedTypes: strings.Split(getEnv("UPLOAD_ALLOWED_TYPES", "image/jpeg,image/png"), ","),
+		},
+		MinIO: MinIOConfig{
+			Endpoint:        getEnv("MINIO_ENDPOINT", "localhost:9000"),
+			AccessKeyID:     getEnv("MINIO_ACCESS_KEY", "minioadmin"),
+			SecretAccessKey: getEnv("MINIO_SECRET_KEY", "minioadmin"),
+			UseSSL:          getEnv("MINIO_USE_SSL", "false") == "true",
+			BucketName:      getEnv("MINIO_BUCKET_NAME", "chat-app-uploads"),
+			PublicURL:       getEnv("MINIO_PUBLIC_URL", "http://localhost:9000"),
 		},
 	}
 

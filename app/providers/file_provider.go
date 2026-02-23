@@ -29,14 +29,16 @@ func NewFileProvider(cfg *config.Config) *fileProvider {
 
 // SaveFile 儲存檔案到本地檔案系統
 func (fp *fileProvider) SaveFile(file multipart.File, filename string) (string, error) {
+	// fullPath 是實際存在檔案系統上的絕對路徑或相對於專案目錄的完整路徑
+	fullPath := filepath.Join(BaseUploadPath, filename)
+
 	// 確保目錄存在
-	dir := filepath.Dir(filepath.Join(BaseUploadPath, filename))
+	dir := filepath.Dir(fullPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", fmt.Errorf("無法創建目錄: %w", err)
 	}
 
 	// 創建目標檔案
-	fullPath := filepath.Join(BaseUploadPath, filename)
 	dst, err := os.Create(fullPath)
 	if err != nil {
 		return "", fmt.Errorf("無法創建檔案: %w", err)
@@ -55,19 +57,26 @@ func (fp *fileProvider) SaveFile(file multipart.File, filename string) (string, 
 		return "", fmt.Errorf("無法複製檔案內容: %w", err)
 	}
 
-	return fullPath, nil
+	// 回傳相對路徑，儲存於資料庫
+	return filename, nil
 }
 
 // DeleteFile 刪除檔案
-func (fp *fileProvider) DeleteFile(filepath string) error {
+func (fp *fileProvider) DeleteFile(filepathStr string) error {
+	// 若傳入的是相對路徑，先補上 BaseUploadPath
+	fullPath := filepathStr
+	if !strings.HasPrefix(fullPath, BaseUploadPath) {
+		fullPath = filepath.Join(BaseUploadPath, filepathStr)
+	}
+
 	// 確保檔案路徑在允許的基礎路徑內（防止路徑遍歷攻擊）
-	if !strings.HasPrefix(filepath, BaseUploadPath) {
+	if !strings.HasPrefix(fullPath, BaseUploadPath) {
 		return fmt.Errorf("檔案路徑不在允許範圍內")
 	}
 
-	if err := os.Remove(filepath); err != nil {
+	if err := os.Remove(fullPath); err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("檔案不存在: %s", filepath)
+			return fmt.Errorf("檔案不存在: %s", fullPath)
 		}
 		return fmt.Errorf("無法刪除檔案: %w", err)
 	}
@@ -76,16 +85,22 @@ func (fp *fileProvider) DeleteFile(filepath string) error {
 }
 
 // GetFileInfo 取得檔案資訊
-func (fp *fileProvider) GetFileInfo(filepath string) (os.FileInfo, error) {
+func (fp *fileProvider) GetFileInfo(filepathStr string) (os.FileInfo, error) {
+	// 若傳入的是相對路徑，先補上 BaseUploadPath
+	fullPath := filepathStr
+	if !strings.HasPrefix(fullPath, BaseUploadPath) {
+		fullPath = filepath.Join(BaseUploadPath, filepathStr)
+	}
+
 	// 確保檔案路徑在允許的基礎路徑內
-	if !strings.HasPrefix(filepath, BaseUploadPath) {
+	if !strings.HasPrefix(fullPath, BaseUploadPath) {
 		return nil, fmt.Errorf("檔案路徑不在允許範圍內")
 	}
 
-	info, err := os.Stat(filepath)
+	info, err := os.Stat(fullPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("檔案不存在: %s", filepath)
+			return nil, fmt.Errorf("檔案不存在: %s", fullPath)
 		}
 		return nil, fmt.Errorf("無法取得檔案資訊: %w", err)
 	}
@@ -96,17 +111,39 @@ func (fp *fileProvider) GetFileInfo(filepath string) (os.FileInfo, error) {
 // GetFileURL 生成檔案的URL
 func (fp *fileProvider) GetFileURL(filePath string) string {
 	baseURL := fp.cfg.Server.BaseURL
+	// 移除末尾的斜線
+	baseURL = strings.TrimRight(baseURL, "/")
+
 	if (baseURL == "" || baseURL == "http://localhost") && fp.cfg.Server.Port != "" {
 		baseURL = fmt.Sprintf("http://localhost:%s", fp.cfg.Server.Port)
 	}
 
-	// 確保路徑格式正確
-	if !strings.HasPrefix(filePath, BaseUploadPath) {
-		filePath = filepath.Join(BaseUploadPath, filePath)
+	// 將反斜線替換為正斜線 (處理 Windows 路徑)
+	cleanFilePath := filepath.ToSlash(filePath)
+
+	// 如果已經包含 uploads/ 前綴，確保不會重複
+	if !strings.HasPrefix(cleanFilePath, filepath.ToSlash(BaseUploadPath)) {
+		cleanFilePath = filepath.ToSlash(filepath.Join(BaseUploadPath, cleanFilePath))
 	}
 
 	// 返回完整的檔案URL
-	return fmt.Sprintf("%s/%s", baseURL, filePath)
+	return fmt.Sprintf("%s/%s", baseURL, cleanFilePath)
+}
+
+// GetFile 取得檔案內容
+func (fp *fileProvider) GetFile(filepathStr string) (io.ReadCloser, error) {
+	// 若傳入的是相對路徑，先補上 BaseUploadPath
+	fullPath := filepathStr
+	if !strings.HasPrefix(fullPath, BaseUploadPath) {
+		fullPath = filepath.Join(BaseUploadPath, filepathStr)
+	}
+
+	// 確保檔案路徑在允許的基礎路徑內
+	if !strings.HasPrefix(fullPath, BaseUploadPath) {
+		return nil, fmt.Errorf("檔案路徑不在允許範圍內")
+	}
+
+	return os.Open(fullPath)
 }
 
 // GenerateSecureFileName 生成安全的檔案名稱

@@ -6,6 +6,7 @@ import (
 	"chat_app_backend/app/repositories"
 	"chat_app_backend/app/services"
 	"chat_app_backend/config"
+	"fmt"
 )
 
 // Repository容器
@@ -199,9 +200,20 @@ func initProviders(
 	mongodb *providers.MongoWrapper,
 	redis *providers.RedisWrapper,
 ) *ProviderContainer {
+	var fileProvider providers.FileProvider
+	if cfg.Server.Mode == config.ProductionMode {
+		minioProv, err := providers.NewMinIOProvider(cfg)
+		if err != nil {
+			panic(fmt.Sprintf("初始化 MinIO 失敗: %v", err))
+		}
+		fileProvider = minioProv
+	} else {
+		fileProvider = providers.NewFileProvider(cfg)
+	}
+
 	return &ProviderContainer{
 		ODM:          providers.NewODM(mongodb.DB),
-		FileProvider: providers.NewFileProvider(cfg),
+		FileProvider: fileProvider,
 		Cache:        providers.NewRedisCacheProvider(redis.Client),
 	}
 }
