@@ -77,7 +77,7 @@ func main() {
 	}
 
 	// 設置路由
-	routes.SetupRoutes(r, config.AppConfig, deps.Controllers)
+	routes.SetupRoutes(r, config.AppConfig, redis, deps.Controllers)
 
 	// 確保上傳目錄存在
 	err = os.MkdirAll("uploads", 0755)

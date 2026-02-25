@@ -15,19 +15,21 @@ import (
 
 // 定義專門的控制器結構體
 type ChatController struct {
-	config       *config.Config
-	mongoConnect *mongo.Database
-	chatService  services.ChatService
-	userService  services.UserService
+	config         *config.Config
+	mongoConnect   *mongo.Database
+	chatService    services.ChatService
+	userService    services.UserService
+	allowedOrigins []string // WebSocket 連線允許的 Origin 白名單
 }
 
 // 創建控制器的工廠函數
 func NewChatController(cfg *config.Config, mongodb *mongo.Database, chatService services.ChatService, userService services.UserService) *ChatController {
 	return &ChatController{
-		config:       cfg,
-		mongoConnect: mongodb,
-		chatService:  chatService,
-		userService:  userService,
+		config:         cfg,
+		mongoConnect:   mongodb,
+		chatService:    chatService,
+		userService:    userService,
+		allowedOrigins: cfg.Server.AllowedOrigins,
 	}
 }
 
@@ -38,17 +40,29 @@ type User struct {
 	Status string // `online` 或 `offline`
 }
 
-// 定義 WebSocket 升級器
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
-}
-
-// 處理 WebSocket 連接
+// HandleConnections 處理 WebSocket 連接
 func (cc *ChatController) HandleConnections(c *gin.Context) {
+	// 建立帶白名單驗證的 Upgrader，防止 CSWSH（跨站 WebSocket 劫持）攻擊
+	upgrader := websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin: func(r *http.Request) bool {
+			// 非瀏覽器客戶端（如手機原生應用）可能沒有 Origin header，需放行
+			origin := r.Header.Get("Origin")
+			if origin == "" {
+				return true
+			}
+			// 檢查 Origin 是否在白名單中
+			for _, allowed := range cc.allowedOrigins {
+				if origin == allowed {
+					return true
+				}
+			}
+			slog.Warn("WebSocket 連線被拒絕：Origin 不在白名單中", "origin", origin)
+			return false
+		},
+	}
+
 	// 解析參數
 	token := c.Query("token")
 

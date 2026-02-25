@@ -1,0 +1,40 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: none
+  enable:
+    # 空指針 / 邏輯錯誤相關
+    - nilnil       # 偵測同時回傳 nil, nil 的危險模式
+    - nilerr       # 偵測 err != nil 時卻回傳 nil error 的邏輯錯誤
+    - staticcheck  # 進階靜態分析，涵蓋空指針路徑、deprecated API 等
+    - govet        # Go 官方工具：printf 參數型別、unreachable code 等
+    # 安全性相關
+    - gosec        # 安全性漏洞偵測（SQL Injection、硬編碼密碼、弱加密等）
+    - bodyclose    # 確保 HTTP response.Body 有正確關閉，防止資源洩漏
+    # 程式碼品質
+    - errcheck     # 確保所有 error 都有被處理
+    - exhaustive   # 確保 switch 分支涵蓋所有 enum 值
+    - ineffassign  # 偵測無效的變數賦值
+    - unused       # 偵測未使用的程式碼
+    - gofmt        # 格式化檢查
+  settings:
+    gosec:
+      excludes:
+        - G404  # 允許使用 math/rand（此專案不需要密碼學 RNG）
+    exhaustive:
+      default-signifies-exhaustive: true  # 有 default 分支的 switch 視為完整
+
+issues:
+  exclude-rules:
+    # 測試檔案放寬 gosec 與 errcheck 限制
+    - path: "_test\\.go"
+      linters:
+        - gosec
+        - errcheck
+    # mock 檔案放寬所有限制
+    - path: "app/mocks/"
+      linters:
+        - all

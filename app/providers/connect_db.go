@@ -10,6 +10,7 @@ import (
 	"chat_app_backend/config"
 
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/sony/gobreaker"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -26,8 +27,15 @@ type DBConnection interface {
 
 // MongoWrapper 結構體包裝 *mongo.Database，使其實現 DBConnection 介面
 type MongoWrapper struct {
-	Client *mongo.Client   // 實際的 mongo Client
-	DB     *mongo.Database // 實際的 mongo Database
+	Client *mongo.Client             // 實際的 mongo Client
+	DB     *mongo.Database           // 實際的 mongo Database
+	cb     *gobreaker.CircuitBreaker // 熔斷器：防止連線失敗時雪崩
+}
+
+// Execute 使用熔斷器包裹 MongoDB 操作
+// 若熔斷器處於開啟狀態，fn 不會被執行，直接回傳服務不可用錯誤
+func (mw *MongoWrapper) Execute(fn func() (interface{}, error)) (interface{}, error) {
+	return ExecuteWithBreaker(mw.cb, fn)
 }
 
 func (mw *MongoWrapper) Close() {
@@ -76,7 +84,11 @@ func DBConnect[T DBConnection](dbType string) (T, error) {
 		if err != nil {
 			return result, err
 		}
-		return any(&MongoWrapper{Client: client, DB: db}).(T), nil
+		return any(&MongoWrapper{
+			Client: client,
+			DB:     db,
+			cb:     newCircuitBreaker("mongodb"),
+		}).(T), nil
 	case "postgresql":
 		db, err := connectPostgreSQL()
 		if err != nil {

@@ -2,6 +2,7 @@ package routes
 
 import (
 	"chat_app_backend/app/http/middlewares"
+	"chat_app_backend/app/providers"
 	"chat_app_backend/config"
 	"chat_app_backend/di"
 	"chat_app_backend/version"
@@ -13,13 +14,17 @@ import (
 	ginprometheus "github.com/zsais/go-gin-prometheus"
 )
 
-func SetupRoutes(r *gin.Engine, cfg *config.Config, controllers *di.ControllerContainer) {
+func SetupRoutes(r *gin.Engine, cfg *config.Config, redis *providers.RedisWrapper, controllers *di.ControllerContainer) {
 	// 初始化 Prometheus 監控
 	p := ginprometheus.NewPrometheus("gin")
 	p.Use(r)
 
 	// 使用 JSON 日誌中間件 (配合 Loki)
 	r.Use(middlewares.JSONLoggerMiddleware())
+
+	// 全域請求超時設定（30秒），防止 goroutine 因 DB 掛起而無限阻塞
+	// WebSocket 連線不套用此 timeout（長連線需另行管理）
+	r.Use(middlewares.Timeout(30 * time.Second))
 
 	// 設定靜態文件服務
 	// 使用絕對路徑，確保在任何環境下都可以正確訪問上傳的文件
@@ -54,10 +59,21 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, controllers *di.ControllerCo
 
 	// 未認證的路由，只需要 CSRF 驗證
 	public := r.Group("/")
-	public.POST("/register", controllers.UserController.Register)
-	public.POST("/login", controllers.UserController.Login)
+	// 高風險公開端點：套用 Rate Limiter 防止暴力破解
+	public.POST("/register",
+		middlewares.RateLimiter(redis.Client, "register", 3, time.Minute),
+		controllers.UserController.Register,
+	)
+	public.POST("/login",
+		middlewares.RateLimiter(redis.Client, "login", 5, time.Minute),
+		controllers.UserController.Login,
+	)
 	public.POST("/logout", middlewares.VerifyCSRFToken(), controllers.UserController.Logout)
-	public.POST("/refresh_token", middlewares.VerifyCSRFToken(), controllers.UserController.RefreshToken)
+	public.POST("/refresh_token",
+		middlewares.RateLimiter(redis.Client, "refresh_token", 10, 5*time.Minute),
+		middlewares.VerifyCSRFToken(),
+		controllers.UserController.RefreshToken,
+	)
 
 	// 測試用 API
 	if cfg.Server.Mode != config.ProductionMode {
@@ -136,9 +152,12 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, controllers *di.ControllerCo
 	auth.GET("/channels/:channel_id/messages", controllers.ChatController.GetChannelMessages)      // 獲取頻道訊息
 
 	// file upload
-	authWithCSRF.POST("/upload/file", controllers.FileController.UploadFile)         // 通用檔案上傳
-	authWithCSRF.POST("/upload/avatar", controllers.FileController.UploadAvatar)     // 頭像上傳
-	authWithCSRF.POST("/upload/document", controllers.FileController.UploadDocument) // 文件上傳
-	auth.GET("/files", controllers.FileController.GetUserFiles)                      // 獲取用戶檔案列表
-	authWithCSRF.DELETE("/files/:file_id", controllers.FileController.DeleteFile)    // 刪除檔案
+	// 上傳路由獨立群組，覆蓋全域的 30s timeout，改為 120s（大型檔案上傳需要更長時間）
+	uploadGroup := authWithCSRF.Group("/")
+	uploadGroup.Use(middlewares.Timeout(120 * time.Second))
+	uploadGroup.POST("/upload/file", controllers.FileController.UploadFile)         // 通用檔案上傳
+	uploadGroup.POST("/upload/avatar", controllers.FileController.UploadAvatar)     // 頭像上傳
+	uploadGroup.POST("/upload/document", controllers.FileController.UploadDocument) // 文件上傳
+	auth.GET("/files", controllers.FileController.GetUserFiles)                     // 獲取用戶檔案列表
+	authWithCSRF.DELETE("/files/:file_id", controllers.FileController.DeleteFile)   // 刪除檔案
 }
