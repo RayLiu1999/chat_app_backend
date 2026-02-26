@@ -205,6 +205,7 @@ func TestNewServerService(t *testing.T) {
 		mockFileService,
 		nil,
 		mockClientMgr,
+		nil,
 	)
 
 	assert.NotNil(t, service)

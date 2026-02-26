@@ -22,7 +22,7 @@ func (m *mockWebSocketConn) Close() error {
 }
 
 func TestNewClientManager(t *testing.T) {
-	cm := NewClientManager()
+	cm := NewClientManager(nil)
 
 	assert.NotNil(t, cm)
 	assert.NotNil(t, cm.clients)
@@ -34,7 +34,7 @@ func TestNewClientManager(t *testing.T) {
 }
 
 func TestNewClient(t *testing.T) {
-	cm := NewClientManager()
+	cm := NewClientManager(nil)
 	userID := primitive.NewObjectID().Hex()
 	mockConn := &mockWebSocketConn{}
 
@@ -52,7 +52,7 @@ func TestNewClient(t *testing.T) {
 }
 
 func TestRegisterClient(t *testing.T) {
-	cm := NewClientManager()
+	cm := NewClientManager(nil)
 	userID := primitive.NewObjectID().Hex()
 	mockConn := &mockWebSocketConn{}
 	client := cm.NewClient(userID, mockConn.Conn)
@@ -75,7 +75,7 @@ func TestRegisterClient(t *testing.T) {
 }
 
 func TestUnregisterClient(t *testing.T) {
-	cm := NewClientManager()
+	cm := NewClientManager(nil)
 	userID := primitive.NewObjectID().Hex()
 	mockConn := &mockWebSocketConn{}
 	client := cm.NewClient(userID, mockConn.Conn)
@@ -109,7 +109,7 @@ func TestUnregisterClient(t *testing.T) {
 }
 
 func TestGetClient(t *testing.T) {
-	cm := NewClientManager()
+	cm := NewClientManager(nil)
 	userID1 := primitive.NewObjectID().Hex()
 	userID2 := primitive.NewObjectID().Hex()
 	mockConn := &mockWebSocketConn{}
@@ -131,7 +131,7 @@ func TestGetClient(t *testing.T) {
 }
 
 func TestGetAllClients(t *testing.T) {
-	cm := NewClientManager()
+	cm := NewClientManager(nil)
 	mockConn := &mockWebSocketConn{}
 
 	userID1 := primitive.NewObjectID().Hex()
@@ -157,7 +157,7 @@ func TestGetAllClients(t *testing.T) {
 }
 
 func TestCheckClientsHealth(t *testing.T) {
-	cm := NewClientManager()
+	cm := NewClientManager(nil)
 	mockConn := &mockWebSocketConn{}
 
 	healthyUserID := primitive.NewObjectID().Hex()
@@ -190,7 +190,7 @@ func TestCheckClientsHealth(t *testing.T) {
 }
 
 func TestIsUserOnline(t *testing.T) {
-	cm := NewClientManager()
+	cm := NewClientManager(nil)
 	mockConn := &mockWebSocketConn{}
 
 	onlineUserID := primitive.NewObjectID().Hex()
@@ -212,7 +212,7 @@ func TestIsUserOnline(t *testing.T) {
 }
 
 func TestStartHealthChecker(t *testing.T) {
-	cm := NewClientManager()
+	cm := NewClientManager(nil)
 	mockConn := &mockWebSocketConn{}
 
 	unhealthyUserID := primitive.NewObjectID().Hex()
@@ -257,7 +257,7 @@ func TestStartHealthChecker(t *testing.T) {
 }
 
 func TestMultipleClientsRegistrationAndUnregistration(t *testing.T) {
-	cm := NewClientManager()
+	cm := NewClientManager(nil)
 	mockConn := &mockWebSocketConn{}
 
 	// 創建多個客戶端

@@ -75,7 +75,7 @@ func initServices(
 	redis *providers.RedisWrapper,
 ) *ServiceContainer {
 	// 1. 將 ClientManager 的初始化提前
-	clientManager := services.NewClientManager()
+	clientManager := services.NewClientManager(providers.Cache)
 
 	// 2. 初始化檔案上傳服務
 	fileUploadService := services.NewFileUploadService(
@@ -91,6 +91,7 @@ func initServices(
 		providers.ODM,
 		repos.UserRepo,
 		fileUploadService,
+		providers.Cache,
 	)
 
 	// 4. 創建 ChatService，並傳入已經建立好的 UserService
@@ -120,6 +121,7 @@ func initServices(
 		fileUploadService,
 		userService,
 		clientManager,
+		providers.Cache,
 	)
 	friendService := services.NewFriendService(
 		cfg,
@@ -137,6 +139,7 @@ func initServices(
 		repos.ServerMemberRepo,
 		repos.UserRepo,
 		repos.ChatRepo,
+		providers.Cache,
 	)
 
 	return &ServiceContainer{

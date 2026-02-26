@@ -47,7 +47,7 @@ func NewChatService(cfg *config.Config,
 	fileUploadService FileUploadService) ChatService {
 
 	// 創建模組化組件
-	clientManager := NewClientManager()
+	clientManager := NewClientManager(cache)
 	roomManager := NewRoomManager(odm, redisClient, serverMemberRepo)
 	messageHandler := NewMessageHandler(odm, roomManager, redisClient)
 	websocketHandler := NewWebSocketHandler(odm, clientManager, roomManager, messageHandler, userService, cache)

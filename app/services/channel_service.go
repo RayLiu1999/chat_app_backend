@@ -5,7 +5,10 @@ import (
 	"chat_app_backend/app/providers"
 	"chat_app_backend/app/repositories"
 	"chat_app_backend/config"
+	"chat_app_backend/utils"
+	"encoding/json"
 	"log/slog"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -18,6 +21,7 @@ type channelService struct {
 	serverMemberRepo repositories.ServerMemberRepository
 	userRepo         repositories.UserRepository
 	chatRepo         repositories.ChatRepository
+	cache            providers.CacheProvider // 伺服器成員權限快取
 }
 
 func NewChannelService(cfg *config.Config,
@@ -26,7 +30,8 @@ func NewChannelService(cfg *config.Config,
 	serverRepo repositories.ServerRepository,
 	serverMemberRepo repositories.ServerMemberRepository,
 	userRepo repositories.UserRepository,
-	chatRepo repositories.ChatRepository) *channelService {
+	chatRepo repositories.ChatRepository,
+	cache providers.CacheProvider) *channelService {
 	return &channelService{
 		config:           cfg,
 		odm:              odm,
@@ -35,13 +40,43 @@ func NewChannelService(cfg *config.Config,
 		serverMemberRepo: serverMemberRepo,
 		userRepo:         userRepo,
 		chatRepo:         chatRepo,
+		cache:            cache,
 	}
+}
+
+// getCachedUserServers 取得用戶所屬伺服器清單，优先讀取 Redis 快取
+// 快取 key: user:{userID}:servers，TTL 5 分鐘
+func (cs *channelService) getCachedUserServers(userID string) ([]models.ServerMember, error) {
+	if cs.cache != nil {
+		cacheKey := utils.UserServersCacheKey(userID)
+		if cached, err := cs.cache.Get(cacheKey); err == nil && cached != "" {
+			var members []models.ServerMember
+			if err := json.Unmarshal([]byte(cached), &members); err == nil {
+				return members, nil
+			}
+		}
+	}
+
+	// Cache miss: 查詢 MongoDB
+	members, err := cs.serverMemberRepo.GetUserServers(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 寫入快取
+	if cs.cache != nil {
+		if data, err := json.Marshal(members); err == nil {
+			cs.cache.Set(utils.UserServersCacheKey(userID), string(data), 5*time.Minute)
+		}
+	}
+
+	return members, nil
 }
 
 // GetChannelsByServerID 根據伺服器ID獲取頻道列表
 func (cs *channelService) GetChannelsByServerID(userID string, serverID string) ([]models.ChannelResponse, *models.MessageOptions) {
 	// 檢查用戶是否有權限訪問該伺服器
-	serverMembers, err := cs.serverMemberRepo.GetUserServers(userID)
+	serverMembers, err := cs.getCachedUserServers(userID)
 	if err != nil {
 		return nil, &models.MessageOptions{
 			Code:    models.ErrInternalServer,
@@ -102,7 +137,7 @@ func (cs *channelService) GetChannelByID(userID string, channelID string) (*mode
 	}
 
 	// 檢查用戶是否有權限訪問該頻道所屬的伺服器
-	serverMembers, err := cs.serverMemberRepo.GetUserServers(userID)
+	serverMembers, err := cs.getCachedUserServers(userID)
 	if err != nil {
 		return nil, &models.MessageOptions{
 			Code:    models.ErrInternalServer,

@@ -14,7 +14,7 @@ import (
 
 // TestNewUserService 測試創建 UserService
 func TestNewUserService(t *testing.T) {
-	service := NewUserService(nil, nil, nil, nil)
+	service := NewUserService(nil, nil, nil, nil, nil)
 
 	assert.NotNil(t, service, "服務應該被成功創建")
 	assert.IsType(t, &userService{}, service, "服務應該是 *userService 類型")
@@ -23,7 +23,7 @@ func TestNewUserService(t *testing.T) {
 // TestGetUserPictureURL 測試獲取用戶頭像 URL
 func TestGetUserPictureURL(t *testing.T) {
 	t.Run("用戶沒有頭像", func(t *testing.T) {
-		service := NewUserService(nil, nil, nil, nil)
+		service := NewUserService(nil, nil, nil, nil, nil)
 
 		user := &models.User{
 			BaseModel: providers.BaseModel{
@@ -37,7 +37,7 @@ func TestGetUserPictureURL(t *testing.T) {
 	})
 
 	t.Run("FileUploadService 為 nil", func(t *testing.T) {
-		service := NewUserService(nil, nil, nil, nil)
+		service := NewUserService(nil, nil, nil, nil, nil)
 
 		user := &models.User{
 			BaseModel: providers.BaseModel{
@@ -54,7 +54,7 @@ func TestGetUserPictureURL(t *testing.T) {
 // TestGetUserBannerURL 測試獲取用戶橫幅 URL
 func TestGetUserBannerURL(t *testing.T) {
 	t.Run("用戶沒有橫幅", func(t *testing.T) {
-		service := NewUserService(nil, nil, nil, nil)
+		service := NewUserService(nil, nil, nil, nil, nil)
 
 		user := &models.User{
 			BaseModel: providers.BaseModel{
@@ -68,7 +68,7 @@ func TestGetUserBannerURL(t *testing.T) {
 	})
 
 	t.Run("FileUploadService 為 nil", func(t *testing.T) {
-		service := NewUserService(nil, nil, nil, nil)
+		service := NewUserService(nil, nil, nil, nil, nil)
 
 		user := &models.User{
 			BaseModel: providers.BaseModel{
@@ -91,7 +91,7 @@ func TestGetUserPictureURL_WithFileService(t *testing.T) {
 		fileService := new(mocks.FileUploadService)
 		fileService.On("GetFileURLByID", pictureID.Hex()).Return(expectedURL, (*models.MessageOptions)(nil))
 
-		service := NewUserService(nil, nil, nil, fileService)
+		service := NewUserService(nil, nil, nil, fileService, nil)
 
 		user := &models.User{
 			BaseModel: providers.BaseModel{
@@ -108,7 +108,7 @@ func TestGetUserPictureURL_WithFileService(t *testing.T) {
 		fileService := new(mocks.FileUploadService)
 		fileService.On("GetFileURLByID", mock.Anything).Return("", &models.MessageOptions{Code: models.ErrInternalServer})
 
-		service := NewUserService(nil, nil, nil, fileService)
+		service := NewUserService(nil, nil, nil, fileService, nil)
 
 		user := &models.User{
 			BaseModel: providers.BaseModel{
@@ -131,7 +131,7 @@ func TestGetUserBannerURL_WithFileService(t *testing.T) {
 		fileService := new(mocks.FileUploadService)
 		fileService.On("GetFileURLByID", bannerID.Hex()).Return(expectedURL, (*models.MessageOptions)(nil))
 
-		service := NewUserService(nil, nil, nil, fileService)
+		service := NewUserService(nil, nil, nil, fileService, nil)
 
 		user := &models.User{
 			BaseModel: providers.BaseModel{
@@ -148,7 +148,7 @@ func TestGetUserBannerURL_WithFileService(t *testing.T) {
 		fileService := new(mocks.FileUploadService)
 		fileService.On("GetFileURLByID", mock.Anything).Return("", &models.MessageOptions{Code: models.ErrInternalServer})
 
-		service := NewUserService(nil, nil, nil, fileService)
+		service := NewUserService(nil, nil, nil, fileService, nil)
 
 		user := &models.User{
 			BaseModel: providers.BaseModel{
@@ -165,13 +165,13 @@ func TestGetUserBannerURL_WithFileService(t *testing.T) {
 // TestUserService_ServiceInitialization 測試服務初始化
 func TestUserService_ServiceInitialization(t *testing.T) {
 	t.Run("使用 nil 依賴初始化", func(t *testing.T) {
-		service := NewUserService(nil, nil, nil, nil)
+		service := NewUserService(nil, nil, nil, nil, nil)
 		assert.NotNil(t, service)
 	})
 
 	t.Run("使用完整依賴初始化", func(t *testing.T) {
 		fileService := new(mocks.FileUploadService)
-		service := NewUserService(nil, nil, nil, fileService)
+		service := NewUserService(nil, nil, nil, fileService, nil)
 		assert.NotNil(t, service)
 	})
 }
@@ -179,7 +179,7 @@ func TestUserService_ServiceInitialization(t *testing.T) {
 // TestUserService_NilSafety 測試 nil 安全性
 func TestUserService_NilSafety(t *testing.T) {
 	t.Run("getUserPictureURL 處理 nil fileService", func(t *testing.T) {
-		service := NewUserService(nil, nil, nil, nil)
+		service := NewUserService(nil, nil, nil, nil, nil)
 
 		user := &models.User{
 			PictureID: primitive.NewObjectID(),
@@ -193,7 +193,7 @@ func TestUserService_NilSafety(t *testing.T) {
 	})
 
 	t.Run("getUserBannerURL 處理 nil fileService", func(t *testing.T) {
-		service := NewUserService(nil, nil, nil, nil)
+		service := NewUserService(nil, nil, nil, nil, nil)
 
 		user := &models.User{
 			BannerID: primitive.NewObjectID(),
@@ -208,7 +208,7 @@ func TestUserService_NilSafety(t *testing.T) {
 
 	t.Run("getUserPictureURL 處理零值 ObjectID", func(t *testing.T) {
 		fileService := new(mocks.FileUploadService)
-		service := NewUserService(nil, nil, nil, fileService)
+		service := NewUserService(nil, nil, nil, fileService, nil)
 
 		user := &models.User{
 			PictureID: primitive.NilObjectID,
@@ -220,7 +220,7 @@ func TestUserService_NilSafety(t *testing.T) {
 
 	t.Run("getUserBannerURL 處理零值 ObjectID", func(t *testing.T) {
 		fileService := new(mocks.FileUploadService)
-		service := NewUserService(nil, nil, nil, fileService)
+		service := NewUserService(nil, nil, nil, fileService, nil)
 
 		user := &models.User{
 			BannerID: primitive.NilObjectID,
@@ -324,7 +324,7 @@ func TestRegisterUser(t *testing.T) {
 			},
 		}
 
-		service := NewUserService(nil, nil, mockRepo, nil)
+		service := NewUserService(nil, nil, mockRepo, nil, nil)
 
 		user := models.User{
 			Username: "testuser",
@@ -344,7 +344,7 @@ func TestRegisterUser(t *testing.T) {
 			},
 		}
 
-		service := NewUserService(nil, nil, mockRepo, nil)
+		service := NewUserService(nil, nil, mockRepo, nil, nil)
 
 		user := models.User{
 			Username: "existinguser",
@@ -368,7 +368,7 @@ func TestRegisterUser(t *testing.T) {
 			},
 		}
 
-		service := NewUserService(nil, nil, mockRepo, nil)
+		service := NewUserService(nil, nil, mockRepo, nil, nil)
 
 		user := models.User{
 			Username: "testuser",
@@ -389,7 +389,7 @@ func TestRegisterUser(t *testing.T) {
 			},
 		}
 
-		service := NewUserService(nil, nil, mockRepo, nil)
+		service := NewUserService(nil, nil, mockRepo, nil, nil)
 
 		user := models.User{
 			Username: "testuser",
@@ -419,7 +419,7 @@ func TestGetUserResponseById(t *testing.T) {
 			},
 		}
 
-		service := NewUserService(nil, nil, mockRepo, nil)
+		service := NewUserService(nil, nil, mockRepo, nil, nil)
 
 		response, err := service.GetUserResponseById(userID.Hex())
 
@@ -436,7 +436,7 @@ func TestGetUserResponseById(t *testing.T) {
 			},
 		}
 
-		service := NewUserService(nil, nil, mockRepo, nil)
+		service := NewUserService(nil, nil, mockRepo, nil, nil)
 
 		response, err := service.GetUserResponseById(primitive.NewObjectID().Hex())
 
@@ -460,7 +460,7 @@ func TestSetUserOnline(t *testing.T) {
 			},
 		}
 
-		service := NewUserService(nil, nil, mockRepo, nil)
+		service := NewUserService(nil, nil, mockRepo, nil, nil)
 
 		err := service.SetUserOnline(userID)
 
@@ -475,7 +475,7 @@ func TestSetUserOnline(t *testing.T) {
 			},
 		}
 
-		service := NewUserService(nil, nil, mockRepo, nil)
+		service := NewUserService(nil, nil, mockRepo, nil, nil)
 
 		err := service.SetUserOnline(primitive.NewObjectID().Hex())
 
@@ -498,7 +498,7 @@ func TestSetUserOffline(t *testing.T) {
 			},
 		}
 
-		service := NewUserService(nil, nil, mockRepo, nil)
+		service := NewUserService(nil, nil, mockRepo, nil, nil)
 
 		err := service.SetUserOffline(userID)
 
@@ -522,7 +522,7 @@ func TestUpdateUserActivity(t *testing.T) {
 			},
 		}
 
-		service := NewUserService(nil, nil, mockRepo, nil)
+		service := NewUserService(nil, nil, mockRepo, nil, nil)
 
 		err := service.UpdateUserActivity(userID)
 
@@ -554,7 +554,7 @@ func TestGetUserProfile(t *testing.T) {
 		fileService := new(mocks.FileUploadService)
 		fileService.On("GetFileURLByID", pictureID.Hex()).Return("https://example.com/avatar.jpg", (*models.MessageOptions)(nil))
 
-		service := NewUserService(nil, nil, mockRepo, fileService)
+		service := NewUserService(nil, nil, mockRepo, fileService, nil)
 
 		profile, err := service.GetUserProfile(userID.Hex())
 
@@ -572,7 +572,7 @@ func TestGetUserProfile(t *testing.T) {
 			},
 		}
 
-		service := NewUserService(nil, nil, mockRepo, nil)
+		service := NewUserService(nil, nil, mockRepo, nil, nil)
 
 		profile, err := service.GetUserProfile(primitive.NewObjectID().Hex())
 
@@ -597,7 +597,7 @@ func TestUpdateUserProfile(t *testing.T) {
 			},
 		}
 
-		service := NewUserService(nil, nil, mockRepo, nil)
+		service := NewUserService(nil, nil, mockRepo, nil, nil)
 
 		updates := map[string]any{
 			"nickname": "New Nickname",
@@ -622,7 +622,7 @@ func TestUpdateUserProfile(t *testing.T) {
 			},
 		}
 
-		service := NewUserService(nil, nil, mockRepo, nil)
+		service := NewUserService(nil, nil, mockRepo, nil, nil)
 
 		updates := map[string]any{
 			"nickname": "New Nickname",
@@ -643,7 +643,7 @@ func TestUpdateUserProfile(t *testing.T) {
 			},
 		}
 
-		service := NewUserService(nil, nil, mockRepo, nil)
+		service := NewUserService(nil, nil, mockRepo, nil, nil)
 
 		updates := map[string]any{
 			"invalid_field": "value",
@@ -677,7 +677,7 @@ func TestDeleteUserAvatar(t *testing.T) {
 		fileService := new(mocks.FileUploadService)
 		fileService.On("DeleteFileByID", pictureID.Hex(), userID.Hex()).Return((*models.MessageOptions)(nil))
 
-		service := NewUserService(nil, nil, mockRepo, fileService)
+		service := NewUserService(nil, nil, mockRepo, fileService, nil)
 
 		err := service.DeleteUserAvatar(userID.Hex())
 
@@ -699,7 +699,7 @@ func TestDeleteUserAvatar(t *testing.T) {
 			},
 		}
 
-		service := NewUserService(nil, nil, mockRepo, nil)
+		service := NewUserService(nil, nil, mockRepo, nil, nil)
 
 		err := service.DeleteUserAvatar(userID.Hex())
 
@@ -729,7 +729,7 @@ func TestDeleteUserBanner(t *testing.T) {
 		fileService := new(mocks.FileUploadService)
 		fileService.On("DeleteFileByID", bannerID.Hex(), userID.Hex()).Return((*models.MessageOptions)(nil))
 
-		service := NewUserService(nil, nil, mockRepo, fileService)
+		service := NewUserService(nil, nil, mockRepo, fileService, nil)
 
 		err := service.DeleteUserBanner(userID.Hex())
 
@@ -756,7 +756,7 @@ func TestUpdateUserPassword(t *testing.T) {
 			},
 		}
 
-		service := NewUserService(nil, nil, mockRepo, nil)
+		service := NewUserService(nil, nil, mockRepo, nil, nil)
 
 		err := service.UpdateUserPassword(userID, newPassword)
 
@@ -779,7 +779,7 @@ func TestGetTwoFactorStatus(t *testing.T) {
 			},
 		}
 
-		service := NewUserService(nil, nil, mockRepo, nil)
+		service := NewUserService(nil, nil, mockRepo, nil, nil)
 
 		status, err := service.GetTwoFactorStatus(userID.Hex())
 
@@ -805,7 +805,7 @@ func TestUpdateTwoFactorStatus(t *testing.T) {
 			},
 		}
 
-		service := NewUserService(nil, nil, mockRepo, nil)
+		service := NewUserService(nil, nil, mockRepo, nil, nil)
 
 		err := service.UpdateTwoFactorStatus(userID, true)
 
@@ -830,7 +830,7 @@ func TestDeactivateAccount(t *testing.T) {
 			},
 		}
 
-		service := NewUserService(nil, nil, mockRepo, nil)
+		service := NewUserService(nil, nil, mockRepo, nil, nil)
 
 		err := service.DeactivateAccount(userID)
 
@@ -853,7 +853,7 @@ func TestDeleteAccount(t *testing.T) {
 			},
 		}
 
-		service := NewUserService(nil, nil, mockRepo, nil)
+		service := NewUserService(nil, nil, mockRepo, nil, nil)
 
 		err := service.DeleteAccount(userID)
 
@@ -868,7 +868,7 @@ func TestDeleteAccount(t *testing.T) {
 			},
 		}
 
-		service := NewUserService(nil, nil, mockRepo, nil)
+		service := NewUserService(nil, nil, mockRepo, nil, nil)
 
 		err := service.DeleteAccount(primitive.NewObjectID().Hex())
 

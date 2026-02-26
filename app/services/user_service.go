@@ -7,6 +7,7 @@ import (
 	"chat_app_backend/config"
 	"chat_app_backend/utils"
 	"context"
+	"encoding/json"
 	"fmt"
 	"mime/multipart"
 	"time"
@@ -20,15 +21,17 @@ type userService struct {
 	config            *config.Config
 	userRepo          repositories.UserRepository
 	odm               providers.ODM
-	fileUploadService FileUploadService // 添加 FileUploadService 依賴
+	fileUploadService FileUploadService       // 添加 FileUploadService 依賴
+	cache             providers.CacheProvider // 用戶資料快取
 }
 
-func NewUserService(cfg *config.Config, odm providers.ODM, userRepo repositories.UserRepository, fileUploadService FileUploadService) *userService {
+func NewUserService(cfg *config.Config, odm providers.ODM, userRepo repositories.UserRepository, fileUploadService FileUploadService, cache providers.CacheProvider) *userService {
 	return &userService{
 		config:            cfg,
 		userRepo:          userRepo,
 		odm:               odm,
 		fileUploadService: fileUploadService,
+		cache:             cache,
 	}
 }
 
@@ -142,6 +145,16 @@ func (us *userService) RegisterUser(user models.User) *models.MessageOptions {
 
 // 根據ID獲取用戶信息
 func (us *userService) GetUserResponseById(userID string) (*models.UserResponse, error) {
+	// 先嘗試從 Cache 讀取
+	if us.cache != nil {
+		if cached, err := us.cache.Get(utils.UserProfileCacheKey(userID)); err == nil && cached != "" {
+			var response models.UserResponse
+			if err := json.Unmarshal([]byte(cached), &response); err == nil {
+				return &response, nil
+			}
+		}
+	}
+
 	user, err := us.userRepo.GetUserById(userID)
 	if err != nil {
 		return nil, err
@@ -155,6 +168,13 @@ func (us *userService) GetUserResponseById(userID string) (*models.UserResponse,
 		Nickname:   user.Nickname,
 		PictureURL: us.getUserPictureURL(user),
 		BannerURL:  us.getUserBannerURL(user),
+	}
+
+	// 寫入快取，TTL 10 分鐘
+	if us.cache != nil {
+		if data, err := json.Marshal(response); err == nil {
+			us.cache.Set(utils.UserProfileCacheKey(userID), string(data), 10*time.Minute)
+		}
 	}
 
 	return response, nil
@@ -441,7 +461,11 @@ func (us *userService) UpdateUserProfile(userID string, updates map[string]any) 
 	// 添加更新時間
 	filteredUpdates["updated_at"] = time.Now()
 
-	return us.userRepo.UpdateUser(userID, filteredUpdates)
+	err := us.userRepo.UpdateUser(userID, filteredUpdates)
+	if err == nil && us.cache != nil {
+		us.cache.Delete(utils.UserProfileCacheKey(userID))
+	}
+	return err
 }
 
 // UploadUserImage 上傳用戶頭像或橫幅
@@ -496,10 +520,20 @@ func (us *userService) UploadUserImage(userID string, file multipart.File, heade
 		return nil, fmt.Errorf("更新用戶資料失敗: %v", updateErr)
 	}
 
+	// 清除用戶資料快取（頭像/橫幅 URL 已變更）
+	us.invalidateUserProfileCache(userID)
+
 	return &models.UserImageResponse{
 		ImageURL: imageURL,
 		Type:     imageType,
 	}, nil
+}
+
+// invalidateUserProfileCache 清除用戶資料快取
+func (us *userService) invalidateUserProfileCache(userID string) {
+	if us.cache != nil {
+		us.cache.Delete(utils.UserProfileCacheKey(userID))
+	}
 }
 
 // DeleteUserAvatar 刪除用戶頭像
@@ -523,7 +557,11 @@ func (us *userService) DeleteUserAvatar(userID string) error {
 		"picture_id": nil,
 		"updated_at": time.Now(),
 	}
-	return us.userRepo.UpdateUser(userID, updates)
+	err = us.userRepo.UpdateUser(userID, updates)
+	if err == nil {
+		us.invalidateUserProfileCache(userID)
+	}
+	return err
 }
 
 // DeleteUserBanner 刪除用戶橫幅
@@ -547,7 +585,11 @@ func (us *userService) DeleteUserBanner(userID string) error {
 		"banner_id":  nil,
 		"updated_at": time.Now(),
 	}
-	return us.userRepo.UpdateUser(userID, updates)
+	err = us.userRepo.UpdateUser(userID, updates)
+	if err == nil {
+		us.invalidateUserProfileCache(userID)
+	}
+	return err
 }
 
 // UpdateUserPassword 更新用戶密碼

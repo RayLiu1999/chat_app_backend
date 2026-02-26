@@ -116,6 +116,7 @@ func TestNewChannelService(t *testing.T) {
 		mockServerMemberRepo,
 		nil,
 		mockChatRepo,
+		nil,
 	)
 
 	assert.NotNil(t, service)

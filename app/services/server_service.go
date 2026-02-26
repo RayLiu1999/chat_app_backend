@@ -5,6 +5,7 @@ import (
 	"chat_app_backend/app/providers"
 	"chat_app_backend/app/repositories"
 	"chat_app_backend/config"
+	"chat_app_backend/utils"
 	"context"
 	"fmt"
 	"mime/multipart"
@@ -25,6 +26,7 @@ type serverService struct {
 	fileUploadService   FileUploadService
 	userService         UserService
 	clientManager       ClientManager
+	cache               providers.CacheProvider // 用於清除成員權限快取
 }
 
 func NewServerService(cfg *config.Config,
@@ -38,6 +40,7 @@ func NewServerService(cfg *config.Config,
 	fileUploadService FileUploadService,
 	userService UserService,
 	clientManager ClientManager,
+	cache providers.CacheProvider,
 ) *serverService {
 	return &serverService{
 		config:              cfg,
@@ -51,6 +54,7 @@ func NewServerService(cfg *config.Config,
 		fileUploadService:   fileUploadService,
 		userService:         userService,
 		clientManager:       clientManager,
+		cache:               cache,
 	}
 }
 
@@ -814,6 +818,11 @@ func (ss *serverService) JoinServer(userID string, serverID string) *models.Mess
 		}
 	}
 
+	// 清除用戶的伺服器成員快取（已加入新伺服器）
+	if ss.cache != nil {
+		ss.cache.Delete(utils.UserServersCacheKey(userID))
+	}
+
 	// 更新伺服器成員數量快取
 	newMemberCount := int(memberCount) + 1
 	err = ss.serverRepo.UpdateMemberCount(serverID, newMemberCount)
@@ -878,6 +887,11 @@ func (ss *serverService) LeaveServer(userID string, serverID string) *models.Mes
 			Message: "離開伺服器失敗",
 			Details: err.Error(),
 		}
+	}
+
+	// 清除用戶的伺服器成員快取（已離開伺服器）
+	if ss.cache != nil {
+		ss.cache.Delete(utils.UserServersCacheKey(userID))
 	}
 
 	// 更新伺服器成員數量快取

@@ -16,3 +16,8 @@ func UserStatusCacheKey(userID string) string {
 func UserActivityThrottleCacheKey(userID string) string {
 	return fmt.Sprintf("user:%s:active:throttle", userID)
 }
+
+// UserServersCacheKey 生成用戶所屬伺服器成員清單的快取鍵（用於權限驗證）
+func UserServersCacheKey(userID string) string {
+	return fmt.Sprintf("user:%s:servers", userID)
+}

@@ -7,6 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"chat_app_backend/app/providers"
+	"chat_app_backend/utils"
+
 	"github.com/gorilla/websocket"
 )
 
@@ -17,15 +20,17 @@ type clientManager struct {
 	mutex           sync.RWMutex
 	register        chan *Client
 	unregister      chan *Client
+	cache           providers.CacheProvider // 用於跨實例在線狀態查詢
 }
 
 // NewClientManager 創建新的客戶端管理器
-func NewClientManager() *clientManager {
+func NewClientManager(cache providers.CacheProvider) *clientManager {
 	cm := &clientManager{
 		clients:         make(map[*Client]bool, 1000),
 		clientsByUserID: make(map[string]*Client, 1000),
 		register:        make(chan *Client, 1000),
 		unregister:      make(chan *Client, 1000),
+		cache:           cache,
 	}
 
 	go cm.handleRegister()
@@ -172,8 +177,16 @@ func (cm *clientManager) StartHealthChecker(ctx context.Context) {
 	}
 }
 
-// IsUserOnline 基於 WebSocket 連線檢查用戶是否在線
+// IsUserOnline 檢查用戶是否在線
+// 先查本機 WebSocket 連線（本實例），找不到再查 Redis 跨實例狀態
 func (cm *clientManager) IsUserOnline(userID string) bool {
-	_, exists := cm.GetClient(userID)
-	return exists
+	if _, exists := cm.GetClient(userID); exists {
+		return true
+	}
+	// 跨實例查詢：從 Redis 讀取在線狀態
+	if cm.cache != nil {
+		status, _ := cm.cache.Get(utils.UserStatusCacheKey(userID))
+		return status == "online"
+	}
+	return false
 }
