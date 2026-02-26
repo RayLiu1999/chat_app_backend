@@ -24,13 +24,10 @@ FROM base AS dev
 # 安裝 air 用於熱重載
 RUN go install github.com/air-verse/air@latest
 
-# 創建開發用使用者 (使用系統預設 ID)
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+# 確保必要目錄存在
+RUN mkdir -p /go/pkg/mod /go/cache /app/uploads
 
-# 設置權限
-RUN mkdir -p uploads && chown -R appuser:appgroup /app
-
-USER appuser
+# 開發環境改用 root 以避開 macOS 與 Linux 容器間的權限摩擦
 CMD ["air"]
 
 # ---------------------------------------------------

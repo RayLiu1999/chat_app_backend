@@ -3,6 +3,10 @@
 
 # 預設擴展實例數
 N ?= 3
+# 預設測試用戶數
+USER_COUNT ?= 100
+# 預設環境
+ENV ?= development
 
 .PHONY: help dev dev-logs dev-down dev-restart build logs status ps restart stop start
 .PHONY: shell test test-coverage test-env test-env-down test-smoke test-prepare-users test-capacity test-capacity-prepared rebuild
@@ -60,17 +64,17 @@ help:
 
 dev:
 	@echo "🚀 啟動開發環境..."
-	docker-compose up -d
+	docker-compose --env-file .env.development up -d
 	@echo "✅ 開發環境已啟動"
 	@echo "📍 API: http://localhost:80"
 
 dev-logs:
 	@echo "🚀 啟動開發環境並顯示日誌..."
-	docker-compose up
+	docker-compose --env-file .env.development up
 
 dev-down:
 	@echo "🛑 停止開發環境..."
-	docker-compose down
+	docker-compose --env-file .env.development down
 
 dev-restart:
 	@echo "🔄 重啟開發環境..."
@@ -82,13 +86,13 @@ dev-restart:
 # ============================================
 
 test-env:
-	@echo "🚀 啟動壓測環境 (Prod Image)..."
-	DOCKER_TARGET=prod ENV_FILE=.env CPU_LIMIT=4 MEMORY_LIMIT=2G GOMEMLIMIT=1800MiB docker-compose --profile test up -d
+	@echo "🚀 啟動壓測環境..."
+	docker-compose --profile test --env-file .env.development up -d
 	@echo "✅ 壓測環境已啟動"
 
 test-env-down:
 	@echo "🛑 停止壓測環境..."
-	docker-compose --profile test down
+	docker-compose --profile test --env-file .env.development down
 
 # ============================================
 # 建置與日誌
@@ -141,24 +145,24 @@ shell:
 
 scale:
 	@echo "🔄 啟動水平擴展環境 ($(N) 個實例)..."
-	docker-compose -f docker-compose.scale.yml up -d --scale app=$(N?=3) --no-recreate
+	docker-compose -f docker-compose.scale.yml --env-file .env.development up -d --scale app=$(N) --no-recreate
 	@echo "✅ 擴展環境已啟動"
 	@echo "📍 API (via nginx): http://localhost:80"
 
 scale-up:
 	@echo "📈 擴展到 $(N) 個實例..."
-	docker-compose -f docker-compose.scale.yml up -d --scale app=$(N) --no-recreate
+	docker-compose -f docker-compose.scale.yml --env-file .env.development up -d --scale app=$(N) --no-recreate
 	@echo "✅ 已擴展到 $(N) 個實例"
 
 scale-down:
 	@echo "🛑 停止擴展環境..."
-	docker-compose -f docker-compose.scale.yml down
+	docker-compose -f docker-compose.scale.yml --env-file .env.development down
 
 scale-logs:
-	docker-compose -f docker-compose.scale.yml logs -f
+	docker-compose -f docker-compose.scale.yml --env-file .env.development logs -f
 
 scale-status:
-	docker-compose -f docker-compose.scale.yml ps
+	docker-compose -f docker-compose.scale.yml --env-file .env.development ps
 
 # ============================================
 # Go 開發指令

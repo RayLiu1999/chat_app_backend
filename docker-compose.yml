@@ -16,6 +16,7 @@ services:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
         GIT_BRANCH: ${GIT_BRANCH:-unknown}
     container_name: chat_app_backend
+    user: root
     restart: unless-stopped
     ports:
       - "${SERVER_PORT:-80}:${SERVER_PORT:-80}"
@@ -28,13 +29,15 @@ services:
       # Go Runtime 效能調校參數
       GOMEMLIMIT: ${GOMEMLIMIT:-900MiB}
       GOMAXPROCS: ${GOMAXPROCS:-2}
+      # 讓 Go 使用標準的容器內路徑，並透過 volume 持久化
+      GOCACHE: /go/cache
+      GOMODCACHE: /go/pkg/mod
     volumes:
       # 開發模式：掛載整個專案目錄（實現熱重載）
-      - .:/app
-      # Go modules 快取
+      - .:/app:delegated
+      # 使用專用 Volume 儲存模組與編譯結果，這能大幅提升 air rebuild 速度
       - go-modules:/go/pkg/mod
-      # 編譯快取
-      - go-build-cache:/app/.cache/go-build
+      - go-build-cache:/go/cache
       # 靜態檔案
       - ./uploads:/app/uploads
     networks:
