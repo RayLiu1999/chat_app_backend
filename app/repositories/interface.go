@@ -2,26 +2,27 @@ package repositories
 
 import (
 	"chat_app_backend/app/models"
+	"context"
 )
 
 type ChatRepository interface {
 	// SaveMessage 將聊天消息保存到數據庫
-	SaveMessage(message models.Message) (string, error)
+	SaveMessage(ctx context.Context, message models.Message) (string, error)
 
 	// GetMessagesByRoomID 根據房間ID獲取消息
-	GetMessagesByRoomID(roomID string, limit int64) ([]models.Message, error)
+	GetMessagesByRoomID(ctx context.Context, roomID string, limit int64) ([]models.Message, error)
 
 	// GetDMRoomListByUserID 獲取用戶的聊天列表
-	GetDMRoomListByUserID(userID string, includeNotVisible bool) ([]models.DMRoom, error)
+	GetDMRoomListByUserID(ctx context.Context, userID string, includeNotVisible bool) ([]models.DMRoom, error)
 
 	// UpdateDMRoom 更新聊天列表的刪除狀態
-	UpdateDMRoom(userID string, chatWithUserID string, IsHidden bool) error
+	UpdateDMRoom(ctx context.Context, userID string, chatWithUserID string, IsHidden bool) error
 
 	// SaveOrUpdateDMRoom 保存或更新聊天列表
-	SaveOrUpdateDMRoom(chat models.DMRoom) (models.DMRoom, error)
+	SaveOrUpdateDMRoom(ctx context.Context, chat models.DMRoom) (models.DMRoom, error)
 
 	// DeleteMessagesByRoomID 根據房間ID刪除所有訊息
-	DeleteMessagesByRoomID(roomID string) error
+	DeleteMessagesByRoomID(ctx context.Context, roomID string) error
 }
 
 type ServerRepository interface {

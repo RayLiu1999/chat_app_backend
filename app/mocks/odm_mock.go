@@ -1,7 +1,6 @@
 package mocks
 
 import (
-	"chat_app_backend/app/models"
 	"chat_app_backend/app/providers"
 	"context"
 
@@ -48,24 +47,7 @@ func (m *ODM) FindByID(ctx context.Context, ID string, model providers.Model) er
 
 func (m *ODM) FindOne(ctx context.Context, filter bson.M, result providers.Model) error {
 	args := m.Called(ctx, filter, result)
-
-	// 自動填充結果
-	if args.Get(0) != nil {
-		switch r := result.(type) {
-		case *models.DMRoom:
-			*r = args.Get(0).(models.DMRoom)
-		case *models.Channel:
-			*r = args.Get(0).(models.Channel)
-		case *models.Server:
-			*r = args.Get(0).(models.Server)
-		case *models.User:
-			*r = args.Get(0).(models.User)
-		case *models.Message:
-			*r = args.Get(0).(models.Message)
-		}
-	}
-
-	return args.Error(1)
+	return args.Error(0)
 }
 
 func (m *ODM) Find(ctx context.Context, filter bson.M, models any) error {

@@ -759,7 +759,7 @@ func TestDeleteChannel(t *testing.T) {
 
 		mockChannelRepo.On("GetChannelByID", channelID.Hex()).Return(channel, nil).Once()
 		mockServerMemberRepo.On("GetUserServers", userID.Hex()).Return(serverMembers, nil).Once()
-		mockChatRepo.On("DeleteMessagesByRoomID", channelID.Hex()).Return(nil).Once()
+		mockChatRepo.On("DeleteMessagesByRoomID", mock.Anything, channelID.Hex()).Return(nil).Once()
 		mockChannelRepo.On("DeleteChannel", channelID.Hex()).Return(nil).Once()
 
 		msgOpt := service.DeleteChannel(userID.Hex(), channelID.Hex())
@@ -864,7 +864,7 @@ func TestDeleteChannel(t *testing.T) {
 
 		mockChannelRepo.On("GetChannelByID", channelID.Hex()).Return(channel, nil).Once()
 		mockServerMemberRepo.On("GetUserServers", userID.Hex()).Return(serverMembers, nil).Once()
-		mockChatRepo.On("DeleteMessagesByRoomID", channelID.Hex()).Return(errors.New("delete messages error")).Once()
+		mockChatRepo.On("DeleteMessagesByRoomID", mock.Anything, channelID.Hex()).Return(errors.New("delete messages error")).Once()
 		mockChannelRepo.On("DeleteChannel", channelID.Hex()).Return(nil).Once()
 
 		msgOpt := service.DeleteChannel(userID.Hex(), channelID.Hex())
@@ -909,7 +909,7 @@ func TestDeleteChannel(t *testing.T) {
 
 		mockChannelRepo.On("GetChannelByID", channelID.Hex()).Return(channel, nil).Once()
 		mockServerMemberRepo.On("GetUserServers", userID.Hex()).Return(serverMembers, nil).Once()
-		mockChatRepo.On("DeleteMessagesByRoomID", channelID.Hex()).Return(nil).Once()
+		mockChatRepo.On("DeleteMessagesByRoomID", mock.Anything, channelID.Hex()).Return(nil).Once()
 		mockChannelRepo.On("DeleteChannel", channelID.Hex()).Return(errors.New("database error")).Once()
 
 		msgOpt := service.DeleteChannel(userID.Hex(), channelID.Hex())

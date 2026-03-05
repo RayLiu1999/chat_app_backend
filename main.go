@@ -1,8 +1,12 @@
 package main
 
 import (
+	"context"
 	"log"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"chat_app_backend/app/providers"
@@ -64,12 +68,19 @@ func main() {
 		r.SetTrustedProxies(nil)
 	}
 
+	// 建立全域 Context 以支援優雅停機
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	// 構建依賴
 	deps := di.BuildDependencies(config.AppConfig, mongodb, redis)
 
+	// 啟動 ClientManager 健康檢查器
+	go deps.Services.ClientManager.StartHealthChecker(ctx)
+
 	// 使用依賴容器中的 UserService 來啟動後台任務
 	backgroundTasks := services.NewBackgroundTasks(deps.Services.UserService)
-	go backgroundTasks.StartAllBackgroundTasks()
+	go backgroundTasks.StartAllBackgroundTasks(ctx)
 
 	// 註冊 pprof（僅限非生產環境，避免暴露敏感效能資訊）
 	if config.AppConfig.Server.Mode != config.ProductionMode {
@@ -86,6 +97,30 @@ func main() {
 	}
 
 	// 啟動服務器
-	log.Println("服務器已啟動，Port: " + config.AppConfig.Server.Port)
-	r.Run(":" + config.AppConfig.Server.Port)
+	srv := &http.Server{
+		Addr:    ":" + config.AppConfig.Server.Port,
+		Handler: r,
+	}
+
+	// 在背景啟動 Server
+	go func() {
+		log.Println("服務器已啟動，Port: " + config.AppConfig.Server.Port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("監聽失敗: %v", err)
+		}
+	}()
+
+	// 阻塞等待終止訊號 (使用者按 Ctrl+C，或 Docker/K8s 發送 SIGTERM)
+	<-ctx.Done()
+	log.Println("收到關閉訊號，開始優雅停機...")
+
+	// 給伺服器 5 秒鐘處理尚未完成的請求
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Fatalf("伺服器強制關閉: %v", err)
+	}
+
+	log.Println("伺服器已安全退出")
 }

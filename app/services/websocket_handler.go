@@ -114,7 +114,9 @@ func (wsh *webSocketHandler) handleDMRoomCreation(roomID, userID string) {
 		return
 	}
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	var dmRoomList []models.DMRoom
 	err = wsh.odm.Find(ctx, map[string]any{"room_id": roomObjectID}, &dmRoomList)
 	if err != nil {
@@ -238,30 +240,23 @@ func (wsh *webSocketHandler) updateActivityWithThrottle(userID string) {
 		return
 	}
 
+	// 1. 使用 SetNX 嘗試獲取鎖（節流閥）
 	throttleKey := utils.UserActivityThrottleCacheKey(userID)
-
-	// 1. 檢查節流閥是否存在
-	val, err := wsh.cache.Get(throttleKey)
+	// 如果 key 已存在，SetNX 會回傳 false，表示在 3 分鐘冷卻時間內
+	acquired, err := wsh.cache.SetNX(throttleKey, "1", 3*time.Minute)
 	if err != nil {
-		// Log a cache error if necessary, but proceed
-	}
-
-	// 2. 如果 key 存在，表示在冷卻時間內，直接返回
-	if val != "" {
+		slog.Debug("節流閥讀取失敗，略過此次更新", "user_id", userID, "error", err)
 		return
 	}
 
-	// 3. 如果 key 不存在，執行更新並設置節流閥
+	if !acquired {
+		return
+	}
+
+	// 2. 只有拿到鎖的 Goroutine 才會執行資料庫更新
 	go func() {
-		// 3a. 更新資料庫
 		if err := wsh.userService.UpdateUserActivity(userID); err != nil {
 			slog.Warn("無法更新用戶活動時間", "user_id", userID, "error", err)
-			return // 如果更新失敗，則不設置節流閥，以便下次重試
-		}
-
-		// 3b. 設置節流閥，冷卻時間 3 分鐘
-		if wsh.cache != nil {
-			wsh.cache.Set(throttleKey, "1", 3*time.Minute)
 		}
 	}()
 }
@@ -343,7 +338,7 @@ func (wsh *webSocketHandler) handleJoinRoom(client *Client, data json.RawMessage
 		return
 	}
 
-	allowed, err := wsh.roomManager.CheckUserAllowedJoinRoom(client.UserID, requestData.RoomID, requestData.RoomType)
+	allowed, err := wsh.roomManager.CheckUserAllowedJoinRoom(client.Context, client.UserID, requestData.RoomID, requestData.RoomType)
 	if err != nil {
 		// 使用統一的 error action
 		client.SendError(action, "檢查用戶權限失敗")

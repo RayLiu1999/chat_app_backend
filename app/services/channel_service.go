@@ -6,6 +6,7 @@ import (
 	"chat_app_backend/app/repositories"
 	"chat_app_backend/config"
 	"chat_app_backend/utils"
+	"context"
 	"encoding/json"
 	"log/slog"
 	"time"
@@ -331,7 +332,7 @@ func (cs *channelService) DeleteChannel(userID string, channelID string) *models
 	}
 
 	// 先刪除該頻道的所有訊息
-	err = cs.chatRepo.DeleteMessagesByRoomID(channelID)
+	err = cs.chatRepo.DeleteMessagesByRoomID(context.TODO(), channelID)
 	if err != nil {
 		// 記錄錯誤但不阻止頻道刪除
 		slog.Error("刪除頻道訊息失敗", "channel_id", channelID, "error", err)

@@ -95,8 +95,8 @@ func (cs *chatService) GetClientManager() ClientManager {
 }
 
 // 取得聊天記錄response
-func (cs *chatService) GetDMRoomResponseList(userID string, includeHidden bool) ([]models.DMRoomResponse, *models.MessageOptions) {
-	chatList, err := cs.chatRepo.GetDMRoomListByUserID(userID, includeHidden)
+func (cs *chatService) GetDMRoomResponseList(ctx context.Context, userID string, includeHidden bool) ([]models.DMRoomResponse, *models.MessageOptions) {
+	chatList, err := cs.chatRepo.GetDMRoomListByUserID(ctx, userID, includeHidden)
 	if err != nil {
 		return nil, &models.MessageOptions{
 			Code:    models.ErrInternalServer,
@@ -152,9 +152,8 @@ func (cs *chatService) GetDMRoomResponseList(userID string, includeHidden bool) 
 }
 
 // UpdateDMRoom 更新聊天房間狀態
-func (cs *chatService) UpdateDMRoom(userID string, roomID string, isHidden bool) *models.MessageOptions {
+func (cs *chatService) UpdateDMRoom(ctx context.Context, userID string, roomID string, isHidden bool) *models.MessageOptions {
 	// 使用ODM直接操作
-	ctx := context.Background()
 
 	userObjID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
@@ -205,7 +204,7 @@ func (cs *chatService) UpdateDMRoom(userID string, roomID string, isHidden bool)
 }
 
 // CreateDMRoom 創建私聊房間
-func (cs *chatService) CreateDMRoom(userID string, chatWithUserID string) (*models.DMRoomResponse, *models.MessageOptions) {
+func (cs *chatService) CreateDMRoom(ctx context.Context, userID string, chatWithUserID string) (*models.DMRoomResponse, *models.MessageOptions) {
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return nil, &models.MessageOptions{
@@ -226,7 +225,7 @@ func (cs *chatService) CreateDMRoom(userID string, chatWithUserID string) (*mode
 
 	// 檢查chat_with_user_id是否存在
 	var user models.User
-	err = cs.odm.FindByID(context.Background(), chatWithUserID, &user)
+	err = cs.odm.FindByID(ctx, chatWithUserID, &user)
 	if err != nil {
 		return nil, &models.MessageOptions{
 			Code:    models.ErrUserNotFound,
@@ -250,7 +249,7 @@ func (cs *chatService) CreateDMRoom(userID string, chatWithUserID string) (*mode
 	qb.OrWhere(orConditions)
 
 	var roomList []models.DMRoom
-	err = cs.odm.Find(context.Background(), qb.GetFilter(), &roomList)
+	err = cs.odm.Find(ctx, qb.GetFilter(), &roomList)
 	if err != nil {
 		return nil, &models.MessageOptions{
 			Code:    models.ErrInternalServer,
@@ -274,7 +273,7 @@ func (cs *chatService) CreateDMRoom(userID string, chatWithUserID string) (*mode
 				} // 如果isHidden為true，則將isHidden設為false
 				if room.IsHidden {
 					updateFields := bson.M{"is_hidden": false}
-					cs.odm.UpdateFields(context.Background(), &room, updateFields)
+					cs.odm.UpdateFields(ctx, &room, updateFields)
 				}
 				break
 			}
@@ -296,7 +295,7 @@ func (cs *chatService) CreateDMRoom(userID string, chatWithUserID string) (*mode
 				IsHidden:       false,
 			}
 
-			err := cs.odm.Create(context.Background(), &dmRoom)
+			err := cs.odm.Create(ctx, &dmRoom)
 			if err != nil {
 				return nil, &models.MessageOptions{
 					Code:    models.ErrInternalServer,
@@ -338,7 +337,7 @@ func (cs *chatService) CreateDMRoom(userID string, chatWithUserID string) (*mode
 			IsHidden:       false,
 		}
 
-		err := cs.odm.Create(context.Background(), &dmRoom)
+		err := cs.odm.Create(ctx, &dmRoom)
 		if err != nil {
 			return nil, &models.MessageOptions{
 				Code:    models.ErrInternalServer,
@@ -364,7 +363,7 @@ func (cs *chatService) CreateDMRoom(userID string, chatWithUserID string) (*mode
 }
 
 // GetDMMessages 獲取私聊訊息
-func (cs *chatService) GetDMMessages(userID string, roomID string, before string, after string, limit string) ([]models.MessageResponse, *models.MessageOptions) {
+func (cs *chatService) GetDMMessages(ctx context.Context, userID string, roomID string, before string, after string, limit string) ([]models.MessageResponse, *models.MessageOptions) {
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return nil, &models.MessageOptions{
@@ -388,7 +387,7 @@ func (cs *chatService) GetDMMessages(userID string, roomID string, before string
 	qb.Where("room_id", roomObjectID).Where("user_id", userObjectID)
 
 	var room models.DMRoom
-	err = cs.odm.FindOne(context.Background(), qb.GetFilter(), &room)
+	err = cs.odm.FindOne(ctx, qb.GetFilter(), &room)
 	if err != nil {
 		return nil, &models.MessageOptions{
 			Code:    models.ErrRoomNotFound,
@@ -435,7 +434,7 @@ func (cs *chatService) GetDMMessages(userID string, roomID string, before string
 	}
 
 	var messageList []models.Message
-	err = cs.odm.FindWithOptions(context.Background(), messageQb.GetFilter(), &messageList, messageQb.GetQueryOptions())
+	err = cs.odm.FindWithOptions(ctx, messageQb.GetFilter(), &messageList, messageQb.GetQueryOptions())
 	if err != nil {
 		return nil, &models.MessageOptions{
 			Code:    models.ErrInternalServer,
@@ -460,7 +459,7 @@ func (cs *chatService) GetDMMessages(userID string, roomID string, before string
 }
 
 // GetChannelMessages 獲取頻道訊息
-func (cs *chatService) GetChannelMessages(userID string, channelID string, before string, after string, limit string) ([]models.MessageResponse, *models.MessageOptions) {
+func (cs *chatService) GetChannelMessages(ctx context.Context, userID string, channelID string, before string, after string, limit string) ([]models.MessageResponse, *models.MessageOptions) {
 	channelObjectID, err := primitive.ObjectIDFromHex(channelID)
 	if err != nil {
 		return nil, &models.MessageOptions{
@@ -472,7 +471,7 @@ func (cs *chatService) GetChannelMessages(userID string, channelID string, befor
 
 	// 首先檢查頻道是否存在
 	var channel models.Channel
-	err = cs.odm.FindByID(context.Background(), channelID, &channel)
+	err = cs.odm.FindByID(ctx, channelID, &channel)
 	if err != nil {
 		return nil, &models.MessageOptions{
 			Code:    models.ErrChannelNotFound,
@@ -483,7 +482,7 @@ func (cs *chatService) GetChannelMessages(userID string, channelID string, befor
 
 	// 檢查用戶是否有權限訪問此頻道（檢查是否為伺服器成員）
 	// 這裡我們需要檢查用戶是否是該伺服器的成員
-	isMember, err := cs.checkUserServerMembership(userID, channel.ServerID.Hex())
+	isMember, err := cs.checkUserServerMembership(ctx, userID, channel.ServerID.Hex())
 	if err != nil {
 		return nil, &models.MessageOptions{
 			Code:    models.ErrInternalServer,
@@ -543,7 +542,7 @@ func (cs *chatService) GetChannelMessages(userID string, channelID string, befor
 	}
 
 	var messageList []models.Message
-	err = cs.odm.FindWithOptions(context.Background(), messageQb.GetFilter(), &messageList, messageQb.GetQueryOptions())
+	err = cs.odm.FindWithOptions(ctx, messageQb.GetFilter(), &messageList, messageQb.GetQueryOptions())
 	if err != nil {
 		return nil, &models.MessageOptions{
 			Code:    models.ErrInternalServer,
@@ -569,7 +568,7 @@ func (cs *chatService) GetChannelMessages(userID string, channelID string, befor
 }
 
 // checkUserServerMembership 檢查用戶是否為伺服器成員
-func (cs *chatService) checkUserServerMembership(userID, serverID string) (bool, error) {
+func (cs *chatService) checkUserServerMembership(ctx context.Context, userID, serverID string) (bool, error) {
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return false, err
@@ -586,5 +585,5 @@ func (cs *chatService) checkUserServerMembership(userID, serverID string) (bool,
 		"server_id": serverObjectID,
 	}
 
-	return cs.odm.Exists(context.Background(), filter, &models.ServerMember{})
+	return cs.odm.Exists(ctx, filter, &models.ServerMember{})
 }

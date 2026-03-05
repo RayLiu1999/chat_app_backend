@@ -22,17 +22,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, redis *providers.RedisWrappe
 	// 使用 JSON 日誌中間件 (配合 Loki)
 	r.Use(middlewares.JSONLoggerMiddleware())
 
-	// 全域請求超時設定（30秒），防止 goroutine 因 DB 掛起而無限阻塞
-	// WebSocket 連線不套用此 timeout（長連線需另行管理）
-	r.Use(middlewares.Timeout(30 * time.Second))
-
-	// 設定靜態文件服務
-	// 使用絕對路徑，確保在任何環境下都可以正確訪問上傳的文件
-	uploadsAbsPath := filepath.Join(".", "uploads")
-	r.Static("/uploads", uploadsAbsPath)
-
-	// 健康檢查 - 使用中介軟體保護
-	// r.GET("/health", middlewares.HealthCheckAuth(cfg), controllers.HealthController.HealthCheck)
+	// 健康檢查
 	r.GET("/health", controllers.HealthController.HealthCheck)
 	r.GET("/health/proxy", middlewares.PublicHealthCheckAuth(cfg), controllers.HealthController.ProxyCheck)
 	r.GET("/health/detailed", middlewares.HealthCheckAuth(cfg), controllers.HealthController.DetailedHealthCheck)
@@ -42,24 +32,32 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, redis *providers.RedisWrappe
 		c.JSON(200, version.GetInfo())
 	})
 
+	// --- 以下路由套用全域請求超時設定 (30秒) ---
+	// WebSocket 連線不套用此 timeout（長連線由 Ping/Pong 管理）
+	withTimeout := r.Group("/")
+	withTimeout.Use(middlewares.Timeout(30 * time.Second))
+
+	// 設定靜態文件服務 (此處也可以視需求決定是否套用 timeout，Static 通常不需要)
+	uploadsAbsPath := filepath.Join(".", "uploads")
+	r.Static("/uploads", uploadsAbsPath)
+
 	// 驗證前端來源
 	if cfg.Server.Mode == config.ProductionMode {
-		r.Use(middlewares.VerifyOrigin(cfg.Server.AllowedOrigins))
+		withTimeout.Use(middlewares.VerifyOrigin(cfg.Server.AllowedOrigins))
 	}
 
 	// 設定 CORS 中介軟體
-	r.Use(cors.New(cors.Config{
-		AllowOrigins:     cfg.Server.AllowedOrigins,                                                          // 允許的來源
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},                                           // 允許的方法
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-CSRF-NAME", "X-CSRF-TOKEN"}, // 允許的標頭
-		ExposeHeaders:    []string{"Content-Length"},                                                         // 允許暴露的標頭
-		AllowCredentials: true,                                                                               // 是否允許憑證
-		MaxAge:           12 * time.Hour,                                                                     // 預檢請求的緩存時間
+	withTimeout.Use(cors.New(cors.Config{
+		AllowOrigins:     cfg.Server.AllowedOrigins,
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-CSRF-NAME", "X-CSRF-TOKEN"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
 	}))
 
-	// 未認證的路由，只需要 CSRF 驗證
-	public := r.Group("/")
-	// 高風險公開端點：套用 Rate Limiter 防止暴力破解
+	// 未認證的路由
+	public := withTimeout.Group("/")
 	public.POST("/register",
 		middlewares.RateLimiter(redis.Client, "register", 3, time.Minute),
 		controllers.UserController.Register,
@@ -77,19 +75,22 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, redis *providers.RedisWrappe
 
 	// 測試用 API
 	if cfg.Server.Mode != config.ProductionMode {
-		// 透過用戶名取得使用者資訊（不需要認證）
 		public.GET("/test/user", controllers.UserController.GetUserByUsername)
 	}
 
 	// 需要認證的路由
-	auth := r.Group("/")
+	auth := withTimeout.Group("/")
 	auth.Use(middlewares.Auth())
+
+	// WebSocket 特殊處理：需要認證，但不要 Timeout
+	// 注意：這裡使用 auth.Group("/") 但排除 timeout 是比較困難的，
+	// 所以我們建立一個獨立的 wsAuth 組，只包含 Auth 但不包含 Timeout。
+	wsAuth := r.Group("/")
+	wsAuth.Use(middlewares.Auth())
+	wsAuth.GET("/ws", controllers.ChatController.HandleConnections)
 
 	authWithCSRF := auth.Group("/")
 	authWithCSRF.Use(middlewares.VerifyCSRFToken())
-
-	// WebSocket
-	auth.GET("/ws", controllers.ChatController.HandleConnections)
 
 	// user
 	auth.GET("/user", controllers.UserController.GetUser)

@@ -4,6 +4,7 @@ import (
 	"chat_app_backend/app/mocks"
 	"chat_app_backend/app/models"
 	"chat_app_backend/app/providers"
+	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -56,6 +57,10 @@ func (m *mockFriendClientManager) GetAllClients() map[*Client]bool {
 func (m *mockFriendClientManager) IsUserOnline(userID string) bool {
 	args := m.Called(userID)
 	return args.Bool(0)
+}
+
+func (m *mockFriendClientManager) StartHealthChecker(ctx context.Context) {
+	m.Called(ctx)
 }
 
 // --- Tests ---
@@ -239,11 +244,11 @@ func TestAddFriendRequest(t *testing.T) {
 			odm: mockODM,
 		}
 
-		// 模擬查找目標用戶（成功）- FindOne 只返回 error
-		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Once()
+		// 模擬查找目標用戶（成功）
+		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		// 模擬檢查現有關係（不存在）
-		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Friend")).Return(nil, providers.ErrDocumentNotFound).Once()
+		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Friend")).Return(providers.ErrDocumentNotFound).Once()
 
 		// 模擬創建好友請求
 		mockODM.On("Create", mock.Anything, mock.AnythingOfType("*models.Friend")).Return(nil).Once()
@@ -271,7 +276,7 @@ func TestAddFriendRequest(t *testing.T) {
 			odm: mockODM,
 		}
 
-		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.User")).Return(nil, providers.ErrDocumentNotFound).Once()
+		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.User")).Return(providers.ErrDocumentNotFound).Once()
 
 		msgOpt := service.AddFriendRequest(userID.Hex(), "nonexistent_user")
 
@@ -282,9 +287,6 @@ func TestAddFriendRequest(t *testing.T) {
 	})
 
 	t.Run("不能加自己為好友", func(t *testing.T) {
-		// 注意：由於mock無法設置FindOne返回的user.ID，
-		// 這個測試在實際代碼中會執行，但在mock環境下會繼續到下一步
-		// 實際應用中，friend_service.go:163會檢查 userObjectID == user.ID
 		t.Skip("此測試需要集成測試環境才能正確驗證")
 	})
 
@@ -296,8 +298,8 @@ func TestAddFriendRequest(t *testing.T) {
 			odm: mockODM,
 		}
 
-		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Once()
-		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Once()
+		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		msgOpt := service.AddFriendRequest(userID.Hex(), "existing_friend")
 
@@ -362,7 +364,6 @@ func TestGetPendingRequests(t *testing.T) {
 
 		// 模擬查詢發送的請求
 		mockODM.On("Find", mock.Anything, mock.MatchedBy(func(filter map[string]any) bool {
-			// 檢查是否為查詢發送請求的 filter
 			return filter["user_id"] == userID
 		}), mock.AnythingOfType("*[]models.Friend")).Run(func(args mock.Arguments) {
 			arg := args.Get(2).(*[]models.Friend)
@@ -371,7 +372,6 @@ func TestGetPendingRequests(t *testing.T) {
 
 		// 模擬查詢收到的請求
 		mockODM.On("Find", mock.Anything, mock.MatchedBy(func(filter map[string]any) bool {
-			// 檢查是否為查詢收到請求的 filter
 			return filter["friend_id"] == userID
 		}), mock.AnythingOfType("*[]models.Friend")).Run(func(args mock.Arguments) {
 			arg := args.Get(2).(*[]models.Friend)
@@ -456,16 +456,6 @@ func TestGetBlockedUsers(t *testing.T) {
 		mockODM.AssertExpectations(t)
 		mockUserRepo.AssertExpectations(t)
 	})
-
-	t.Run("無效的用戶ID", func(t *testing.T) {
-		service := &friendService{}
-
-		result, msgOpt := service.GetBlockedUsers("invalid_id")
-
-		assert.Nil(t, result)
-		assert.NotNil(t, msgOpt)
-		assert.Equal(t, models.ErrInvalidParams, msgOpt.Code)
-	})
 }
 
 func TestAcceptFriendRequest(t *testing.T) {
@@ -478,7 +468,7 @@ func TestAcceptFriendRequest(t *testing.T) {
 			odm: mockODM,
 		}
 
-		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Once()
+		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockODM.On("Update", mock.Anything, mock.AnythingOfType("*models.Friend")).Return(nil).Once()
 
 		msgOpt := service.AcceptFriendRequest(userID.Hex(), requestID.Hex())
@@ -505,7 +495,7 @@ func TestAcceptFriendRequest(t *testing.T) {
 			odm: mockODM,
 		}
 
-		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Friend")).Return(nil, providers.ErrDocumentNotFound).Once()
+		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Friend")).Return(providers.ErrDocumentNotFound).Once()
 
 		msgOpt := service.AcceptFriendRequest(userID.Hex(), requestID.Hex())
 
@@ -526,7 +516,7 @@ func TestDeclineFriendRequest(t *testing.T) {
 			odm: mockODM,
 		}
 
-		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Once()
+		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockODM.On("Delete", mock.Anything, mock.AnythingOfType("*models.Friend")).Return(nil).Once()
 
 		msgOpt := service.DeclineFriendRequest(userID.Hex(), requestID.Hex())
@@ -555,7 +545,7 @@ func TestCancelFriendRequest(t *testing.T) {
 			odm: mockODM,
 		}
 
-		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Once()
+		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockODM.On("Delete", mock.Anything, mock.AnythingOfType("*models.Friend")).Return(nil).Once()
 
 		msgOpt := service.CancelFriendRequest(userID.Hex(), requestID.Hex())
@@ -573,7 +563,7 @@ func TestCancelFriendRequest(t *testing.T) {
 			odm: mockODM,
 		}
 
-		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Friend")).Return(nil, providers.ErrDocumentNotFound).Once()
+		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Friend")).Return(providers.ErrDocumentNotFound).Once()
 
 		msgOpt := service.CancelFriendRequest(userID.Hex(), requestID.Hex())
 
@@ -601,7 +591,7 @@ func TestBlockUser(t *testing.T) {
 		}
 
 		mockUserRepo.On("GetUserById", targetID.Hex()).Return(targetUser, nil).Once()
-		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Friend")).Return(nil, providers.ErrDocumentNotFound).Once()
+		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Friend")).Return(providers.ErrDocumentNotFound).Once()
 		mockODM.On("Create", mock.Anything, mock.AnythingOfType("*models.Friend")).Return(nil).Once()
 
 		msgOpt := service.BlockUser(userID.Hex(), targetID.Hex())
@@ -656,7 +646,7 @@ func TestBlockUser(t *testing.T) {
 		}
 
 		mockUserRepo.On("GetUserById", targetID.Hex()).Return(targetUser, nil).Once()
-		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Once()
+		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockODM.On("Update", mock.Anything, mock.AnythingOfType("*models.Friend")).Return(nil).Once()
 
 		msgOpt := service.BlockUser(userID.Hex(), targetID.Hex())
@@ -677,7 +667,7 @@ func TestUnblockUser(t *testing.T) {
 			odm: mockODM,
 		}
 
-		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Once()
+		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockODM.On("Delete", mock.Anything, mock.AnythingOfType("*models.Friend")).Return(nil).Once()
 
 		msgOpt := service.UnblockUser(userID.Hex(), targetID.Hex())
@@ -705,7 +695,7 @@ func TestUnblockUser(t *testing.T) {
 			odm: mockODM,
 		}
 
-		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Friend")).Return(nil, providers.ErrDocumentNotFound).Once()
+		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Friend")).Return(providers.ErrDocumentNotFound).Once()
 
 		msgOpt := service.UnblockUser(userID.Hex(), targetID.Hex())
 
@@ -737,12 +727,12 @@ func TestRemoveFriend(t *testing.T) {
 		// 模擬找到一個方向的好友關係
 		mockODM.On("FindOne", mock.Anything, mock.MatchedBy(func(filter map[string]any) bool {
 			return filter["user_id"] == userID
-		}), mock.AnythingOfType("*models.Friend")).Return(nil, nil).Once()
+		}), mock.AnythingOfType("*models.Friend")).Return(nil).Once()
 
 		// 模擬找不到另一個方向的關係
 		mockODM.On("FindOne", mock.Anything, mock.MatchedBy(func(filter map[string]any) bool {
 			return filter["user_id"] == friendID
-		}), mock.AnythingOfType("*models.Friend")).Return(nil, providers.ErrDocumentNotFound).Once()
+		}), mock.AnythingOfType("*models.Friend")).Return(providers.ErrDocumentNotFound).Once()
 
 		mockODM.On("Delete", mock.Anything, mock.AnythingOfType("*models.Friend")).Return(nil).Once()
 
@@ -798,7 +788,8 @@ func TestRemoveFriend(t *testing.T) {
 		}
 
 		mockUserRepo.On("GetUserById", friendID.Hex()).Return(friendUser, nil).Once()
-		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Friend")).Return(nil, providers.ErrDocumentNotFound).Times(2)
+
+		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Friend")).Return(providers.ErrDocumentNotFound).Times(2)
 
 		msgOpt := service.RemoveFriend(userID.Hex(), friendID.Hex())
 

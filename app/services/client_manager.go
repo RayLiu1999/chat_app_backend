@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"log/slog"
-	"maps"
 	"sync"
 	"time"
 
@@ -18,25 +17,16 @@ type clientManager struct {
 	clients         map[*Client]bool
 	clientsByUserID map[string]*Client
 	mutex           sync.RWMutex
-	register        chan *Client
-	unregister      chan *Client
 	cache           providers.CacheProvider // 用於跨實例在線狀態查詢
 }
 
 // NewClientManager 創建新的客戶端管理器
 func NewClientManager(cache providers.CacheProvider) *clientManager {
-	cm := &clientManager{
+	return &clientManager{
 		clients:         make(map[*Client]bool, 1000),
 		clientsByUserID: make(map[string]*Client, 1000),
-		register:        make(chan *Client, 1000),
-		unregister:      make(chan *Client, 1000),
 		cache:           cache,
 	}
-
-	go cm.handleRegister()
-	go cm.handleUnregister()
-
-	return cm
 }
 
 // NewClient 創建新的客戶端
@@ -59,14 +49,15 @@ func (cm *clientManager) NewClient(userID string, ws *websocket.Conn) *Client {
 	}
 }
 
-// Register 註冊客戶端
+// Register 註冊客戶端 (直接加鎖，移除 Channel)
 func (cm *clientManager) Register(client *Client) {
-	cm.register <- client
-}
+	cm.mutex.Lock()
+	defer cm.mutex.Unlock()
 
-// Unregister 註銷客戶端
-func (cm *clientManager) Unregister(client *Client) {
-	cm.unregister <- client
+	cm.clients[client] = true
+	cm.clientsByUserID[client.UserID] = client
+
+	slog.Info("客戶端已註冊", "user_id", client.UserID, "total_connections", len(cm.clients))
 }
 
 // GetClient 根據用戶ID獲取客戶端
@@ -81,43 +72,15 @@ func (cm *clientManager) GetClient(userID string) (*Client, bool) {
 func (cm *clientManager) GetAllClients() map[*Client]bool {
 	cm.mutex.RLock()
 	defer cm.mutex.RUnlock()
-	result := make(map[*Client]bool)
-	maps.Copy(result, cm.clients)
+	result := make(map[*Client]bool, len(cm.clients))
+	for k, v := range cm.clients {
+		result[k] = v
+	}
 	return result
 }
 
-// handleRegister 處理客戶端註冊
-func (cm *clientManager) handleRegister() {
-	for client := range cm.register {
-		slog.Debug("正在處理用戶註冊事件", "user_id", client.UserID)
-		cm.registerClient(client)
-		slog.Debug("用戶註冊事件已完成", "user_id", client.UserID)
-	}
-}
-
-// handleUnregister 處理客戶端註銷
-func (cm *clientManager) handleUnregister() {
-	for client := range cm.unregister {
-		slog.Debug("正在處理用戶註銷事件", "user_id", client.UserID)
-		cm.unregisterClient(client)
-		slog.Debug("用戶註銷事件已完成", "user_id", client.UserID)
-	}
-}
-
-// registerClient 註冊客戶端
-func (cm *clientManager) registerClient(client *Client) {
-	cm.mutex.Lock()
-	defer cm.mutex.Unlock()
-
-	// 由於 Context 已在 NewClient 中初始化，直接加入 Map
-	cm.clients[client] = true
-	cm.clientsByUserID[client.UserID] = client
-
-	slog.Info("客戶端已註冊", "user_id", client.UserID, "total_connections", len(cm.clients))
-}
-
-// unregisterClient 註銷客戶端
-func (cm *clientManager) unregisterClient(client *Client) {
+// Unregister 註銷客戶端 (直接加鎖，移除 Channel)
+func (cm *clientManager) Unregister(client *Client) {
 	cm.mutex.Lock()
 	defer cm.mutex.Unlock()
 
@@ -127,15 +90,13 @@ func (cm *clientManager) unregisterClient(client *Client) {
 		client.Cancel()
 	}
 
-	// 關閉發送通道
-	if client.Send != nil {
-		close(client.Send)
-	}
+	// ❌ 移除 close(client.Send) 以防止 Panic
+	// 依賴 clientWritePump 監聽 Cancel() 訊號後自然退出
 
 	delete(cm.clients, client)
 	delete(cm.clientsByUserID, client.UserID)
 
-	// 關閉 WebSocket 連線
+	// 關閉 WebSocket 連線 (必須由 Hub 負責清理)
 	if client.Conn != nil {
 		client.Conn.Close()
 	}

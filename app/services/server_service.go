@@ -917,7 +917,7 @@ func (ss *serverService) deleteServerChannelsAndCategories(serverID string) erro
 	// 刪除所有頻道及其訊息
 	for _, channel := range channels {
 		// 先刪除該頻道的所有訊息
-		err = ss.chatRepo.DeleteMessagesByRoomID(channel.BaseModel.GetID().Hex())
+		err = ss.chatRepo.DeleteMessagesByRoomID(context.TODO(), channel.BaseModel.GetID().Hex())
 		if err != nil {
 			fmt.Printf("刪除頻道 %s 的訊息失敗: %v\n", channel.Name, err)
 		}

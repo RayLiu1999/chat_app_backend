@@ -94,7 +94,7 @@ func (cc *ChatController) GetDMRoomList(c *gin.Context) {
 	}
 
 	// 獲取聊天列表
-	dmRoomResponseList, msgOpt := cc.chatService.GetDMRoomResponseList(userID, false)
+	dmRoomResponseList, msgOpt := cc.chatService.GetDMRoomResponseList(c.Request.Context(), userID, false)
 	if msgOpt != nil {
 		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
 		return
@@ -121,7 +121,7 @@ func (cc *ChatController) UpdateDMRoom(c *gin.Context) {
 	}
 
 	// 使用service層的業務邏輯
-	msgOpt := cc.chatService.UpdateDMRoom(userID, requestBody.RoomID, requestBody.IsHidden)
+	msgOpt := cc.chatService.UpdateDMRoom(c.Request.Context(), userID, requestBody.RoomID, requestBody.IsHidden)
 	if msgOpt != nil {
 		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
 		return
@@ -148,7 +148,7 @@ func (cc *ChatController) CreateDMRoom(c *gin.Context) {
 	}
 
 	// 使用service層的業務邏輯
-	response, msgOpt := cc.chatService.CreateDMRoom(userID, requestBody.ChatWithUserID)
+	response, msgOpt := cc.chatService.CreateDMRoom(c.Request.Context(), userID, requestBody.ChatWithUserID)
 	if msgOpt != nil {
 		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
 		return
@@ -171,7 +171,7 @@ func (cc *ChatController) GetDMMessages(c *gin.Context) {
 	limit := c.Query("limit")
 
 	// 使用service層的業務邏輯
-	messages, msgOpt := cc.chatService.GetDMMessages(userID, roomID, before, after, limit)
+	messages, msgOpt := cc.chatService.GetDMMessages(c.Request.Context(), userID, roomID, before, after, limit)
 	if msgOpt != nil {
 		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
 		return
@@ -202,7 +202,7 @@ func (cc *ChatController) GetChannelMessages(c *gin.Context) {
 	limit := c.Query("limit")
 
 	// 使用service層的業務邏輯
-	messages, msgOpt := cc.chatService.GetChannelMessages(userID, channelID, before, after, limit)
+	messages, msgOpt := cc.chatService.GetChannelMessages(c.Request.Context(), userID, channelID, before, after, limit)
 	if msgOpt != nil {
 		ErrorResponse(c, http.StatusBadRequest, *msgOpt)
 		return

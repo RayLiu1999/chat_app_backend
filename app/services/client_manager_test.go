@@ -27,8 +27,6 @@ func TestNewClientManager(t *testing.T) {
 	assert.NotNil(t, cm)
 	assert.NotNil(t, cm.clients)
 	assert.NotNil(t, cm.clientsByUserID)
-	assert.NotNil(t, cm.register)
-	assert.NotNil(t, cm.unregister)
 	assert.Equal(t, 0, len(cm.clients))
 	assert.Equal(t, 0, len(cm.clientsByUserID))
 }
@@ -60,9 +58,6 @@ func TestRegisterClient(t *testing.T) {
 	// 註冊客戶端
 	cm.Register(client)
 
-	// 等待註冊完成
-	time.Sleep(50 * time.Millisecond)
-
 	// 驗證客戶端已被註冊
 	retrievedClient, exists := cm.GetClient(userID)
 	assert.True(t, exists)
@@ -82,7 +77,6 @@ func TestUnregisterClient(t *testing.T) {
 
 	// 註冊客戶端
 	cm.Register(client)
-	time.Sleep(50 * time.Millisecond)
 
 	// 驗證客戶端已註冊
 	_, exists := cm.GetClient(userID)
@@ -90,7 +84,6 @@ func TestUnregisterClient(t *testing.T) {
 
 	// 註銷客戶端
 	cm.Unregister(client)
-	time.Sleep(50 * time.Millisecond)
 
 	// 驗證客戶端已被註銷
 	_, exists = cm.GetClient(userID)
@@ -102,10 +95,6 @@ func TestUnregisterClient(t *testing.T) {
 
 	// 驗證客戶端被標記為非活躍
 	assert.False(t, client.IsActive)
-
-	// 驗證 Send channel 已被關閉（透過嘗試發送來測試）
-	// 如果 channel 已關閉，這個操作會導致 panic，我們只驗證客戶端狀態即可
-	// 不再驗證 WebSocket 連線的 closed 狀態，因為 mock 的限制
 }
 
 func TestGetClient(t *testing.T) {
@@ -116,7 +105,6 @@ func TestGetClient(t *testing.T) {
 
 	client1 := cm.NewClient(userID1, mockConn.Conn)
 	cm.Register(client1)
-	time.Sleep(50 * time.Millisecond)
 
 	t.Run("Get existing client", func(t *testing.T) {
 		retrievedClient, exists := cm.GetClient(userID1)
@@ -146,7 +134,6 @@ func TestGetAllClients(t *testing.T) {
 	cm.Register(client1)
 	cm.Register(client2)
 	cm.Register(client3)
-	time.Sleep(100 * time.Millisecond)
 
 	allClients := cm.GetAllClients()
 
@@ -169,7 +156,6 @@ func TestCheckClientsHealth(t *testing.T) {
 	// 註冊兩個客戶端
 	cm.Register(healthyClient)
 	cm.Register(unhealthyClient)
-	time.Sleep(50 * time.Millisecond)
 
 	// 將 unhealthyClient 的 LastPongTime 設置為很久之前（超過 PongWait）
 	unhealthyClient.ActivityMutex.Lock()
@@ -178,7 +164,6 @@ func TestCheckClientsHealth(t *testing.T) {
 
 	// 執行健康檢查
 	cm.CheckClientsHealth()
-	time.Sleep(100 * time.Millisecond)
 
 	// 驗證健康的客戶端仍然存在
 	_, exists := cm.GetClient(healthyUserID)
@@ -198,7 +183,6 @@ func TestIsUserOnline(t *testing.T) {
 
 	client := cm.NewClient(onlineUserID, mockConn.Conn)
 	cm.Register(client)
-	time.Sleep(50 * time.Millisecond)
 
 	t.Run("Online user", func(t *testing.T) {
 		isOnline := cm.IsUserOnline(onlineUserID)
@@ -220,7 +204,6 @@ func TestStartHealthChecker(t *testing.T) {
 
 	// 註冊客戶端
 	cm.Register(unhealthyClient)
-	time.Sleep(50 * time.Millisecond)
 
 	// 將客戶端設置為不健康
 	unhealthyClient.ActivityMutex.Lock()
@@ -229,31 +212,20 @@ func TestStartHealthChecker(t *testing.T) {
 
 	// 創建 context 來控制健康檢查器
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	// 啟動健康檢查器（使用較短的間隔進行測試）
-	go func() {
-		ticker := time.NewTicker(100 * time.Millisecond)
-		defer ticker.Stop()
+	// 啟動健康檢查器
+	go cm.StartHealthChecker(ctx)
 
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				cm.CheckClientsHealth()
-			}
-		}
-	}()
+	// 等待一會讓健康檢查器執行一次 (雖然測試中間隔很長，但這裡至少確保方法可以啟動)
+	time.Sleep(100 * time.Millisecond)
 
-	// 等待健康檢查器運行
-	time.Sleep(200 * time.Millisecond)
+	// 我們手動觸發一下以驗證邏輯，因為預設 Ticker 是一分鐘
+	cm.CheckClientsHealth()
 
 	// 驗證不健康的客戶端已被移除
 	_, exists := cm.GetClient(unhealthyUserID)
 	assert.False(t, exists)
-
-	// 停止健康檢查器
-	cancel()
 }
 
 func TestMultipleClientsRegistrationAndUnregistration(t *testing.T) {
@@ -270,8 +242,6 @@ func TestMultipleClientsRegistrationAndUnregistration(t *testing.T) {
 		cm.Register(clients[i])
 	}
 
-	time.Sleep(100 * time.Millisecond)
-
 	// 驗證所有客戶端都已註冊
 	allClients := cm.GetAllClients()
 	assert.Equal(t, 10, len(allClients))
@@ -280,8 +250,6 @@ func TestMultipleClientsRegistrationAndUnregistration(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		cm.Unregister(clients[i])
 	}
-
-	time.Sleep(100 * time.Millisecond)
 
 	// 驗證還剩 5 個客戶端
 	allClients = cm.GetAllClients()

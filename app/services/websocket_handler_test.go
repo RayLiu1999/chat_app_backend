@@ -81,13 +81,17 @@ func (m *mockClientManager) IsUserOnline(userID string) bool {
 	return args.Bool(0)
 }
 
+func (m *mockClientManager) StartHealthChecker(ctx context.Context) {
+	m.Called(ctx)
+}
+
 // mockRoomManager 模擬 RoomManager
 type mockRoomManager struct {
 	mock.Mock
 }
 
-func (m *mockRoomManager) CheckUserAllowedJoinRoom(userID string, roomID string, roomType models.RoomType) (bool, error) {
-	args := m.Called(userID, roomID, roomType)
+func (m *mockRoomManager) CheckUserAllowedJoinRoom(ctx context.Context, userID string, roomID string, roomType models.RoomType) (bool, error) {
+	args := m.Called(ctx, userID, roomID, roomType)
 	return args.Bool(0), args.Error(1)
 }
 
@@ -237,6 +241,11 @@ func (m *mockCacheProvider) Delete(key string) error {
 	return args.Error(0)
 }
 
+func (m *mockCacheProvider) SetNX(key string, value string, expiration time.Duration) (bool, error) {
+	args := m.Called(key, value, expiration)
+	return args.Bool(0), args.Error(1)
+}
+
 func (m *mockCacheProvider) Exists(key string) (bool, error) {
 	args := m.Called(key)
 	return args.Bool(0), args.Error(1)
@@ -309,7 +318,7 @@ func TestHandleJoinRoom(t *testing.T) {
 		data, _ := json.Marshal(requestData)
 
 		// 設定 mock 期望
-		mockRM.On("CheckUserAllowedJoinRoom", userID, roomID, models.RoomTypeChannel).Return(true, nil).Once()
+		mockRM.On("CheckUserAllowedJoinRoom", client.Context, userID, roomID, models.RoomTypeChannel).Return(true, nil).Once()
 		mockRM.On("InitRoom", models.RoomTypeChannel, roomID).Return(&Room{}).Once()
 		mockRM.On("JoinRoom", client, models.RoomTypeChannel, roomID).Once()
 
@@ -391,7 +400,7 @@ func TestHandleJoinRoom(t *testing.T) {
 		data, _ := json.Marshal(requestData)
 
 		// 設定 mock：用戶無權限
-		mockRM.On("CheckUserAllowedJoinRoom", userID, roomID, models.RoomTypeChannel).Return(false, nil).Once()
+		mockRM.On("CheckUserAllowedJoinRoom", client.Context, userID, roomID, models.RoomTypeChannel).Return(false, nil).Once()
 
 		handler.handleJoinRoom(client, data)
 
@@ -438,7 +447,7 @@ func TestHandleJoinRoom(t *testing.T) {
 		data, _ := json.Marshal(requestData)
 
 		// 設定 mock：檢查權限時發生錯誤
-		mockRM.On("CheckUserAllowedJoinRoom", userID, roomID, models.RoomTypeChannel).Return(false, errors.New("database error")).Once()
+		mockRM.On("CheckUserAllowedJoinRoom", client.Context, userID, roomID, models.RoomTypeChannel).Return(false, errors.New("database error")).Once()
 
 		handler.handleJoinRoom(client, data)
 
@@ -751,7 +760,7 @@ func TestHandleClientMessage(t *testing.T) {
 			Data:   dataBytes,
 		}
 
-		mockRM.On("CheckUserAllowedJoinRoom", userID, roomID, models.RoomTypeChannel).Return(true, nil).Once()
+		mockRM.On("CheckUserAllowedJoinRoom", client.Context, userID, roomID, models.RoomTypeChannel).Return(true, nil).Once()
 		mockRM.On("InitRoom", models.RoomTypeChannel, roomID).Return(&Room{}).Once()
 		mockRM.On("JoinRoom", client, models.RoomTypeChannel, roomID).Once()
 
@@ -953,10 +962,9 @@ func TestUpdateActivityWithThrottle(t *testing.T) {
 			userService: mockUS,
 		}
 
-		// 模擬節流閥不存在
-		mockCache.On("Get", mock.AnythingOfType("string")).Return("", errors.New("key not found")).Once()
+		// 模擬節流閥不存在，SetNX 成功
+		mockCache.On("SetNX", mock.AnythingOfType("string"), "1", 3*time.Minute).Return(true, nil).Once()
 		mockUS.On("UpdateUserActivity", userID).Return(nil).Once()
-		mockCache.On("Set", mock.AnythingOfType("string"), "1", 3*time.Minute).Return(nil).Once()
 
 		handler.updateActivityWithThrottle(userID)
 
@@ -976,8 +984,8 @@ func TestUpdateActivityWithThrottle(t *testing.T) {
 			userService: mockUS,
 		}
 
-		// 模擬節流閥存在
-		mockCache.On("Get", mock.AnythingOfType("string")).Return("1", nil).Once()
+		// 模擬節流閥存在，SetNX 失敗
+		mockCache.On("SetNX", mock.AnythingOfType("string"), "1", 3*time.Minute).Return(false, nil).Once()
 		// 不應該調用 UpdateUserActivity
 
 		handler.updateActivityWithThrottle(userID)

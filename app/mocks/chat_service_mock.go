@@ -2,6 +2,7 @@ package mocks
 
 import (
 	"chat_app_backend/app/models"
+	"context"
 
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/mock"
@@ -18,8 +19,8 @@ func (m *ChatService) HandleWebSocket(ws *websocket.Conn, userID string) {
 }
 
 // GetDMRoomResponseList 獲取聊天列表response
-func (m *ChatService) GetDMRoomResponseList(userID string, includeNotVisible bool) ([]models.DMRoomResponse, *models.MessageOptions) {
-	args := m.Called(userID, includeNotVisible)
+func (m *ChatService) GetDMRoomResponseList(ctx context.Context, userID string, includeNotVisible bool) ([]models.DMRoomResponse, *models.MessageOptions) {
+	args := m.Called(ctx, userID, includeNotVisible)
 	var roomList []models.DMRoomResponse
 	var msgOpts *models.MessageOptions
 
@@ -34,8 +35,8 @@ func (m *ChatService) GetDMRoomResponseList(userID string, includeNotVisible boo
 }
 
 // UpdateDMRoom 更新聊天房間狀態
-func (m *ChatService) UpdateDMRoom(userID string, roomID string, isHidden bool) *models.MessageOptions {
-	args := m.Called(userID, roomID, isHidden)
+func (m *ChatService) UpdateDMRoom(ctx context.Context, userID string, roomID string, isHidden bool) *models.MessageOptions {
+	args := m.Called(ctx, userID, roomID, isHidden)
 	if args.Get(0) == nil {
 		return nil
 	}
@@ -43,8 +44,8 @@ func (m *ChatService) UpdateDMRoom(userID string, roomID string, isHidden bool) 
 }
 
 // CreateDMRoom 創建私聊房間
-func (m *ChatService) CreateDMRoom(userID string, chatWithUserID string) (*models.DMRoomResponse, *models.MessageOptions) {
-	args := m.Called(userID, chatWithUserID)
+func (m *ChatService) CreateDMRoom(ctx context.Context, userID string, chatWithUserID string) (*models.DMRoomResponse, *models.MessageOptions) {
+	args := m.Called(ctx, userID, chatWithUserID)
 	var resp *models.DMRoomResponse
 	var msgOpts *models.MessageOptions
 
@@ -59,8 +60,8 @@ func (m *ChatService) CreateDMRoom(userID string, chatWithUserID string) (*model
 }
 
 // GetDMMessages 獲取私聊訊息
-func (m *ChatService) GetDMMessages(userID string, roomID string, before string, after string, limit string) ([]models.MessageResponse, *models.MessageOptions) {
-	args := m.Called(userID, roomID, before, after, limit)
+func (m *ChatService) GetDMMessages(ctx context.Context, userID string, roomID string, before string, after string, limit string) ([]models.MessageResponse, *models.MessageOptions) {
+	args := m.Called(ctx, userID, roomID, before, after, limit)
 	var messages []models.MessageResponse
 	var msgOpts *models.MessageOptions
 
@@ -75,8 +76,8 @@ func (m *ChatService) GetDMMessages(userID string, roomID string, before string,
 }
 
 // GetChannelMessages 獲取頻道訊息
-func (m *ChatService) GetChannelMessages(userID string, channelID string, before string, after string, limit string) ([]models.MessageResponse, *models.MessageOptions) {
-	args := m.Called(userID, channelID, before, after, limit)
+func (m *ChatService) GetChannelMessages(ctx context.Context, userID string, channelID string, before string, after string, limit string) ([]models.MessageResponse, *models.MessageOptions) {
+	args := m.Called(ctx, userID, channelID, before, after, limit)
 	var messages []models.MessageResponse
 	var msgOpts *models.MessageOptions
 

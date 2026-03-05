@@ -210,7 +210,7 @@ func TestRoomManager_Broadcast(t *testing.T) {
 		failingClient.Client.Send = make(chan []byte) // 零緩衝區通道
 
 		rm.JoinRoom(failingClient.Client, models.RoomTypeChannel, roomID)
-		assert.True(t, failingClient.IsActive, "故障客戶端初始應該是活躍的")
+		assert.True(t, failingClient.IsActive, "故障客戶端實例應該是活躍的")
 
 		// 發送多個訊息以填充並阻塞
 		errorMsg := &WsMessage[MessageResponse]{
@@ -290,9 +290,12 @@ func TestCheckUserAllowedJoinRoom(t *testing.T) {
 		rm := NewRoomManager(mockODM, nil, nil)
 
 		// 期望 FindOne 被調用並返回非錯誤結果
-		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.DMRoom")).Return(models.DMRoom{}, nil).Once()
+		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.DMRoom")).Return(nil).Run(func(args mock.Arguments) {
+			arg := args.Get(2).(*models.DMRoom)
+			*arg = models.DMRoom{}
+		}).Once()
 
-		allowed, err := rm.CheckUserAllowedJoinRoom(userID.Hex(), roomID.Hex(), models.RoomTypeDM)
+		allowed, err := rm.CheckUserAllowedJoinRoom(context.Background(), userID.Hex(), roomID.Hex(), models.RoomTypeDM)
 
 		assert.True(t, allowed)
 		assert.NoError(t, err)
@@ -303,9 +306,9 @@ func TestCheckUserAllowedJoinRoom(t *testing.T) {
 		mockODM := new(mocks.ODM)
 		rm := NewRoomManager(mockODM, nil, nil)
 
-		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.DMRoom")).Return(nil, providers.ErrDocumentNotFound).Once()
+		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.DMRoom")).Return(providers.ErrDocumentNotFound).Once()
 
-		allowed, err := rm.CheckUserAllowedJoinRoom(userID.Hex(), roomID.Hex(), models.RoomTypeDM)
+		allowed, err := rm.CheckUserAllowedJoinRoom(context.Background(), userID.Hex(), roomID.Hex(), models.RoomTypeDM)
 
 		assert.False(t, allowed)
 		assert.NoError(t, err)
@@ -317,13 +320,19 @@ func TestCheckUserAllowedJoinRoom(t *testing.T) {
 		mockRepo := new(mocks.ServerMemberRepository)
 		rm := NewRoomManager(mockODM, nil, mockRepo)
 
-		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Channel")).Return(models.Channel{ServerID: serverID}, nil).Once()
+		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Channel")).Return(nil).Run(func(args mock.Arguments) {
+			arg := args.Get(2).(*models.Channel)
+			*arg = models.Channel{ServerID: serverID}
+		}).Once()
 
-		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Server")).Return(models.Server{}, nil).Once()
+		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Server")).Return(nil).Run(func(args mock.Arguments) {
+			arg := args.Get(2).(*models.Server)
+			*arg = models.Server{}
+		}).Once()
 
 		mockRepo.On("IsMemberOfServer", serverID.Hex(), userID.Hex()).Return(true, nil).Once()
 
-		allowed, err := rm.CheckUserAllowedJoinRoom(userID.Hex(), roomID.Hex(), models.RoomTypeChannel)
+		allowed, err := rm.CheckUserAllowedJoinRoom(context.Background(), userID.Hex(), roomID.Hex(), models.RoomTypeChannel)
 
 		assert.True(t, allowed)
 		assert.NoError(t, err)
@@ -336,13 +345,19 @@ func TestCheckUserAllowedJoinRoom(t *testing.T) {
 		mockRepo := new(mocks.ServerMemberRepository)
 		rm := NewRoomManager(mockODM, nil, mockRepo)
 
-		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Channel")).Return(models.Channel{ServerID: serverID}, nil).Once()
+		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Channel")).Return(nil).Run(func(args mock.Arguments) {
+			arg := args.Get(2).(*models.Channel)
+			*arg = models.Channel{ServerID: serverID}
+		}).Once()
 
-		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Server")).Return(models.Server{}, nil).Once()
+		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Server")).Return(nil).Run(func(args mock.Arguments) {
+			arg := args.Get(2).(*models.Server)
+			*arg = models.Server{}
+		}).Once()
 
 		mockRepo.On("IsMemberOfServer", serverID.Hex(), userID.Hex()).Return(false, nil).Once()
 
-		allowed, err := rm.CheckUserAllowedJoinRoom(userID.Hex(), roomID.Hex(), models.RoomTypeChannel)
+		allowed, err := rm.CheckUserAllowedJoinRoom(context.Background(), userID.Hex(), roomID.Hex(), models.RoomTypeChannel)
 
 		assert.False(t, allowed)
 		assert.NoError(t, err)
@@ -355,9 +370,9 @@ func TestCheckUserAllowedJoinRoom(t *testing.T) {
 		rm := NewRoomManager(mockODM, nil, nil)
 		expectedErr := errors.New("db connection error")
 
-		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Channel")).Return(nil, expectedErr).Once()
+		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Channel")).Return(expectedErr).Once()
 
-		allowed, err := rm.CheckUserAllowedJoinRoom(userID.Hex(), roomID.Hex(), models.RoomTypeChannel)
+		allowed, err := rm.CheckUserAllowedJoinRoom(context.Background(), userID.Hex(), roomID.Hex(), models.RoomTypeChannel)
 
 		assert.False(t, allowed)
 		assert.Error(t, err)

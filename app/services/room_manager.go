@@ -53,27 +53,27 @@ func (rm *roomManager) AddRoom(room *Room) {
 	rm.mutex.Unlock()
 }
 
-// InitRoom 動態初始化房間
+// InitRoom 動態初始化房間 (修正競態條件)
 func (rm *roomManager) InitRoom(roomType models.RoomType, roomID string) *Room {
 	key := RoomKey{Type: roomType, RoomID: roomID}
+	keyStr := key.String()
 
-	// 先檢查房間是否存在（使用讀鎖）
-	rm.mutex.RLock()
-	room, exists := rm.rooms[key.String()]
-	rm.mutex.RUnlock()
-
-	if exists {
+	// 使用寫鎖包裹「檢查與建立」，確保原子性
+	rm.mutex.Lock()
+	if room, exists := rm.rooms[keyStr]; exists {
+		rm.mutex.Unlock()
 		return room
 	}
 
-	room = &Room{
+	room := &Room{
 		Key:       key,
 		ID:        roomID,
 		Type:      roomType,
 		Clients:   make(map[*Client]bool),
 		Broadcast: make(chan *WsMessage[MessageResponse], 1000),
 	}
-	rm.AddRoom(room)
+	rm.rooms[keyStr] = room
+	rm.mutex.Unlock()
 
 	// 根據房間類型設定工作池大小
 	workerCount := 3
@@ -187,7 +187,7 @@ func (rm *roomManager) LeaveRoom(client *Client, roomType models.RoomType, roomI
 }
 
 // CheckUserAllowedJoinRoom 檢查房間是否允許使用者進入
-func (rm *roomManager) CheckUserAllowedJoinRoom(userID string, roomID string, roomType models.RoomType) (bool, error) {
+func (rm *roomManager) CheckUserAllowedJoinRoom(ctx context.Context, userID string, roomID string, roomType models.RoomType) (bool, error) {
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return false, err
@@ -196,8 +196,6 @@ func (rm *roomManager) CheckUserAllowedJoinRoom(userID string, roomID string, ro
 	if err != nil {
 		return false, err
 	}
-
-	ctx := context.Background()
 
 	if roomType == models.RoomTypeDM {
 		dmRoom := &models.DMRoom{}
@@ -252,7 +250,8 @@ func (rm *roomManager) cleanupRoom(roomKey string) {
 	defer rm.mutex.Unlock()
 
 	if room, exists := rm.rooms[roomKey]; exists && len(room.Clients) == 0 {
-		close(room.Broadcast)
+		// ❌ 移除 close(room.Broadcast) 以防止發送方 Panic
+		// 背景 broadcastWorker 會因為房間被 delete 從而無法取得新訊息，自然停止即可
 
 		// 清理 Redis Pub/Sub 訂閱
 		rm.pubSubMutex.Lock()

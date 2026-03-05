@@ -81,19 +81,19 @@ type ChatService interface {
 	HandleWebSocket(ws *websocket.Conn, userID string)
 
 	// GetDMRoomResponseList 獲取聊天列表response
-	GetDMRoomResponseList(userID string, includeNotVisible bool) ([]models.DMRoomResponse, *models.MessageOptions)
+	GetDMRoomResponseList(ctx context.Context, userID string, includeNotVisible bool) ([]models.DMRoomResponse, *models.MessageOptions)
 
 	// UpdateDMRoom 更新聊天房間狀態
-	UpdateDMRoom(userID string, roomID string, isHidden bool) *models.MessageOptions
+	UpdateDMRoom(ctx context.Context, userID string, roomID string, isHidden bool) *models.MessageOptions
 
 	// CreateDMRoom 創建私聊房間
-	CreateDMRoom(userID string, chatWithUserID string) (*models.DMRoomResponse, *models.MessageOptions)
+	CreateDMRoom(ctx context.Context, userID string, chatWithUserID string) (*models.DMRoomResponse, *models.MessageOptions)
 
 	// GetDMMessages 獲取私聊訊息
-	GetDMMessages(userID string, roomID string, before string, after string, limit string) ([]models.MessageResponse, *models.MessageOptions)
+	GetDMMessages(ctx context.Context, userID string, roomID string, before string, after string, limit string) ([]models.MessageResponse, *models.MessageOptions)
 
 	// GetChannelMessages 獲取頻道訊息
-	GetChannelMessages(userID string, channelID string, before string, after string, limit string) ([]models.MessageResponse, *models.MessageOptions)
+	GetChannelMessages(ctx context.Context, userID string, channelID string, before string, after string, limit string) ([]models.MessageResponse, *models.MessageOptions)
 }
 
 // ServerService 定義了伺服器服務的接口
@@ -220,11 +220,12 @@ type ClientManager interface {
 	GetClient(userID string) (*Client, bool)
 	GetAllClients() map[*Client]bool
 	IsUserOnline(userID string) bool
+	StartHealthChecker(ctx context.Context)
 }
 
 // RoomManager defines the interface for room management.
 type RoomManager interface {
-	CheckUserAllowedJoinRoom(userID string, roomID string, roomType models.RoomType) (bool, error)
+	CheckUserAllowedJoinRoom(ctx context.Context, userID string, roomID string, roomType models.RoomType) (bool, error)
 	GetRoom(roomType models.RoomType, roomID string) (*Room, bool)
 	AddRoom(room *Room)
 	InitRoom(roomType models.RoomType, roomID string) *Room

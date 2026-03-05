@@ -4,6 +4,7 @@ import (
 	"chat_app_backend/app/mocks"
 	"chat_app_backend/app/models"
 	"chat_app_backend/app/providers"
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -89,11 +90,11 @@ func TestGetDMRoomResponseList(t *testing.T) {
 			},
 		}
 
-		mockChatRepo.On("GetDMRoomListByUserID", userID.Hex(), false).Return(dmRooms, nil).Once()
+		mockChatRepo.On("GetDMRoomListByUserID", mock.Anything, userID.Hex(), false).Return(dmRooms, nil).Once()
 		mockUserRepo.On("GetUserListByIds", []string{chatWithUserID.Hex()}).Return(users, nil).Once()
 		mockClientManager.On("IsUserOnline", chatWithUserID.Hex()).Return(true).Once()
 
-		result, msgOpt := service.GetDMRoomResponseList(userID.Hex(), false)
+		result, msgOpt := service.GetDMRoomResponseList(context.Background(), userID.Hex(), false)
 
 		assert.Nil(t, msgOpt)
 		assert.NotNil(t, result)
@@ -115,9 +116,9 @@ func TestGetDMRoomResponseList(t *testing.T) {
 			chatRepo: mockChatRepo,
 		}
 
-		mockChatRepo.On("GetDMRoomListByUserID", userID.Hex(), false).Return(nil, errors.New("database error")).Once()
+		mockChatRepo.On("GetDMRoomListByUserID", mock.Anything, userID.Hex(), false).Return(nil, errors.New("database error")).Once()
 
-		result, msgOpt := service.GetDMRoomResponseList(userID.Hex(), false)
+		result, msgOpt := service.GetDMRoomResponseList(context.Background(), userID.Hex(), false)
 
 		assert.Nil(t, result)
 		assert.NotNil(t, msgOpt)
@@ -144,10 +145,10 @@ func TestGetDMRoomResponseList(t *testing.T) {
 			},
 		}
 
-		mockChatRepo.On("GetDMRoomListByUserID", userID.Hex(), false).Return(dmRooms, nil).Once()
+		mockChatRepo.On("GetDMRoomListByUserID", mock.Anything, userID.Hex(), false).Return(dmRooms, nil).Once()
 		mockUserRepo.On("GetUserListByIds", []string{chatWithUserID.Hex()}).Return(nil, errors.New("user fetch error")).Once()
 
-		result, msgOpt := service.GetDMRoomResponseList(userID.Hex(), false)
+		result, msgOpt := service.GetDMRoomResponseList(context.Background(), userID.Hex(), false)
 
 		assert.Nil(t, result)
 		assert.NotNil(t, msgOpt)
@@ -175,10 +176,13 @@ func TestUpdateDMRoom(t *testing.T) {
 			IsHidden:  false,
 		}
 
-		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.DMRoom")).Return(dmRoom, nil).Once()
+		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.DMRoom")).Return(nil).Run(func(args mock.Arguments) {
+			arg := args.Get(2).(*models.DMRoom)
+			*arg = dmRoom
+		}).Once()
 		mockODM.On("Update", mock.Anything, mock.AnythingOfType("*models.DMRoom")).Return(nil).Once()
 
-		msgOpt := service.UpdateDMRoom(userID.Hex(), roomID.Hex(), true)
+		msgOpt := service.UpdateDMRoom(context.Background(), userID.Hex(), roomID.Hex(), true)
 
 		assert.Nil(t, msgOpt)
 		mockODM.AssertExpectations(t)
@@ -187,7 +191,7 @@ func TestUpdateDMRoom(t *testing.T) {
 	t.Run("無效的用戶ID格式", func(t *testing.T) {
 		service := &chatService{}
 
-		msgOpt := service.UpdateDMRoom("invalid_id", primitive.NewObjectID().Hex(), true)
+		msgOpt := service.UpdateDMRoom(context.Background(), "invalid_id", primitive.NewObjectID().Hex(), true)
 
 		assert.NotNil(t, msgOpt)
 		assert.Equal(t, models.ErrInvalidParams, msgOpt.Code)
@@ -197,7 +201,7 @@ func TestUpdateDMRoom(t *testing.T) {
 		service := &chatService{}
 		userID := primitive.NewObjectID()
 
-		msgOpt := service.UpdateDMRoom(userID.Hex(), "invalid_id", true)
+		msgOpt := service.UpdateDMRoom(context.Background(), userID.Hex(), "invalid_id", true)
 
 		assert.NotNil(t, msgOpt)
 		assert.Equal(t, models.ErrInvalidParams, msgOpt.Code)
@@ -212,9 +216,9 @@ func TestUpdateDMRoom(t *testing.T) {
 			odm: mockODM,
 		}
 
-		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.DMRoom")).Return(nil, providers.ErrDocumentNotFound).Once()
+		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.DMRoom")).Return(providers.ErrDocumentNotFound).Once()
 
-		msgOpt := service.UpdateDMRoom(userID.Hex(), roomID.Hex(), true)
+		msgOpt := service.UpdateDMRoom(context.Background(), userID.Hex(), roomID.Hex(), true)
 
 		assert.NotNil(t, msgOpt)
 		assert.Equal(t, models.ErrRoomNotFound, msgOpt.Code)
@@ -244,7 +248,7 @@ func TestCreateDMRoom(t *testing.T) {
 		// 模擬創建房間
 		mockODM.On("Create", mock.Anything, mock.AnythingOfType("*models.DMRoom")).Return(nil).Once()
 
-		result, msgOpt := service.CreateDMRoom(userID.Hex(), chatWithUserID.Hex())
+		result, msgOpt := service.CreateDMRoom(context.Background(), userID.Hex(), chatWithUserID.Hex())
 
 		assert.Nil(t, msgOpt)
 		assert.NotNil(t, result)
@@ -285,7 +289,7 @@ func TestCreateDMRoom(t *testing.T) {
 			*arg = dmRooms
 		}).Return(nil).Once()
 
-		result, msgOpt := service.CreateDMRoom(userID.Hex(), chatWithUserID.Hex())
+		result, msgOpt := service.CreateDMRoom(context.Background(), userID.Hex(), chatWithUserID.Hex())
 
 		assert.Nil(t, msgOpt)
 		assert.NotNil(t, result)
@@ -297,7 +301,7 @@ func TestCreateDMRoom(t *testing.T) {
 	t.Run("無效的用戶ID格式", func(t *testing.T) {
 		service := &chatService{}
 
-		result, msgOpt := service.CreateDMRoom("invalid_id", primitive.NewObjectID().Hex())
+		result, msgOpt := service.CreateDMRoom(context.Background(), "invalid_id", primitive.NewObjectID().Hex())
 
 		assert.Nil(t, result)
 		assert.NotNil(t, msgOpt)
@@ -315,7 +319,7 @@ func TestCreateDMRoom(t *testing.T) {
 
 		mockODM.On("FindByID", mock.Anything, chatWithUserID.Hex(), mock.AnythingOfType("*models.User")).Return(providers.ErrDocumentNotFound).Once()
 
-		result, msgOpt := service.CreateDMRoom(userID.Hex(), chatWithUserID.Hex())
+		result, msgOpt := service.CreateDMRoom(context.Background(), userID.Hex(), chatWithUserID.Hex())
 
 		assert.Nil(t, result)
 		assert.NotNil(t, msgOpt)
@@ -353,13 +357,16 @@ func TestGetDMMessages(t *testing.T) {
 			},
 		}
 
-		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.DMRoom")).Return(dmRoom, nil).Once()
+		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.DMRoom")).Return(nil).Run(func(args mock.Arguments) {
+			arg := args.Get(2).(*models.DMRoom)
+			*arg = dmRoom
+		}).Once()
 		mockODM.On("FindWithOptions", mock.Anything, mock.Anything, mock.AnythingOfType("*[]models.Message"), mock.Anything).Run(func(args mock.Arguments) {
 			arg := args.Get(2).(*[]models.Message)
 			*arg = messages
 		}).Return(nil).Once()
 
-		result, msgOpt := service.GetDMMessages(userID.Hex(), roomID.Hex(), "", "", "50")
+		result, msgOpt := service.GetDMMessages(context.Background(), userID.Hex(), roomID.Hex(), "", "", "50")
 
 		assert.Nil(t, msgOpt)
 		assert.NotNil(t, result)
@@ -372,7 +379,7 @@ func TestGetDMMessages(t *testing.T) {
 	t.Run("無效的用戶ID", func(t *testing.T) {
 		service := &chatService{}
 
-		result, msgOpt := service.GetDMMessages("invalid_id", primitive.NewObjectID().Hex(), "", "", "")
+		result, msgOpt := service.GetDMMessages(context.Background(), "invalid_id", primitive.NewObjectID().Hex(), "", "", "")
 
 		assert.Nil(t, result)
 		assert.NotNil(t, msgOpt)
@@ -388,9 +395,9 @@ func TestGetDMMessages(t *testing.T) {
 			odm: mockODM,
 		}
 
-		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.DMRoom")).Return(nil, providers.ErrDocumentNotFound).Once()
+		mockODM.On("FindOne", mock.Anything, mock.Anything, mock.AnythingOfType("*models.DMRoom")).Return(providers.ErrDocumentNotFound).Once()
 
-		result, msgOpt := service.GetDMMessages(userID.Hex(), roomID.Hex(), "", "", "")
+		result, msgOpt := service.GetDMMessages(context.Background(), userID.Hex(), roomID.Hex(), "", "", "")
 
 		assert.Nil(t, result)
 		assert.NotNil(t, msgOpt)
@@ -430,7 +437,7 @@ func TestGetChannelMessages(t *testing.T) {
 			*arg = messages
 		}).Return(nil).Once()
 
-		result, msgOpt := service.GetChannelMessages(userID.Hex(), channelID.Hex(), "", "", "")
+		result, msgOpt := service.GetChannelMessages(context.Background(), userID.Hex(), channelID.Hex(), "", "", "")
 
 		assert.Nil(t, msgOpt)
 		assert.NotNil(t, result)
@@ -451,7 +458,7 @@ func TestGetChannelMessages(t *testing.T) {
 
 		mockODM.On("FindByID", mock.Anything, channelID.Hex(), mock.AnythingOfType("*models.Channel")).Return(providers.ErrDocumentNotFound).Once()
 
-		result, msgOpt := service.GetChannelMessages(userID.Hex(), channelID.Hex(), "", "", "")
+		result, msgOpt := service.GetChannelMessages(context.Background(), userID.Hex(), channelID.Hex(), "", "", "")
 
 		assert.Nil(t, result)
 		assert.NotNil(t, msgOpt)
@@ -472,7 +479,7 @@ func TestGetChannelMessages(t *testing.T) {
 		mockODM.On("FindByID", mock.Anything, channelID.Hex(), mock.AnythingOfType("*models.Channel")).Return(nil).Once()
 		mockODM.On("Exists", mock.Anything, mock.Anything, mock.AnythingOfType("*models.ServerMember")).Return(false, nil).Once()
 
-		result, msgOpt := service.GetChannelMessages(userID.Hex(), channelID.Hex(), "", "", "")
+		result, msgOpt := service.GetChannelMessages(context.Background(), userID.Hex(), channelID.Hex(), "", "", "")
 
 		assert.Nil(t, result)
 		assert.NotNil(t, msgOpt)
@@ -494,7 +501,7 @@ func TestCheckUserServerMembership(t *testing.T) {
 
 		mockODM.On("Exists", mock.Anything, mock.Anything, mock.AnythingOfType("*models.ServerMember")).Return(true, nil).Once()
 
-		isMember, err := service.checkUserServerMembership(userID.Hex(), serverID.Hex())
+		isMember, err := service.checkUserServerMembership(context.Background(), userID.Hex(), serverID.Hex())
 
 		assert.NoError(t, err)
 		assert.True(t, isMember)
@@ -513,7 +520,7 @@ func TestCheckUserServerMembership(t *testing.T) {
 
 		mockODM.On("Exists", mock.Anything, mock.Anything, mock.AnythingOfType("*models.ServerMember")).Return(false, nil).Once()
 
-		isMember, err := service.checkUserServerMembership(userID.Hex(), serverID.Hex())
+		isMember, err := service.checkUserServerMembership(context.Background(), userID.Hex(), serverID.Hex())
 
 		assert.NoError(t, err)
 		assert.False(t, isMember)
@@ -524,7 +531,7 @@ func TestCheckUserServerMembership(t *testing.T) {
 	t.Run("無效的用戶ID", func(t *testing.T) {
 		service := &chatService{}
 
-		isMember, err := service.checkUserServerMembership("invalid_id", primitive.NewObjectID().Hex())
+		isMember, err := service.checkUserServerMembership(context.Background(), "invalid_id", primitive.NewObjectID().Hex())
 
 		assert.Error(t, err)
 		assert.False(t, isMember)

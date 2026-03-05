@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -49,7 +50,7 @@ func TestChatController_GetDMRoomList(t *testing.T) {
 			},
 		}
 
-		mockChatService.On("GetDMRoomResponseList", "user123", false).Return(expectedRooms, nil)
+		mockChatService.On("GetDMRoomResponseList", mock.Anything, "user123", false).Return(expectedRooms, nil)
 
 		controller := NewChatController(&config.Config{}, nil, mockChatService, nil)
 
@@ -73,7 +74,7 @@ func TestChatController_GetDMRoomList(t *testing.T) {
 
 	t.Run("服務層錯誤", func(t *testing.T) {
 		mockChatService := new(mocks.ChatService)
-		mockChatService.On("GetDMRoomResponseList", "user123", false).Return(
+		mockChatService.On("GetDMRoomResponseList", mock.Anything, "user123", false).Return(
 			nil,
 			&models.MessageOptions{
 				Code:    models.ErrInternalServer,
@@ -113,7 +114,7 @@ func TestChatController_CreateDMRoom(t *testing.T) {
 			Nickname: "New Friend",
 		}
 
-		mockChatService.On("CreateDMRoom", "user123", "user456").Return(expectedRoom, nil)
+		mockChatService.On("CreateDMRoom", mock.Anything, "user123", "user456").Return(expectedRoom, nil)
 
 		controller := NewChatController(&config.Config{}, nil, mockChatService, nil)
 
@@ -168,7 +169,7 @@ func TestChatController_CreateDMRoom(t *testing.T) {
 func TestChatController_UpdateDMRoom(t *testing.T) {
 	t.Run("成功更新聊天房間", func(t *testing.T) {
 		mockChatService := new(mocks.ChatService)
-		mockChatService.On("UpdateDMRoom", "user123", "room1", true).Return(nil)
+		mockChatService.On("UpdateDMRoom", mock.Anything, "user123", "room1", true).Return(nil)
 
 		controller := NewChatController(&config.Config{}, nil, mockChatService, nil)
 
@@ -239,7 +240,7 @@ func TestChatController_GetDMMessages(t *testing.T) {
 			},
 		}
 
-		mockChatService.On("GetDMMessages", "user123", "room1", "", "", "").Return(expectedMessages, nil)
+		mockChatService.On("GetDMMessages", mock.Anything, "user123", "room1", "", "", "").Return(expectedMessages, nil)
 
 		controller := NewChatController(&config.Config{}, nil, mockChatService, nil)
 
@@ -281,7 +282,7 @@ func TestChatController_GetChannelMessages(t *testing.T) {
 			},
 		}
 
-		mockChatService.On("GetChannelMessages", "user123", "channel1", "", "", "").Return(expectedMessages, nil)
+		mockChatService.On("GetChannelMessages", mock.Anything, "user123", "channel1", "", "", "").Return(expectedMessages, nil)
 
 		controller := NewChatController(&config.Config{}, nil, mockChatService, nil)
 

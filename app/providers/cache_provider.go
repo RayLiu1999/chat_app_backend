@@ -13,6 +13,7 @@ type CacheProvider interface {
 	Get(key string) (string, error)
 	Set(key string, value string, expiration time.Duration) error
 	Delete(key string) error
+	SetNX(key string, value string, expiration time.Duration) (bool, error)
 }
 
 // RedisCacheProvider 是 ICacheProvider 的 Redis 實作
@@ -47,4 +48,9 @@ func (p *RedisCacheProvider) Set(key string, value string, expiration time.Durat
 // Delete 從 Redis 刪除一個值
 func (p *RedisCacheProvider) Delete(key string) error {
 	return p.client.Del(context.Background(), key).Err()
+}
+
+// SetNX 將一個值存入 Redis，僅當該值不存在時才執行 (Set if Not eXists)
+func (p *RedisCacheProvider) SetNX(key string, value string, expiration time.Duration) (bool, error) {
+	return p.client.SetNX(context.Background(), key, value, expiration).Result()
 }

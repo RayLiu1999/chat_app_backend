@@ -4,6 +4,7 @@ import (
 	"chat_app_backend/app/mocks"
 	"chat_app_backend/app/models"
 	"chat_app_backend/app/providers"
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -177,6 +178,10 @@ func (m *mockServerClientManager) GetAllClients() map[*Client]bool {
 func (m *mockServerClientManager) IsUserOnline(userID string) bool {
 	args := m.Called(userID)
 	return args.Bool(0)
+}
+
+func (m *mockServerClientManager) StartHealthChecker(ctx context.Context) {
+	m.Called(ctx)
 }
 
 // --- Tests ---

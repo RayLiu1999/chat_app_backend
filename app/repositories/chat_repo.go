@@ -29,10 +29,7 @@ func NewChatRepository(cfg *config.Config, odm providers.ODM) *chatRepository {
 }
 
 // SaveMessage 將聊天消息保存到數據庫
-func (cr *chatRepository) SaveMessage(message models.Message) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
+func (cr *chatRepository) SaveMessage(ctx context.Context, message models.Message) (string, error) {
 	err := cr.odm.Create(ctx, &message)
 	if err != nil {
 		return "", err
@@ -42,10 +39,7 @@ func (cr *chatRepository) SaveMessage(message models.Message) (string, error) {
 }
 
 // GetMessagesByRoomID 根據房間ID獲取消息
-func (cr *chatRepository) GetMessagesByRoomID(roomID string, limit int64) ([]models.Message, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
+func (cr *chatRepository) GetMessagesByRoomID(ctx context.Context, roomID string, limit int64) ([]models.Message, error) {
 	roomObjectID, err := primitive.ObjectIDFromHex(roomID)
 	if err != nil {
 		return nil, err
@@ -70,10 +64,7 @@ func (cr *chatRepository) GetMessagesByRoomID(roomID string, limit int64) ([]mod
 }
 
 // GetDMRoomListByUserID 獲取用戶的聊天列表
-func (cr *chatRepository) GetDMRoomListByUserID(userID string, includeHidden bool) ([]models.DMRoom, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
+func (cr *chatRepository) GetDMRoomListByUserID(ctx context.Context, userID string, includeHidden bool) ([]models.DMRoom, error) {
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return nil, err
@@ -102,10 +93,7 @@ func (cr *chatRepository) GetDMRoomListByUserID(userID string, includeHidden boo
 }
 
 // UpdateDMRoom 更新聊天列表的刪除狀態
-func (cr *chatRepository) UpdateDMRoom(userID string, chatWithUserID string, IsHidden bool) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
+func (cr *chatRepository) UpdateDMRoom(ctx context.Context, userID string, chatWithUserID string, IsHidden bool) error {
 	userObjectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return err
@@ -136,10 +124,7 @@ func (cr *chatRepository) UpdateDMRoom(userID string, chatWithUserID string, IsH
 }
 
 // SaveOrUpdateDMRoom 保存或更新聊天列表
-func (cr *chatRepository) SaveOrUpdateDMRoom(chat models.DMRoom) (models.DMRoom, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
+func (cr *chatRepository) SaveOrUpdateDMRoom(ctx context.Context, chat models.DMRoom) (models.DMRoom, error) {
 	filter := bson.M{
 		"user_id":           chat.UserID,
 		"chat_with_user_id": chat.ChatWithUserID,
@@ -186,9 +171,7 @@ func (cr *chatRepository) SaveOrUpdateDMRoom(chat models.DMRoom) (models.DMRoom,
 }
 
 // DeleteMessagesByRoomID 根據房間ID刪除所有訊息
-func (cr *chatRepository) DeleteMessagesByRoomID(roomID string) error {
-	ctx := context.Background()
-
+func (cr *chatRepository) DeleteMessagesByRoomID(ctx context.Context, roomID string) error {
 	// 將 roomID 轉換為 ObjectID
 	roomObjectID, err := primitive.ObjectIDFromHex(roomID)
 	if err != nil {
