@@ -1,7 +1,7 @@
 # ---------------------------------------------------
 # 1. Base Stage: 共用基礎設置
 # ---------------------------------------------------
-FROM golang:1.25.3-alpine AS base
+FROM golang:1.25-alpine AS base
 
 # 安裝基礎工具
 RUN apk update && apk upgrade && \
