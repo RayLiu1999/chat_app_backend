@@ -27,14 +27,14 @@ linters:
     exhaustive:
       default-signifies-exhaustive: true  # 有 default 分支的 switch 視為完整
 
-issues:
-  exclude-rules:
-    # 測試檔案放寬 gosec 與 errcheck 限制
-    - path: "_test\\.go"
-      linters:
-        - gosec
-        - errcheck
-    # mock 檔案放寬所有限制
-    - path: "app/mocks/"
-      linters:
-        - all
+  exclusions:
+    rules:
+      # 測試檔案放寬 gosec 與 errcheck 限制
+      - path: "_test\\.go"
+        linters:
+          - gosec
+          - errcheck
+      # mock 檔案放寬所有限制
+      - path: "app/mocks/"
+        linters:
+          - all
