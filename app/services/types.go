@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -133,7 +134,9 @@ func (c *Client) SendError(OriginalAction, message string) {
 			Message:        message,
 		},
 	}
-	c.SendMessage(errorMsg)
+	if err := c.SendMessage(errorMsg); err != nil {
+		slog.Warn("無法發送錯誤訊息至客戶端", "user_id", c.UserID, "error", err)
+	}
 }
 
 // Close 優雅關閉客戶端連線
@@ -144,12 +147,16 @@ func (c *Client) Close() {
 	}
 
 	// 設置寫入超時並發送關閉訊息
-	c.Conn.SetWriteDeadline(time.Now().Add(WriteWait))
-	c.Conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	_ = c.Conn.SetWriteDeadline(time.Now().Add(WriteWait))
+	if err := c.Conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")); err != nil {
+		slog.Warn("無法發送 WebSocket 關閉訊息", "user_id", c.UserID, "error", err)
+	}
 
 	// 等待優雅關閉
 	time.AfterFunc(CloseGracePeriod, func() {
-		c.Conn.Close()
+		if err := c.Conn.Close(); err != nil {
+			slog.Warn("無法在優雅關閉後關閉 WebSocket 連線", "user_id", c.UserID, "error", err)
+		}
 	})
 }
 

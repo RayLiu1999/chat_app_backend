@@ -135,7 +135,8 @@ func (cr *chatRepository) SaveOrUpdateDMRoom(ctx context.Context, chat models.DM
 	err := cr.odm.FindOne(ctx, filter, &existingChatList)
 	date := time.Now()
 
-	if err == nil {
+	switch err {
+	case nil:
 		// 已存在，更新
 		update := bson.M{
 			"$set": bson.M{
@@ -151,7 +152,7 @@ func (cr *chatRepository) SaveOrUpdateDMRoom(ctx context.Context, chat models.DM
 		if err != nil {
 			return models.DMRoom{}, err
 		}
-	} else if err == mongo.ErrNoDocuments {
+	case mongo.ErrNoDocuments:
 		// 不存在，創建新的
 		chat.ID = primitive.NewObjectID()
 		chat.CreatedAt = date
@@ -162,7 +163,7 @@ func (cr *chatRepository) SaveOrUpdateDMRoom(ctx context.Context, chat models.DM
 		if err != nil {
 			return models.DMRoom{}, err
 		}
-	} else {
+	default:
 		// 其他錯誤
 		return models.DMRoom{}, err
 	}

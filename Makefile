@@ -10,7 +10,7 @@ ENV ?= development
 
 .PHONY: help dev dev-logs dev-down dev-restart build logs status ps restart stop start
 .PHONY: shell test test-coverage test-env test-env-down test-smoke test-prepare-users test-capacity test-capacity-prepared rebuild
-.PHONY: clean clean-dev fmt lint tidy run env-check install-deps init mongo-init
+.PHONY: clean clean-dev fmt lint vuln tidy run env-check install-deps init mongo-init
 .PHONY: db-shell db-migrate db-seed db-fresh
 .PHONY: scale scale-up scale-down scale-logs scale-status
 .PHONY: k8s-build k8s-deploy k8s-redeploy k8s-delete k8s-scale k8s-status k8s-logs k8s-pods k8s-health
@@ -61,7 +61,8 @@ help:
 	@echo "🏗️  Go 開發:"
 	@echo "  make run              - 本地執行應用"
 	@echo "  make fmt              - 格式化程式碼"
-	@echo "  make lint             - 程式碼檢查"
+	@echo "  make lint             - 執行核心的代碼風格與潛在 Bug 檢查 (讀取 .golangci.yml)"
+	@echo "  make vuln             - 檢查漏洞 (govulncheck)"
 	@echo "  make tidy             - 整理依賴"
 	@echo ""
 
@@ -221,7 +222,12 @@ fmt:
 	go fmt ./...
 
 lint:
+	@echo "🔍 執行代碼風格與潛在 Bug 檢查..."
 	golangci-lint run
+
+vuln:
+	@echo "🛡️  檢查代碼漏洞..."
+	govulncheck ./...
 
 tidy:
 	go mod tidy

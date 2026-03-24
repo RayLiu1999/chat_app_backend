@@ -65,6 +65,7 @@ func (p *RedisCacheProvider) SetNX(key string, value string, expiration time.Dur
 	if p.client == nil {
 		return true, nil
 	}
+	//nolint:staticcheck // SetNX is still functional and widely used in this project style
 	return p.client.SetNX(context.Background(), key, value, expiration).Result()
 }
 

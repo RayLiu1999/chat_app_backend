@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"reflect"
 	"time"
 
@@ -210,7 +211,11 @@ func (o *odm) Find(ctx context.Context, filter bson.M, models any) error {
 	if err != nil {
 		return err
 	}
-	defer cursor.Close(ctx)
+	defer func() {
+		if err := cursor.Close(ctx); err != nil {
+			slog.Warn("無法關閉資料庫游標 (Find)", "error", err)
+		}
+	}()
 
 	return cursor.All(ctx, models)
 }
@@ -362,7 +367,11 @@ func (o *odm) FindWithOptions(ctx context.Context, filter bson.M, models any, op
 	if err != nil {
 		return err
 	}
-	defer cursor.Close(ctx)
+	defer func() {
+		if err := cursor.Close(ctx); err != nil {
+			slog.Warn("無法關閉資料庫游標 (FindWithPagination)", "error", err)
+		}
+	}()
 
 	return cursor.All(ctx, models)
 }
@@ -373,7 +382,11 @@ func (o *odm) Aggregate(ctx context.Context, pipeline any, models any, model Mod
 	if err != nil {
 		return err
 	}
-	defer cursor.Close(ctx)
+	defer func() {
+		if err := cursor.Close(ctx); err != nil {
+			slog.Warn("無法關閉資料庫游標 (Aggregate)", "error", err)
+		}
+	}()
 
 	return cursor.All(ctx, models)
 }

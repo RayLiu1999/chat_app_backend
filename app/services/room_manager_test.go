@@ -207,7 +207,7 @@ func TestRoomManager_Broadcast(t *testing.T) {
 		failingClient := newTestClient("failing_user")
 		// 建立一個沒有緩衝區的通道且不從中讀取
 		// 當通道滿時這會導致發送失敗
-		failingClient.Client.Send = make(chan []byte) // 零緩衝區通道
+		failingClient.Send = make(chan []byte) // 零緩衝區通道
 
 		rm.JoinRoom(failingClient.Client, models.RoomTypeChannel, roomID)
 		assert.True(t, failingClient.IsActive, "故障客戶端實例應該是活躍的")

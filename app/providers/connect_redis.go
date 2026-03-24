@@ -51,6 +51,8 @@ func (rw *RedisWrapper) Ping() error {
 // Close 關閉 Redis 連線
 func (rw *RedisWrapper) Close() {
 	if rw.Client != nil {
-		rw.Client.Close()
+		if err := rw.Client.Close(); err != nil {
+			slog.Warn("無法關閉 Redis 連線", "error", err)
+		}
 	}
 }

@@ -10,7 +10,7 @@ type User struct {
 	providers.BaseModel `bson:",inline"`
 	Username            string               `json:"username" bson:"username"`
 	Email               string               `json:"email" bson:"email"`
-	Password            string               `json:"password,omitempty" bson:"password"`
+	Password            string               `json:"-" bson:"password"`
 	Nickname            string               `json:"nickname" bson:"nickname"`
 	Friends             []primitive.ObjectID `json:"friends" bson:"friends"`
 	PictureID           primitive.ObjectID   `json:"picture_id" bson:"picture_id"`                 // 頭像圖片ID

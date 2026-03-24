@@ -132,8 +132,8 @@ func (us *userService) RegisterUser(user models.User) *models.MessageOptions {
 
 	// 設置創建時間和更新時間
 	now := time.Now()
-	user.BaseModel.CreatedAt = now
-	user.BaseModel.UpdatedAt = now
+	user.CreatedAt = now
+	user.UpdatedAt = now
 
 	// 創建用戶
 	err = us.userRepo.CreateUser(user)
@@ -179,7 +179,9 @@ func (us *userService) GetUserResponseById(userID string) (*models.UserResponse,
 	// 寫入快取，TTL 10 分鐘
 	if us.cache != nil {
 		if data, err := json.Marshal(response); err == nil {
-			us.cache.Set(utils.UserProfileCacheKey(userID), string(data), 10*time.Minute)
+			if cacheErr := us.cache.Set(utils.UserProfileCacheKey(userID), string(data), 10*time.Minute); cacheErr != nil {
+				slog.Warn("無法在獲取時更新用戶資料快取", "user_id", userID, "error", cacheErr)
+			}
 		}
 	}
 
@@ -215,7 +217,7 @@ func (us *userService) Login(loginUser models.User) (*models.LoginResponse, *mod
 	}
 
 	// 生成 Refresh Token
-	refreshTokenResponse, err := utils.GenRefreshToken(user.BaseModel.GetID().Hex())
+	refreshTokenResponse, err := utils.GenRefreshToken(user.GetID().Hex())
 	if err != nil {
 		return nil, &models.MessageOptions{
 			Code:    models.ErrInternalServer,
@@ -226,7 +228,7 @@ func (us *userService) Login(loginUser models.User) (*models.LoginResponse, *mod
 
 	// 將 refresh token 寫入資料庫
 	var refreshTokenDoc = models.RefreshToken{
-		UserID:    user.BaseModel.GetID(),
+		UserID:    user.GetID(),
 		Token:     refreshTokenResponse.Token,
 		ExpiresAt: refreshTokenResponse.ExpiresAt,
 		Revoked:   false,
@@ -234,7 +236,7 @@ func (us *userService) Login(loginUser models.User) (*models.LoginResponse, *mod
 
 	err = us.odm.Create(context.Background(), &refreshTokenDoc)
 	if err != nil {
-		slog.Error("創建刷新令牌失敗", "user_id", user.BaseModel.GetID().Hex(), "error", err)
+		slog.Error("創建刷新令牌失敗", "user_id", user.GetID().Hex(), "error", err)
 		return nil, &models.MessageOptions{
 			Code:    models.ErrInternalServer,
 			Details: err,
@@ -243,7 +245,7 @@ func (us *userService) Login(loginUser models.User) (*models.LoginResponse, *mod
 	}
 
 	// 生成 Access Token
-	accessTokenResponse, err := utils.GenAccessToken(user.BaseModel.GetID().Hex())
+	accessTokenResponse, err := utils.GenAccessToken(user.GetID().Hex())
 	if err != nil {
 		return nil, &models.MessageOptions{
 			Code:    models.ErrInternalServer,
@@ -466,7 +468,9 @@ func (us *userService) UpdateUserProfile(userID string, updates map[string]any) 
 
 	err := us.userRepo.UpdateUser(userID, filteredUpdates)
 	if err == nil && us.cache != nil {
-		us.cache.Delete(utils.UserProfileCacheKey(userID))
+		if cacheErr := us.cache.Delete(utils.UserProfileCacheKey(userID)); cacheErr != nil {
+			slog.Warn("無法清理用戶資料快取", "user_id", userID, "error", cacheErr)
+		}
 	}
 	return err
 }
@@ -535,7 +539,9 @@ func (us *userService) UploadUserImage(userID string, file multipart.File, heade
 // invalidateUserProfileCache 清除用戶資料快取
 func (us *userService) invalidateUserProfileCache(userID string) {
 	if us.cache != nil {
-		us.cache.Delete(utils.UserProfileCacheKey(userID))
+		if cacheErr := us.cache.Delete(utils.UserProfileCacheKey(userID)); cacheErr != nil {
+			slog.Warn("無法清理用戶資料快取", "user_id", userID, "error", cacheErr)
+		}
 	}
 }
 

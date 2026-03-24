@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/mongo"
+	"log/slog"
 )
 
 type FileController struct {
@@ -45,7 +46,11 @@ func (fc *FileController) UploadFile(c *gin.Context) {
 		})
 		return
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			slog.Warn("無法關閉上傳檔案", "error", err)
+		}
+	}()
 
 	// 上傳檔案
 	result, msgOpt := fc.fileUploadService.UploadFile(file, header, userID.(string))
@@ -79,7 +84,11 @@ func (fc *FileController) UploadAvatar(c *gin.Context) {
 		})
 		return
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			slog.Warn("無法關閉頭像檔案", "error", err)
+		}
+	}()
 
 	// 上傳頭像
 	result, msgOpt := fc.fileUploadService.UploadAvatar(file, header, userID.(string))
@@ -113,7 +122,11 @@ func (fc *FileController) UploadDocument(c *gin.Context) {
 		})
 		return
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			slog.Warn("無法關閉文件檔案", "error", err)
+		}
+	}()
 
 	// 上傳文件
 	result, msgOpt := fc.fileUploadService.UploadDocument(file, header, userID.(string))

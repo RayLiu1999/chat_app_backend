@@ -58,7 +58,7 @@ func (cc *ChatController) HandleConnections(c *gin.Context) {
 					return true
 				}
 			}
-			slog.Warn("WebSocket 連線被拒絕：Origin 不在白名單中", "origin", origin)
+			slog.Warn("WebSocket 連線被拒絕：Origin 不在白名單中", "origin", utils.SanitizeLogInput(origin)) // #nosec G706
 			return false
 		},
 	}

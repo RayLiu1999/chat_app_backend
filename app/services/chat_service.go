@@ -6,6 +6,7 @@ import (
 	"chat_app_backend/app/repositories"
 	"chat_app_backend/config"
 	"context"
+	"log/slog"
 	"strconv"
 	"time"
 
@@ -273,7 +274,9 @@ func (cs *chatService) CreateDMRoom(ctx context.Context, userID string, chatWith
 				} // 如果isHidden為true，則將isHidden設為false
 				if room.IsHidden {
 					updateFields := bson.M{"is_hidden": false}
-					cs.odm.UpdateFields(ctx, &room, updateFields)
+					if dbErr := cs.odm.UpdateFields(ctx, &room, updateFields); dbErr != nil {
+						slog.Warn("無法更新私聊房間最後訊息", "room_id", room.RoomID.Hex(), "error", dbErr)
+					}
 				}
 				break
 			}
@@ -401,7 +404,8 @@ func (cs *chatService) GetDMMessages(ctx context.Context, userID string, roomID 
 	messageQb.Where("room_id", roomObjectID)
 
 	if before != "" {
-		beforeObjectID, err := primitive.ObjectIDFromHex(before)
+		var beforeObjectID primitive.ObjectID
+		beforeObjectID, err = primitive.ObjectIDFromHex(before)
 		if err != nil {
 			return nil, &models.MessageOptions{
 				Code:    models.ErrInvalidParams,
@@ -413,7 +417,8 @@ func (cs *chatService) GetDMMessages(ctx context.Context, userID string, roomID 
 	}
 
 	if after != "" {
-		afterObjectID, err := primitive.ObjectIDFromHex(after)
+		var afterObjectID primitive.ObjectID
+		afterObjectID, err = primitive.ObjectIDFromHex(after)
 		if err != nil {
 			return nil, &models.MessageOptions{
 				Code:    models.ErrInvalidParams,
@@ -427,7 +432,8 @@ func (cs *chatService) GetDMMessages(ctx context.Context, userID string, roomID 
 	messageQb.SortDesc("_id")
 
 	if limit != "" {
-		limitVal, err := strconv.ParseInt(limit, 10, 64)
+		var limitVal int64
+		limitVal, err = strconv.ParseInt(limit, 10, 64)
 		if err == nil && limitVal > 0 {
 			messageQb.Limit(limitVal)
 		}
@@ -502,7 +508,8 @@ func (cs *chatService) GetChannelMessages(ctx context.Context, userID string, ch
 	messageQb.Where("room_id", channelObjectID).Where("room_type", string(models.RoomTypeChannel))
 
 	if before != "" {
-		beforeObjectID, err := primitive.ObjectIDFromHex(before)
+		var beforeObjectID primitive.ObjectID
+		beforeObjectID, err = primitive.ObjectIDFromHex(before)
 		if err != nil {
 			return nil, &models.MessageOptions{
 				Code:    models.ErrInvalidParams,
@@ -514,7 +521,8 @@ func (cs *chatService) GetChannelMessages(ctx context.Context, userID string, ch
 	}
 
 	if after != "" {
-		afterObjectID, err := primitive.ObjectIDFromHex(after)
+		var afterObjectID primitive.ObjectID
+		afterObjectID, err = primitive.ObjectIDFromHex(after)
 		if err != nil {
 			return nil, &models.MessageOptions{
 				Code:    models.ErrInvalidParams,
@@ -528,7 +536,8 @@ func (cs *chatService) GetChannelMessages(ctx context.Context, userID string, ch
 	messageQb.SortDesc("_id")
 
 	if limit != "" {
-		limitVal, err := strconv.ParseInt(limit, 10, 64)
+		var limitVal int64
+		limitVal, err = strconv.ParseInt(limit, 10, 64)
 		if err == nil && limitVal > 0 {
 			// 限制最大獲取數量為100
 			if limitVal > 100 {

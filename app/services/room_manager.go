@@ -98,7 +98,9 @@ func (rm *roomManager) InitRoom(roomType models.RoomType, roomID string) *Room {
 		rm.pubSubMutex.Unlock()
 
 		defer func() {
-			pubsub.Close()
+			if err := pubsub.Close(); err != nil {
+				slog.Warn("無法關閉 Redis PubSub 訂閱", "error", err)
+			}
 			rm.pubSubMutex.Lock()
 			delete(rm.roomPubSubs, key.String())
 			rm.pubSubMutex.Unlock()
@@ -197,7 +199,8 @@ func (rm *roomManager) CheckUserAllowedJoinRoom(ctx context.Context, userID stri
 		return false, err
 	}
 
-	if roomType == models.RoomTypeDM {
+	switch roomType {
+	case models.RoomTypeDM:
 		dmRoom := &models.DMRoom{}
 		err := rm.odm.FindOne(ctx, bson.M{"room_id": roomObjectID, "user_id": userObjectID}, dmRoom)
 		if err != nil {
@@ -208,7 +211,7 @@ func (rm *roomManager) CheckUserAllowedJoinRoom(ctx context.Context, userID stri
 			return false, err
 		}
 		return true, nil
-	} else if roomType == models.RoomTypeChannel {
+	case models.RoomTypeChannel:
 		channel := &models.Channel{}
 		err := rm.odm.FindOne(ctx, bson.M{"_id": roomObjectID}, channel)
 		if err != nil {
@@ -256,7 +259,7 @@ func (rm *roomManager) cleanupRoom(roomKey string) {
 		// 清理 Redis Pub/Sub 訂閱
 		rm.pubSubMutex.Lock()
 		if pubsub, exists := rm.roomPubSubs[roomKey]; exists {
-			pubsub.Unsubscribe(context.Background(), "room:"+roomKey)
+			_ = pubsub.Unsubscribe(context.Background(), "room:"+roomKey)
 			delete(rm.roomPubSubs, roomKey)
 		}
 		rm.pubSubMutex.Unlock()

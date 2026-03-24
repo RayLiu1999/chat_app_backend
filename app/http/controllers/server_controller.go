@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/mongo"
+	"log/slog"
 )
 
 // 定義專門的控制器結構體
@@ -79,7 +80,11 @@ func (sc *ServerController) CreateServer(c *gin.Context) {
 			})
 			return
 		}
-		defer file.Close()
+		defer func() {
+			if err := file.Close(); err != nil {
+				slog.Warn("無法關閉伺服器圖示檔案", "error", err)
+			}
+		}()
 	}
 
 	// 透過Service創建伺服器（包含檔案上傳）

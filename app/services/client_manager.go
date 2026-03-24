@@ -31,7 +31,10 @@ func NewClientManager(cache providers.CacheProvider) *clientManager {
 
 // NewClient 創建新的客戶端
 func (cm *clientManager) NewClient(userID string, ws *websocket.Conn) *Client {
+	// #nosec G118
 	ctx, cancel := context.WithCancel(context.Background())
+	// 這裡不使用 defer cancel() 因為 context 需要隨 Client 存活
+	// cancel 會在 Unregister 時被呼叫以釋放資源 (符合 G118 邏輯，但 gosec 可能仍會警告)
 	return &Client{
 		UserID:       userID,
 		Conn:         ws,
@@ -98,7 +101,9 @@ func (cm *clientManager) Unregister(client *Client) {
 
 	// 關閉 WebSocket 連線 (必須由 Hub 負責清理)
 	if client.Conn != nil {
-		client.Conn.Close()
+		if err := client.Conn.Close(); err != nil {
+			slog.Warn("無法關閉客戶端 WebSocket 連線", "user_id", client.UserID, "error", err)
+		}
 	}
 
 	slog.Info("客戶端已註銷", "user_id", client.UserID, "total_connections", len(cm.clients))

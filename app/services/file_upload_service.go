@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"log/slog"
 )
 
 // fileUploadService 檔案上傳服務實現
@@ -95,7 +96,9 @@ func (fs *fileUploadService) UploadFileWithConfig(file multipart.File, header *m
 	fileHash, err := providers.GenerateFileHash(file)
 	if err != nil {
 		// 清理已儲存的檔案
-		fs.fileProvider.DeleteFile(fullPath)
+		if cleanupErr := fs.fileProvider.DeleteFile(fullPath); cleanupErr != nil {
+			slog.Warn("無法在雜湊計算失敗後清理檔案", "path", fullPath, "error", cleanupErr)
+		}
 		return nil, &models.MessageOptions{
 			Code:    models.ErrInternalServer,
 			Message: "檔案雜湊計算失敗",
@@ -106,7 +109,9 @@ func (fs *fileUploadService) UploadFileWithConfig(file multipart.File, header *m
 	// 惡意軟體掃描（如果配置要求）
 	if config.ScanMalware {
 		if msgOpt := fs.ScanFileForMalware(fullPath); msgOpt != nil {
-			fs.fileProvider.DeleteFile(fullPath)
+			if err := fs.fileProvider.DeleteFile(fullPath); err != nil {
+				slog.Warn("無法在掃描到惡意軟體後清理檔案", "path", fullPath, "error", err)
+			}
 			return nil, msgOpt
 		}
 	}
@@ -126,7 +131,9 @@ func (fs *fileUploadService) UploadFileWithConfig(file multipart.File, header *m
 	}
 
 	if err := fs.fileRepo.CreateFile(uploadedFile); err != nil {
-		fs.fileProvider.DeleteFile(fullPath)
+		if cleanupErr := fs.fileProvider.DeleteFile(fullPath); cleanupErr != nil {
+			slog.Warn("無法在資料庫寫入失敗後清理檔案", "path", fullPath, "error", cleanupErr)
+		}
 		return nil, &models.MessageOptions{
 			Code:    models.ErrInternalServer,
 			Message: "資料庫記錄創建失敗",
@@ -135,7 +142,7 @@ func (fs *fileUploadService) UploadFileWithConfig(file multipart.File, header *m
 	}
 
 	return &models.FileResult{
-		ID:         uploadedFile.BaseModel.GetID(),
+		ID:         uploadedFile.GetID(),
 		FileName:   secureFileName,
 		FilePath:   fullPath,
 		FileURL:    fs.fileProvider.GetFileURL(fullPath),
@@ -466,7 +473,11 @@ func (fs *fileUploadService) ScanFileForMalware(filePath string) *models.Message
 			Details: err.Error(),
 		}
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			slog.Warn("無法關閉掃描中的檔案", "path", filePath, "error", closeErr)
+		}
+	}()
 
 	// 讀取檔案開頭進行基本檢查
 	buffer := make([]byte, 1024)
@@ -536,12 +547,12 @@ func (fs *fileUploadService) GetFileInfo(filePath string) (*models.FileInfo, *mo
 	}
 
 	return &models.FileInfo{
-		ID:         uploadedFile.BaseModel.GetID(),
+		ID:         uploadedFile.GetID(),
 		FileName:   uploadedFile.FileName,
 		FilePath:   uploadedFile.FilePath,
 		FileSize:   fileInfo.Size(),
 		MimeType:   uploadedFile.MimeType,
-		CreatedAt:  uploadedFile.BaseModel.CreatedAt.UnixMilli(),
+		CreatedAt:  uploadedFile.CreatedAt.UnixMilli(),
 		ModifiedAt: fileInfo.ModTime().UnixMilli(),
 	}, nil
 }

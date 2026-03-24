@@ -67,7 +67,9 @@ func (cs *channelService) getCachedUserServers(userID string) ([]models.ServerMe
 	// 寫入快取
 	if cs.cache != nil {
 		if data, err := json.Marshal(members); err == nil {
-			cs.cache.Set(utils.UserServersCacheKey(userID), string(data), 5*time.Minute)
+			if cacheErr := cs.cache.Set(utils.UserServersCacheKey(userID), string(data), 5*time.Minute); cacheErr != nil {
+				slog.Warn("無法更新用戶伺服器列表快取", "user_id", userID, "error", cacheErr)
+			}
 		}
 	}
 
@@ -96,7 +98,8 @@ func (cs *channelService) GetChannelsByServerID(userID string, serverID string) 
 
 	if !hasAccess {
 		// 回退機制：如果快取中找不到，可能是快取延遲，直接查一次資料庫
-		members, err := cs.serverMemberRepo.GetUserServers(userID)
+		var members []models.ServerMember
+		members, err = cs.serverMemberRepo.GetUserServers(userID)
 		if err == nil {
 			for _, member := range members {
 				if member.ServerID.Hex() == serverID {

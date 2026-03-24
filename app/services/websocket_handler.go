@@ -39,14 +39,18 @@ func NewWebSocketHandler(odm providers.ODM, clientManager ClientManager, roomMan
 func (wsh *webSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) {
 	// 設置連接參數
 	ws.SetReadLimit(MaxMessageSize)
-	ws.SetReadDeadline(time.Now().Add(PongWait))
+	if err := ws.SetReadDeadline(time.Now().Add(PongWait)); err != nil {
+		slog.Warn("無法設置 WebSocket 讀取期限", "user_id", userID, "error", err)
+	}
 
 	// 創建客戶端
 	client := wsh.clientManager.NewClient(userID, ws)
 
 	// 設置 pong 處理器
 	ws.SetPongHandler(func(string) error {
-		ws.SetReadDeadline(time.Now().Add(PongWait))
+		if err := ws.SetReadDeadline(time.Now().Add(PongWait)); err != nil {
+			slog.Warn("無法在 Pong 處理中更新讀取期限", "user_id", userID, "error", err)
+		}
 		if client != nil {
 			client.UpdateLastSeen()
 		}
@@ -64,7 +68,9 @@ func (wsh *webSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) 
 
 	// 3. 更新 Redis 快取狀態(未來拓展用)
 	if wsh.cache != nil {
-		wsh.cache.Set(utils.UserStatusCacheKey(userID), "online", 24*time.Hour)
+		if err := wsh.cache.Set(utils.UserStatusCacheKey(userID), "online", 24*time.Hour); err != nil {
+			slog.Warn("無法更新用戶在線狀態快取", "user_id", userID, "error", err)
+		}
 	}
 
 	// 啟動讀寫協程
@@ -87,7 +93,9 @@ func (wsh *webSocketHandler) HandleWebSocket(ws *websocket.Conn, userID string) 
 
 	// 3. 更新 Redis 快取狀態(未來拓展用)
 	if wsh.cache != nil {
-		wsh.cache.Set(utils.UserStatusCacheKey(userID), "offline", 24*time.Hour)
+		if err := wsh.cache.Set(utils.UserStatusCacheKey(userID), "offline", 24*time.Hour); err != nil {
+			slog.Warn("無法更新用戶離線狀態快取", "user_id", userID, "error", err)
+		}
 	}
 }
 
@@ -127,7 +135,9 @@ func (wsh *webSocketHandler) handleDMRoomCreation(roomID, userID string) {
 	// 如果房間已存在（通常會有兩個 entry，雙方各一個），則寫入快取並返回
 	if len(dmRoomList) >= 2 {
 		if wsh.cache != nil {
-			wsh.cache.Set(cacheKey, "1", 24*time.Hour)
+			if err := wsh.cache.Set(cacheKey, "1", 24*time.Hour); err != nil {
+				slog.Warn("無法更新私聊房間快取", "cache_key", cacheKey, "error", err)
+			}
 		}
 		return
 	}
@@ -176,7 +186,9 @@ func (wsh *webSocketHandler) handleDMRoomCreation(roomID, userID string) {
 
 	// 成功處理後寫入快取
 	if wsh.cache != nil {
-		wsh.cache.Set(cacheKey, "1", 24*time.Hour)
+		if err := wsh.cache.Set(cacheKey, "1", 24*time.Hour); err != nil {
+			slog.Warn("無法更新私聊房間快取 (Post-Creation)", "cache_key", cacheKey, "error", err)
+		}
 	}
 }
 
@@ -206,7 +218,9 @@ func (wsh *webSocketHandler) clientReadPump(client *Client) {
 			var msg WsMessage[json.RawMessage]
 
 			// 設置讀取超時
-			client.Conn.SetReadDeadline(time.Now().Add(PongWait))
+			if err := client.Conn.SetReadDeadline(time.Now().Add(PongWait)); err != nil {
+				slog.Warn("無法在讀取泵中設置讀取期限", "user_id", client.UserID, "error", err)
+			}
 
 			err := client.Conn.ReadJSON(&msg)
 			if err != nil {
@@ -236,7 +250,9 @@ func (wsh *webSocketHandler) clientReadPump(client *Client) {
 func (wsh *webSocketHandler) updateActivityWithThrottle(userID string) {
 	if wsh.cache == nil {
 		// 如果沒有快取，直接更新資料庫（不節流，或是依賴服務層自身的邏輯）
-		_ = wsh.userService.UpdateUserActivity(userID)
+		if err := wsh.userService.UpdateUserActivity(userID); err != nil {
+			slog.Warn("無法更新用戶活動時間 (無快取模式)", "user_id", userID, "error", err)
+		}
 		return
 	}
 
@@ -269,7 +285,9 @@ func (wsh *webSocketHandler) clientWritePump(client *Client) {
 		if r := recover(); r != nil {
 			slog.Error("寫入泵 panic", "user_id", client.UserID, "panic", r)
 		}
-		client.Conn.Close()
+		if err := client.Conn.Close(); err != nil {
+			slog.Warn("無法關閉寫入泵中的 WebSocket 連線", "user_id", client.UserID, "error", err)
+		}
 	}()
 
 	for {
@@ -281,10 +299,10 @@ func (wsh *webSocketHandler) clientWritePump(client *Client) {
 			return
 
 		case message, ok := <-client.Send:
-			client.Conn.SetWriteDeadline(time.Now().Add(WriteWait))
+			_ = client.Conn.SetWriteDeadline(time.Now().Add(WriteWait))
 			if !ok {
 				// 通道已關閉
-				client.Conn.WriteMessage(websocket.CloseMessage, []byte{})
+				_ = client.Conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
 
@@ -294,7 +312,9 @@ func (wsh *webSocketHandler) clientWritePump(client *Client) {
 			}
 
 		case <-ticker.C:
-			client.Conn.SetWriteDeadline(time.Now().Add(WriteWait))
+			if err := client.Conn.SetWriteDeadline(time.Now().Add(WriteWait)); err != nil {
+				slog.Warn("無法設置 WebSocket 寫入期限 (Ping)", "user_id", client.UserID, "error", err)
+			}
 			if err := client.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				slog.Debug("發送 Ping 失敗", "user_id", client.UserID, "error", err)
 				return
@@ -354,7 +374,7 @@ func (wsh *webSocketHandler) handleJoinRoom(client *Client, data json.RawMessage
 	wsh.roomManager.InitRoom(requestData.RoomType, requestData.RoomID)
 	wsh.roomManager.JoinRoom(client, requestData.RoomType, requestData.RoomID)
 
-	client.SendMessage(&WsMessage[WsStatusResponse]{
+	_ = client.SendMessage(&WsMessage[WsStatusResponse]{
 		Action: "room_joined",
 		Data: WsStatusResponse{
 			Status:  "success",
@@ -381,7 +401,7 @@ func (wsh *webSocketHandler) handleLeaveRoom(client *Client, data json.RawMessag
 	}
 
 	wsh.roomManager.LeaveRoom(client, requestData.RoomType, requestData.RoomID)
-	client.SendMessage(&WsMessage[WsStatusResponse]{
+	_ = client.SendMessage(&WsMessage[WsStatusResponse]{
 		Action: "room_left",
 		Data: WsStatusResponse{
 			Status:  "success",

@@ -35,14 +35,14 @@ func (ur *userRepository) GetUserById(userID string) (*models.User, error) {
 	// 1. 從快取中獲取用戶
 	cachedUser, err := ur.cache.Get(cacheKey)
 	if err != nil {
-		// 紀錄快取錯誤但繼續從資料庫獲取
+		slog.Error("從快取獲取用戶失敗", "user_id", userID, "error", err)
 	}
 
 	slog.Debug("Cache hit for user", "user_id", userID, "hit", cachedUser != "")
 
 	if cachedUser != "" {
 		var user models.User
-		if err := json.Unmarshal([]byte(cachedUser), &user); err == nil {
+		if err = json.Unmarshal([]byte(cachedUser), &user); err == nil {
 			return &user, nil
 		}
 	}
@@ -57,7 +57,9 @@ func (ur *userRepository) GetUserById(userID string) (*models.User, error) {
 	// 3. 將用戶存入快取
 	userBytes, err := json.Marshal(user)
 	if err == nil {
-		ur.cache.Set(cacheKey, string(userBytes), time.Hour*1) // Cache for 1 hour
+		if cacheErr := ur.cache.Set(cacheKey, string(userBytes), time.Hour*1); cacheErr != nil {
+			slog.Warn("無法更新用戶資料快取 (GetUserByID)", "user_id", userID, "error", cacheErr)
+		} // Cache for 1 hour
 	}
 
 	return &user, nil
@@ -84,7 +86,7 @@ func (ur *userRepository) GetUserListByIds(userIds []string) ([]models.User, err
 		// 1. 從快取中獲取用戶
 		cachedUser, err := ur.cache.Get(cacheKey)
 		if err != nil {
-			// 紀錄快取錯誤但繼續從資料庫獲取
+			slog.Error("從快取獲取用戶清單成員失敗", "user_id", userId, "error", err)
 		}
 
 		if cachedUser != "" {
@@ -115,7 +117,9 @@ func (ur *userRepository) GetUserListByIds(userIds []string) ([]models.User, err
 		cacheKey := utils.UserProfileCacheKey(user.ID.Hex())
 		userBytes, err := json.Marshal(user)
 		if err == nil {
-			ur.cache.Set(cacheKey, string(userBytes), time.Hour*1) // Cache for 1 hour
+			if cacheErr := ur.cache.Set(cacheKey, string(userBytes), time.Hour*1); cacheErr != nil {
+				slog.Warn("無法更新用戶資料快取 (Batch Cache)", "username", user.Username, "user_id", user.ID.Hex(), "error", cacheErr)
+			} // Cache for 1 hour
 		}
 	}
 
@@ -169,7 +173,11 @@ func (ur *userRepository) UpdateUserOnlineStatus(userID string, isOnline bool) e
 	}
 
 	// 更新上線狀態後移除快取
-	defer ur.cache.Delete(utils.UserStatusCacheKey(userID))
+	defer func() {
+		if err := ur.cache.Delete(utils.UserStatusCacheKey(userID)); err != nil {
+			slog.Warn("無法清理用戶狀態快取", "user_id", userID, "error", err)
+		}
+	}()
 
 	return ur.odm.UpdateMany(context.Background(), &models.User{}, filter, update)
 }
@@ -190,7 +198,11 @@ func (ur *userRepository) UpdateUserLastActiveTime(userID string, timestamp int6
 	}
 
 	// 更新後移除快取
-	defer ur.cache.Delete(utils.UserActivityThrottleCacheKey(userID))
+	defer func() {
+		if err := ur.cache.Delete(utils.UserActivityThrottleCacheKey(userID)); err != nil {
+			slog.Warn("無法清理用戶活動節流快取", "user_id", userID, "error", err)
+		}
+	}()
 
 	return ur.odm.UpdateMany(context.Background(), &models.User{}, filter, update)
 }
@@ -208,7 +220,11 @@ func (ur *userRepository) UpdateUser(userID string, updates map[string]any) erro
 	update := bson.M{"$set": updates}
 
 	// 更新後移除快取
-	defer ur.cache.Delete(utils.UserProfileCacheKey(userID))
+	defer func() {
+		if err := ur.cache.Delete(utils.UserProfileCacheKey(userID)); err != nil {
+			slog.Warn("無法清理用戶資料快取", "user_id", userID, "error", err)
+		}
+	}()
 
 	return ur.odm.UpdateMany(ctx, &models.User{}, filter, update)
 }
@@ -216,6 +232,10 @@ func (ur *userRepository) UpdateUser(userID string, updates map[string]any) erro
 // DeleteUser 刪除用戶
 func (ur *userRepository) DeleteUser(userID string) error {
 	// 刪除後移除快取
-	defer ur.cache.Delete(utils.UserProfileCacheKey(userID))
+	defer func() {
+		if err := ur.cache.Delete(utils.UserProfileCacheKey(userID)); err != nil {
+			slog.Warn("無法清理用戶資料快取", "user_id", userID, "error", err)
+		}
+	}()
 	return ur.odm.DeleteByID(context.Background(), userID, &models.User{})
 }

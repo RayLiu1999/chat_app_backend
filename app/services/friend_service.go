@@ -185,7 +185,9 @@ func (fs *friendService) AddFriendRequest(userID string, username string) *model
 		Status:   FriendStatusPending,
 	}
 
-	fs.odm.Create(context.Background(), &newFriend)
+	if err := fs.odm.Create(context.Background(), &newFriend); err != nil {
+		slog.Warn("無法發送好友請求", "user_id", userID, "target_username", username, "error", err)
+	}
 
 	return nil
 }

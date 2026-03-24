@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 )
@@ -28,7 +29,7 @@ func FileExists(path string) bool {
 // 返回：
 //   - 檔案內容和錯誤信息
 func ReadFileContent(path string) (string, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
 		return "", err
 	}
@@ -84,23 +85,31 @@ func EnsureDir(dirPath string, perm ...os.FileMode) error {
 // 返回：
 //   - 複製的位元組數和錯誤訊息
 func CopyFile(src, dst string) (int64, error) {
-	sourceFile, err := os.Open(src)
+	sourceFile, err := os.Open(filepath.Clean(src))
 	if err != nil {
 		return 0, err
 	}
-	defer sourceFile.Close()
+	defer func() {
+		if closeErr := sourceFile.Close(); closeErr != nil {
+			slog.Warn("無法關閉來源檔案 (CopyFile)", "path", src, "error", closeErr)
+		}
+	}()
 
 	// 確保目標目錄存在
 	dstDir := filepath.Dir(dst)
-	if err := EnsureDir(dstDir); err != nil {
+	if err = EnsureDir(dstDir); err != nil {
 		return 0, err
 	}
 
-	destinationFile, err := os.Create(dst)
+	destinationFile, err := os.Create(filepath.Clean(dst))
 	if err != nil {
 		return 0, err
 	}
-	defer destinationFile.Close()
+	defer func() {
+		if closeErr := destinationFile.Close(); closeErr != nil {
+			slog.Warn("無法關閉目標檔案 (CopyFile)", "path", dst, "error", closeErr)
+		}
+	}()
 
 	return io.Copy(destinationFile, sourceFile)
 }

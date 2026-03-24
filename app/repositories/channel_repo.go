@@ -91,7 +91,10 @@ func (cr *channelRepository) CheckChannelExists(channelID string) (bool, error) 
 	var channel models.Channel
 	err = cr.odm.FindOne(context.Background(), qb.GetFilter(), &channel)
 	if err != nil {
-		return false, nil // 沒有找到視為不存在
+		if err == providers.ErrDocumentNotFound {
+			return false, nil // 沒有找到視為不存在
+		}
+		return false, err
 	}
 	return true, nil
 }

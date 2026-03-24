@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/mongo"
+	"log/slog"
 )
 
 type UserController struct {
@@ -247,7 +248,7 @@ func (uc *UserController) UpdateUserProfile(c *gin.Context) {
 	}
 
 	var updates map[string]any
-	if err := c.ShouldBindJSON(&updates); err != nil {
+	if err = c.ShouldBindJSON(&updates); err != nil {
 		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
 			Code:    models.ErrInvalidParams,
 			Message: "更新個人資料失敗",
@@ -287,7 +288,11 @@ func (uc *UserController) UploadUserImage(c *gin.Context) {
 		})
 		return
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			slog.Warn("無法關閉上傳的圖片檔案", "error", closeErr)
+		}
+	}()
 
 	// 獲取圖片類型
 	imageType := c.PostForm("type")
@@ -365,7 +370,7 @@ func (uc *UserController) UpdateUserPassword(c *gin.Context) {
 	var req struct {
 		NewPassword string `json:"newPassword" binding:"required"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err = c.ShouldBindJSON(&req); err != nil {
 		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
 			Code:    models.ErrInvalidParams,
 			Message: "密碼更新失敗",
@@ -419,7 +424,7 @@ func (uc *UserController) UpdateTwoFactorStatus(c *gin.Context) {
 	var req struct {
 		Enabled bool `json:"enabled"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err = c.ShouldBindJSON(&req); err != nil {
 		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
 			Code:    models.ErrInvalidParams,
 			Message: "兩步驟驗證狀態更新失敗",

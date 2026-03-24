@@ -4,9 +4,9 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hmac"
-	"crypto/md5"
+	"crypto/md5" // #nosec G501
 	"crypto/rand"
-	"crypto/sha1"
+	"crypto/sha1" // #nosec G505
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -24,7 +24,7 @@ import (
 // 返回：
 //   - MD5 哈希值（16 進制字串）
 func MD5Hash(s string) string {
-	hash := md5.Sum([]byte(s))
+	hash := md5.Sum([]byte(s)) // #nosec G401
 	return hex.EncodeToString(hash[:])
 }
 
@@ -52,9 +52,9 @@ func GenerateHMAC(message, key, algorithm string) (string, error) {
 
 	switch strings.ToLower(algorithm) {
 	case "md5":
-		mac = hmac.New(md5.New, []byte(key))
+		mac = hmac.New(md5.New, []byte(key)) // #nosec G501
 	case "sha1":
-		mac = hmac.New(sha1.New, []byte(key))
+		mac = hmac.New(sha1.New, []byte(key)) // #nosec G505
 	case "sha256":
 		mac = hmac.New(sha256.New, []byte(key))
 	default:
@@ -78,17 +78,19 @@ func AESEncrypt(plaintext, key []byte) (string, error) {
 		return "", err
 	}
 
-	// 創建初始向量
-	iv := make([]byte, aes.BlockSize)
-	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
+	aesGCM, err := cipher.NewGCM(block)
+	if err != nil {
 		return "", err
 	}
 
-	// 加密
-	ciphertext := make([]byte, aes.BlockSize+len(plaintext))
-	copy(ciphertext[:aes.BlockSize], iv)
-	stream := cipher.NewCFBEncrypter(block, iv)
-	stream.XORKeyStream(ciphertext[aes.BlockSize:], plaintext)
+	// 創建隨機 nonce
+	nonce := make([]byte, aesGCM.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return "", err
+	}
+
+	// 加密並附加 nonce 到密文開頭
+	ciphertext := aesGCM.Seal(nonce, nonce, plaintext, nil)
 
 	// 轉換為 base64
 	return base64.StdEncoding.EncodeToString(ciphertext), nil
@@ -108,26 +110,27 @@ func AESDecrypt(encryptedData string, key []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	// 檢查密文長度
-	if len(ciphertext) < aes.BlockSize {
-		return nil, errors.New("密文太短")
-	}
-
-	// 從密文中提取初始向量
-	iv := ciphertext[:aes.BlockSize]
-	ciphertext = ciphertext[aes.BlockSize:]
-
 	// 創建解密器
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
 	}
 
-	// 解密
-	stream := cipher.NewCFBDecrypter(block, iv)
-	stream.XORKeyStream(ciphertext, ciphertext)
+	aesGCM, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
 
-	return ciphertext, nil
+	nonceSize := aesGCM.NonceSize()
+	if len(ciphertext) < nonceSize {
+		return nil, errors.New("密文太短")
+	}
+
+	// 提取 nonce 和密文
+	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
+
+	// 解密並驗證
+	return aesGCM.Open(nil, nonce, ciphertext, nil)
 }
 
 // GenerateSecureRandomString 生成一個指定長度的安全隨機字串

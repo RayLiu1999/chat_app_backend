@@ -49,7 +49,7 @@ func main() {
 		log.Fatalf("Redis 初始化失敗: %v", err)
 	}
 
-	if err := redis.Ping(); err != nil {
+	if err = redis.Ping(); err != nil {
 		log.Fatalf("Redis 連線測試失敗: %v", err)
 	}
 	defer redis.Close()
@@ -62,10 +62,14 @@ func main() {
 	// 設置信任的代理
 	// 在生產環境中，使用配置中的可信代理設置
 	if config.AppConfig.Server.Mode == config.ProductionMode {
-		r.SetTrustedProxies(config.AppConfig.Server.TrustedProxies)
+		if err = r.SetTrustedProxies(config.AppConfig.Server.TrustedProxies); err != nil {
+			log.Printf("警告：設置信任代理失敗: %v", err)
+		}
 	} else {
 		// 開發環境不信任任何代理
-		r.SetTrustedProxies(nil)
+		if err = r.SetTrustedProxies(nil); err != nil {
+			log.Printf("警告：清除信任代理失敗: %v", err)
+		}
 	}
 
 	// 建立全域 Context 以支援優雅停機
@@ -90,16 +94,17 @@ func main() {
 	// 設置路由
 	routes.SetupRoutes(r, config.AppConfig, redis, deps.Controllers)
 
-	// 確保上傳目錄存在
-	err = os.MkdirAll("uploads", 0755)
+	// 確保上傳目錄存在 (權限設置為 0750 以符合安全建議)
+	err = os.MkdirAll("uploads", 0750)
 	if err != nil {
 		log.Fatalf("無法創建上傳目錄: %v", err)
 	}
 
 	// 啟動服務器
 	srv := &http.Server{
-		Addr:    ":" + config.AppConfig.Server.Port,
-		Handler: r,
+		Addr:              ":" + config.AppConfig.Server.Port,
+		Handler:           r,
+		ReadHeaderTimeout: 10 * time.Second, // 設置讀取 Header 超時，防止 Slowloris 攻擊
 	}
 
 	// 在背景啟動 Server

@@ -8,6 +8,7 @@ import (
 	"chat_app_backend/utils"
 	"context"
 	"fmt"
+	"log/slog"
 	"mime/multipart"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -121,7 +122,7 @@ func (ss *serverService) GetServerListResponse(userID string) ([]models.ServerRe
 		}
 
 		serverResponses[i] = models.ServerResponse{
-			ID:          server.BaseModel.GetID(),
+			ID:          server.GetID(),
 			Name:        server.Name,
 			PictureURL:  pictureURL,
 			Description: server.Description,
@@ -203,11 +204,13 @@ func (ss *serverService) CreateServer(userID string, name string, file multipart
 
 	// 清除用戶的伺服器成員快取（因為已創建並自動加入新伺服器）
 	if ss.cache != nil {
-		ss.cache.Delete(utils.UserServersCacheKey(userID))
+		if cacheErr := ss.cache.Delete(utils.UserServersCacheKey(userID)); cacheErr != nil {
+			slog.Warn("無法清理用戶伺服器列表快取", "user_id", userID, "error", cacheErr)
+		}
 	}
 
 	// 創建預設頻道
-	err = ss.createDefaultChannels(createdServer.BaseModel.GetID())
+	err = ss.createDefaultChannels(createdServer.GetID())
 	if err != nil {
 		// 如果創建頻道失敗，記錄錯誤但不阻止伺服器創建
 		fmt.Printf("創建預設頻道失敗: %v\n", err)
@@ -223,7 +226,7 @@ func (ss *serverService) CreateServer(userID string, name string, file multipart
 	}
 
 	serverResponse := &models.ServerResponse{
-		ID:          createdServer.BaseModel.GetID(),
+		ID:          createdServer.GetID(),
 		Name:        createdServer.Name,
 		PictureURL:  pictureURL,
 		Description: createdServer.Description,
@@ -250,7 +253,7 @@ func (ss *serverService) createDefaultChannels(serverID primitive.ObjectID) erro
 	textChannel := &models.Channel{
 		Name:       "一般",
 		ServerID:   serverID,
-		CategoryID: textCategory.BaseModel.GetID(),
+		CategoryID: textCategory.GetID(),
 		Type:       "text",
 	}
 
@@ -263,7 +266,7 @@ func (ss *serverService) createDefaultChannels(serverID primitive.ObjectID) erro
 	voiceChannel := &models.Channel{
 		Name:       "語音聊天室",
 		ServerID:   serverID,
-		CategoryID: voiceCategory.BaseModel.GetID(),
+		CategoryID: voiceCategory.GetID(),
 		Type:       "voice",
 	}
 
@@ -377,7 +380,7 @@ func (ss *serverService) SearchPublicServers(userID string, request models.Serve
 		}
 
 		serverResponse := models.ServerSearchResponse{
-			ID:          server.BaseModel.GetID(),
+			ID:          server.GetID(),
 			Name:        server.Name,
 			PictureURL:  pictureURL,
 			Description: server.Description,
@@ -465,7 +468,7 @@ func (ss *serverService) UpdateServer(userID string, serverID string, updates ma
 	}
 
 	return &models.ServerResponse{
-		ID:          updatedServer.BaseModel.GetID(),
+		ID:          updatedServer.GetID(),
 		Name:        updatedServer.Name,
 		PictureURL:  pictureURL,
 		Description: updatedServer.Description,
@@ -506,7 +509,9 @@ func (ss *serverService) DeleteServer(userID string, serverID string) *models.Me
 	members, _, err := ss.serverMemberRepo.GetServerMembers(serverID, 1, 1000)
 	if err == nil {
 		for _, member := range members {
-			ss.serverMemberRepo.RemoveMemberFromServer(serverID, member.UserID.Hex())
+			if dbErr := ss.serverMemberRepo.RemoveMemberFromServer(serverID, member.UserID.Hex()); dbErr != nil {
+				slog.Warn("無法從伺服器移除成員", "server_id", serverID, "user_id", member.UserID.Hex(), "error", dbErr)
+			}
 		}
 	}
 
@@ -586,7 +591,7 @@ func (ss *serverService) GetServerByID(userID string, serverID string) (*models.
 	}
 
 	return &models.ServerResponse{
-		ID:          server.BaseModel.GetID(),
+		ID:          server.GetID(),
 		Name:        server.Name,
 		PictureURL:  pictureURL,
 		Description: server.Description,
@@ -717,7 +722,7 @@ func (ss *serverService) GetServerDetailByID(userID string, serverID string) (*m
 
 		for _, channel := range serverChannels {
 			channels = append(channels, models.ChannelResponse{
-				ID:       channel.BaseModel.GetID(),
+				ID:       channel.GetID(),
 				ServerID: channel.ServerID,
 				Name:     channel.Name,
 				Type:     channel.Type,
@@ -726,7 +731,7 @@ func (ss *serverService) GetServerDetailByID(userID string, serverID string) (*m
 	}
 
 	return &models.ServerDetailResponse{
-		ID:          server.BaseModel.GetID(),
+		ID:          server.GetID(),
 		Name:        server.Name,
 		PictureURL:  pictureURL,
 		Description: server.Description,
@@ -825,7 +830,9 @@ func (ss *serverService) JoinServer(userID string, serverID string) *models.Mess
 
 	// 清除用戶的伺服器成員快取（已加入新伺服器）
 	if ss.cache != nil {
-		ss.cache.Delete(utils.UserServersCacheKey(userID))
+		if cacheErr := ss.cache.Delete(utils.UserServersCacheKey(userID)); cacheErr != nil {
+			slog.Warn("無法清理用戶伺服器列表快取", "user_id", userID, "error", cacheErr)
+		}
 	}
 
 	// 更新伺服器成員數量快取
@@ -896,7 +903,9 @@ func (ss *serverService) LeaveServer(userID string, serverID string) *models.Mes
 
 	// 清除用戶的伺服器成員快取（已離開伺服器）
 	if ss.cache != nil {
-		ss.cache.Delete(utils.UserServersCacheKey(userID))
+		if cacheErr := ss.cache.Delete(utils.UserServersCacheKey(userID)); cacheErr != nil {
+			slog.Warn("無法清理用戶伺服器列表快取", "user_id", userID, "error", cacheErr)
+		}
 	}
 
 	// 更新伺服器成員數量快取

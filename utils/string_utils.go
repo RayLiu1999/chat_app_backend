@@ -111,3 +111,10 @@ func RandomString(length int, charset ...string) string {
 
 	return string(result)
 }
+
+// SanitizeLogInput 清除字串中的換行符號（防止日誌注入攻擊）
+func SanitizeLogInput(s string) string {
+	s = strings.ReplaceAll(s, "\n", "")
+	s = strings.ReplaceAll(s, "\r", "")
+	return s
+}

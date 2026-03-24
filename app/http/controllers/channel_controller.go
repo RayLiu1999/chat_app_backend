@@ -133,7 +133,7 @@ func (cc *ChannelController) CreateChannel(c *gin.Context) {
 
 	// 解析請求體
 	var req CreateChannelRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err = c.ShouldBindJSON(&req); err != nil {
 		ErrorResponse(c, http.StatusBadRequest, models.MessageOptions{
 			Code:    models.ErrInvalidParams,
 			Message: "無效的請求格式",

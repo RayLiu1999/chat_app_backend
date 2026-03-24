@@ -99,7 +99,7 @@ func (r *channelCategoryRepository) CheckChannelCategoryExists(categoryID string
 
 	exists, err := r.odm.ExistsByID(ctx, categoryID, &models.ChannelCategory{})
 	if err != nil {
-		return false, nil // 不存在
+		return false, err
 	}
 
 	return exists, nil

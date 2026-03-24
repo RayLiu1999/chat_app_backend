@@ -204,7 +204,6 @@ func CreateIndexes(db *mongo.Database) error {
 // connectPostgreSQL 函數保持不變
 var (
 	pgOnce sync.Once
-	pgPool *pgxpool.Pool // 全局 pgxpool.Pool
 )
 
 func connectPostgreSQL() (*pgxpool.Pool, error) {
@@ -215,7 +214,6 @@ func connectPostgreSQL() (*pgxpool.Pool, error) {
 		// 由於目前專案不使用 PostgreSQL，暫時返回錯誤
 		// 如果需要使用，請在配置中添加 PostgreSQL 相關設定
 		err = fmt.Errorf("PostgreSQL 支援暫未實作，請使用 MongoDB")
-		return
 
 		// 以下是 PostgreSQL 連接的範例代碼，需要時可以啟用
 		/*

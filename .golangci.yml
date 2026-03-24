@@ -2,6 +2,8 @@ version: "2"
 
 run:
   timeout: 5m
+  # 自動檢測 CPU 核心數來加速掃描
+  allow-parallel-runners: true
 
 linters:
   default: none
@@ -32,6 +34,10 @@ linters:
     - unused       # 偵測未使用的程式碼
 
   settings:
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
     gosec:
       excludes:
         - G404  # 允許使用 math/rand（此專案不需要密碼學 RNG）

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime/multipart"
 	"os"
 	"path/filepath"
@@ -34,16 +35,20 @@ func (fp *fileProvider) SaveFile(file multipart.File, filename string) (string, 
 
 	// 確保目錄存在
 	dir := filepath.Dir(fullPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return "", fmt.Errorf("無法創建目錄: %w", err)
 	}
 
 	// 創建目標檔案
-	dst, err := os.Create(fullPath)
+	dst, err := os.Create(filepath.Clean(fullPath))
 	if err != nil {
 		return "", fmt.Errorf("無法創建檔案: %w", err)
 	}
-	defer dst.Close()
+	defer func() {
+		if err := dst.Close(); err != nil {
+			slog.Warn("無法關閉目標檔案 (SaveFile)", "path", fullPath, "error", err)
+		}
+	}()
 
 	// 重置檔案指針到開始
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
@@ -53,7 +58,9 @@ func (fp *fileProvider) SaveFile(file multipart.File, filename string) (string, 
 	// 複製檔案內容
 	if _, err := io.Copy(dst, file); err != nil {
 		// 如果複製失敗，清理部分寫入的檔案
-		os.Remove(fullPath)
+		if cleanupErr := os.Remove(fullPath); cleanupErr != nil {
+			slog.Warn("無法刪除損毀的檔案", "path", fullPath, "error", cleanupErr)
+		}
 		return "", fmt.Errorf("無法複製檔案內容: %w", err)
 	}
 
@@ -143,7 +150,7 @@ func (fp *fileProvider) GetFile(filepathStr string) (io.ReadCloser, error) {
 		return nil, fmt.Errorf("檔案路徑不在允許範圍內")
 	}
 
-	return os.Open(fullPath)
+	return os.Open(filepath.Clean(fullPath))
 }
 
 // GenerateSecureFileName 生成安全的檔案名稱
@@ -156,7 +163,7 @@ func GenerateSecureFileName(originalName, userID string) string {
 
 	// 生成隨機雜湊
 	h := sha256.New()
-	h.Write([]byte(fmt.Sprintf("%s_%d_%s", userID, timestamp, originalName)))
+	_, _ = fmt.Fprintf(h, "%s_%d_%s", userID, timestamp, originalName)
 	hash := fmt.Sprintf("%x", h.Sum(nil))[:16]
 
 	return fmt.Sprintf("%d_%s%s", timestamp, hash, ext)
@@ -214,7 +221,7 @@ func ValidateFilePath(basePath, filePath string) error {
 // CreateTempFile 創建臨時檔案
 func CreateTempFile(file multipart.File, tempDir string) (string, error) {
 	// 確保臨時目錄存在
-	if err := os.MkdirAll(tempDir, 0755); err != nil {
+	if err := os.MkdirAll(tempDir, 0750); err != nil {
 		return "", fmt.Errorf("無法創建臨時目錄: %w", err)
 	}
 
@@ -223,23 +230,33 @@ func CreateTempFile(file multipart.File, tempDir string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("無法創建臨時檔案: %w", err)
 	}
-	defer tempFile.Close()
+	defer func() {
+		if err := tempFile.Close(); err != nil {
+			slog.Warn("無法關閉臨時檔案 (CreateTempFile)", "path", tempFile.Name(), "error", err)
+		}
+	}()
 
 	// 重置檔案指針
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		os.Remove(tempFile.Name())
+		if cleanupErr := os.Remove(tempFile.Name()); cleanupErr != nil {
+			slog.Warn("無法在重置檔案指針失敗時刪除臨時檔案", "path", tempFile.Name(), "error", cleanupErr)
+		}
 		return "", fmt.Errorf("無法重置檔案指針: %w", err)
 	}
 
 	// 複製內容到臨時檔案
 	if _, err := io.Copy(tempFile, file); err != nil {
-		os.Remove(tempFile.Name())
+		if cleanupErr := os.Remove(tempFile.Name()); cleanupErr != nil {
+			slog.Warn("無法在複製檔案失敗時刪除臨時檔案", "path", tempFile.Name(), "error", cleanupErr)
+		}
 		return "", fmt.Errorf("無法複製檔案到臨時位置: %w", err)
 	}
 
 	// 重置原檔案指針
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		os.Remove(tempFile.Name())
+		if cleanupErr := os.Remove(tempFile.Name()); cleanupErr != nil {
+			slog.Warn("無法在重置原檔案指針失敗時刪除臨時檔案", "path", tempFile.Name(), "error", cleanupErr)
+		}
 		return "", fmt.Errorf("無法重置原檔案指針: %w", err)
 	}
 

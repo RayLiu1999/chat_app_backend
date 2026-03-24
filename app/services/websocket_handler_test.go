@@ -20,25 +20,6 @@ import (
 // --- Test Helpers ---
 
 // mockCache 模擬 providers.CacheProvider
-type mockCache struct {
-	mock.Mock
-}
-
-func (m *mockCache) Get(key string) (string, error) {
-	args := m.Called(key)
-	return args.String(0), args.Error(1)
-}
-
-func (m *mockCache) Set(key string, value string, expiration time.Duration) error {
-	args := m.Called(key, value, expiration)
-	return args.Error(0)
-}
-
-func (m *mockCache) Delete(key string) error {
-	args := m.Called(key)
-	return args.Error(0)
-}
-
 // mockClientManager 模擬 ClientManager
 type mockClientManager struct {
 	mock.Mock
@@ -139,7 +120,7 @@ type mockUserService struct {
 }
 
 func (m *mockUserService) GetUserResponseById(userID string) (*models.UserResponse, error) {
-	return nil, nil
+	return nil, errors.New("not found")
 }
 
 func (m *mockUserService) GetUserByUsername(username string) (*models.User, *models.MessageOptions) {
@@ -186,7 +167,7 @@ func (m *mockUserService) ClearExpiredRefreshTokens() error {
 }
 
 func (m *mockUserService) GetUserProfile(userID string) (*models.UserProfileResponse, error) {
-	return nil, nil
+	return nil, errors.New("not found")
 }
 
 func (m *mockUserService) UpdateUserProfile(userID string, updates map[string]any) error {
@@ -194,7 +175,7 @@ func (m *mockUserService) UpdateUserProfile(userID string, updates map[string]an
 }
 
 func (m *mockUserService) UploadUserImage(userID string, file multipart.File, header *multipart.FileHeader, imageType string) (*models.UserImageResponse, error) {
-	return nil, nil
+	return nil, errors.New("upload failed")
 }
 
 func (m *mockUserService) DeleteUserAvatar(userID string) error {
@@ -210,7 +191,7 @@ func (m *mockUserService) UpdateUserPassword(userID string, newPassword string) 
 }
 
 func (m *mockUserService) GetTwoFactorStatus(userID string) (*models.TwoFactorStatusResponse, error) {
-	return nil, nil
+	return nil, errors.New("not found")
 }
 
 func (m *mockUserService) UpdateTwoFactorStatus(userID string, enabled bool) error {
