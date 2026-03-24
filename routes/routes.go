@@ -22,6 +22,16 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, redis *providers.RedisWrappe
 	// 使用 JSON 日誌中間件 (配合 Loki)
 	r.Use(middlewares.JSONLoggerMiddleware())
 
+	// 設定 CORS 中介軟體 (放到最全域，確保 OPTIONS 等預檢請求能正確處理)
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     cfg.Server.AllowedOrigins,
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-CSRF-NAME", "X-CSRF-TOKEN"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
+
 	// 健康檢查
 	r.GET("/health", controllers.HealthController.HealthCheck)
 	r.GET("/health/proxy", middlewares.PublicHealthCheckAuth(cfg), controllers.HealthController.ProxyCheck)
@@ -46,15 +56,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, redis *providers.RedisWrappe
 		withTimeout.Use(middlewares.VerifyOrigin(cfg.Server.AllowedOrigins))
 	}
 
-	// 設定 CORS 中介軟體
-	withTimeout.Use(cors.New(cors.Config{
-		AllowOrigins:     cfg.Server.AllowedOrigins,
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-CSRF-NAME", "X-CSRF-TOKEN"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
-	}))
+	// --- 以下路由套用全域請求超時設定 (30秒) ---
 
 	// 未認證的路由
 	public := withTimeout.Group("/")

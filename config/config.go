@@ -95,13 +95,8 @@ func LoadConfig() {
 		envFile = ".env.development"
 	}
 
-	if err := godotenv.Load(envFile); err != nil {
-		if envFile == ".env" {
-			log.Printf("未找到 %s 檔案，請確保在生產環境中已正確設置環境變數", envFile)
-		} else {
-			log.Printf("未找到 %s 檔案，使用系統環境變數", envFile)
-		}
-	}
+	// 嘗試載入 .env 檔案（如果不存在也不報錯，因為 Docker/K8s 會直接注入環境變數）
+	_ = godotenv.Load(envFile)
 
 	AppConfig = &Config{
 		Server: ServerConfig{
@@ -150,6 +145,9 @@ func LoadConfig() {
 
 	// 驗證必要的配置
 	validateConfig()
+
+	// 輸出當前載入的環境狀態，作為環境變數成功套用的依據
+	log.Printf("✅ 配置載入成功 | 環境: %s | Port: %s | DB: %s", AppConfig.Server.Mode, AppConfig.Server.Port, AppConfig.Database.MongoDBName)
 }
 
 func getEnv(key, defaultValue string) string {

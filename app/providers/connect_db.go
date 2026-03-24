@@ -183,7 +183,8 @@ func CreateIndexes(db *mongo.Database) error {
 	tokensColl := db.Collection("refresh_tokens")
 	tokenIndexes := []mongo.IndexModel{
 		{
-			Keys: bson.D{{Key: "expires_at", Value: 1}},
+			Keys:    bson.D{{Key: "expires_at", Value: 1}},
+			Options: options.Index().SetExpireAfterSeconds(0),
 		},
 		{
 			Keys: bson.D{{Key: "revoked", Value: 1}},
