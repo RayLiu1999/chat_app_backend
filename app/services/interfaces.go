@@ -43,6 +43,9 @@ type UserService interface {
 	// CheckAndSetOfflineUsers 檢查並設置離線用戶
 	CheckAndSetOfflineUsers(offlineThresholdMinutes int) error
 
+	// ClearExpiredRefreshTokens 清除過期刷新令牌
+	ClearExpiredRefreshTokens() error
+
 	// GetUserProfile 獲取用戶個人資料
 	GetUserProfile(userID string) (*models.UserProfileResponse, error)
 

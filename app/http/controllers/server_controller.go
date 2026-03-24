@@ -195,7 +195,11 @@ func (sc *ServerController) UpdateServer(c *gin.Context) {
 	// 透過Service更新伺服器
 	serverResponse, msgOpt := sc.serverService.UpdateServer(userID, serverID, updates)
 	if msgOpt != nil {
-		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
+		statusCode := http.StatusInternalServerError
+		if msgOpt.Code == models.ErrUnauthorized {
+			statusCode = http.StatusForbidden
+		}
+		ErrorResponse(c, statusCode, *msgOpt)
 		return
 	}
 
@@ -255,7 +259,11 @@ func (sc *ServerController) GetServerByID(c *gin.Context) {
 	// 透過Service獲取伺服器
 	serverResponse, msgOpt := sc.serverService.GetServerByID(userID, serverID)
 	if msgOpt != nil {
-		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
+		statusCode := http.StatusInternalServerError
+		if msgOpt.Code == models.ErrUnauthorized {
+			statusCode = http.StatusForbidden
+		}
+		ErrorResponse(c, statusCode, *msgOpt)
 		return
 	}
 
@@ -285,7 +293,11 @@ func (sc *ServerController) GetServerDetailByID(c *gin.Context) {
 	// 透過Service獲取伺服器詳細信息
 	serverDetailResponse, msgOpt := sc.serverService.GetServerDetailByID(userID, serverID)
 	if msgOpt != nil {
-		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
+		statusCode := http.StatusInternalServerError
+		if msgOpt.Code == models.ErrUnauthorized {
+			statusCode = http.StatusForbidden
+		}
+		ErrorResponse(c, statusCode, *msgOpt)
 		return
 	}
 

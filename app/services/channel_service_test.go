@@ -221,8 +221,8 @@ func TestGetChannelsByServerID(t *testing.T) {
 			},
 		}
 
-		mockServerMemberRepo.On("GetUserServers", userID.Hex()).Return(serverMembers, nil).Once()
-
+		mockServerMemberRepo.On("GetUserServers", userID.Hex()).Return(serverMembers, nil).Times(2)
+ 
 		result, msgOpt := service.GetChannelsByServerID(userID.Hex(), serverID.Hex())
 
 		assert.Nil(t, result)
@@ -277,7 +277,7 @@ func TestGetChannelsByServerID(t *testing.T) {
 			serverMemberRepo: mockServerMemberRepo,
 		}
 
-		mockServerMemberRepo.On("GetUserServers", userID.Hex()).Return([]models.ServerMember{}, nil).Once()
+		mockServerMemberRepo.On("GetUserServers", userID.Hex()).Return([]models.ServerMember{}, nil).Times(2)
 
 		result, msgOpt := service.GetChannelsByServerID(userID.Hex(), serverID.Hex())
 

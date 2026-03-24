@@ -59,16 +59,16 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, redis *providers.RedisWrappe
 	// 未認證的路由
 	public := withTimeout.Group("/")
 	public.POST("/register",
-		middlewares.RateLimiter(redis.Client, "register", 3, time.Minute),
+		middlewares.RateLimiter(redis.Client, "register", 3, time.Minute, cfg.Server.DisableRateLimit),
 		controllers.UserController.Register,
 	)
 	public.POST("/login",
-		middlewares.RateLimiter(redis.Client, "login", 5, time.Minute),
+		middlewares.RateLimiter(redis.Client, "login", 5, time.Minute, cfg.Server.DisableRateLimit),
 		controllers.UserController.Login,
 	)
 	public.POST("/logout", middlewares.VerifyCSRFToken(), controllers.UserController.Logout)
 	public.POST("/refresh_token",
-		middlewares.RateLimiter(redis.Client, "refresh_token", 10, 5*time.Minute),
+		middlewares.RateLimiter(redis.Client, "refresh_token", 10, 5*time.Minute, cfg.Server.DisableRateLimit),
 		middlewares.VerifyCSRFToken(),
 		controllers.UserController.RefreshToken,
 	)

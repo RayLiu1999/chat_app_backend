@@ -45,5 +45,28 @@ func (bt *BackgroundTasks) StartAllBackgroundTasks(ctx context.Context) {
 	// 啟動離線用戶檢查任務 - 每5分鐘檢查一次，15分鐘未活動則設為離線
 	go bt.StartOfflineUserChecker(ctx, 5, 15)
 
+	// 啟動過期令牌清理任務 - 每10分鐘檢查一次
+	go bt.StartExpiredTokenCleaner(ctx, 10)
+
 	log.Println("所有後台任務已啟動")
+}
+
+// StartExpiredTokenCleaner 啟動過期令牌清理任務
+func (bt *BackgroundTasks) StartExpiredTokenCleaner(ctx context.Context, intervalMinutes int) {
+	ticker := time.NewTicker(time.Duration(intervalMinutes) * time.Minute)
+	defer ticker.Stop()
+
+	slog.Info("過期令牌清理任務已啟動", "interval_minutes", intervalMinutes)
+
+	for {
+		select {
+		case <-ctx.Done():
+			slog.Info("收到關閉信號，停止過期令牌清理任務")
+			return
+		case <-ticker.C:
+			if err := bt.userService.ClearExpiredRefreshTokens(); err != nil {
+				slog.Error("清理過期令牌失敗", "error", err)
+			}
+		}
+	}
 }

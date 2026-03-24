@@ -8,7 +8,9 @@ import (
 	"chat_app_backend/utils"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log/slog"
 	"mime/multipart"
 	"time"
 
@@ -86,6 +88,7 @@ func (us *userService) RegisterUser(user models.User) *models.MessageOptions {
 	// 檢查用戶名是否已存在
 	exists, err := us.userRepo.CheckUsernameExists(user.Username)
 	if err != nil {
+		slog.Error("檢查用戶名是否存在失敗", "username", user.Username, "error", err)
 		return &models.MessageOptions{
 			Code:    models.ErrInternalServer,
 			Details: err,
@@ -102,6 +105,7 @@ func (us *userService) RegisterUser(user models.User) *models.MessageOptions {
 	// 檢查電子郵件是否已存在
 	exists, err = us.userRepo.CheckEmailExists(user.Email)
 	if err != nil {
+		slog.Error("檢查電子郵件是否存在失敗", "email", user.Email, "error", err)
 		return &models.MessageOptions{
 			Code:    models.ErrInternalServer,
 			Details: err,
@@ -117,6 +121,7 @@ func (us *userService) RegisterUser(user models.User) *models.MessageOptions {
 	// 加密密碼
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
+		slog.Error("密碼雜湊失敗", "error", err)
 		return &models.MessageOptions{
 			Code:    models.ErrInternalServer,
 			Details: err,
@@ -133,6 +138,7 @@ func (us *userService) RegisterUser(user models.User) *models.MessageOptions {
 	// 創建用戶
 	err = us.userRepo.CreateUser(user)
 	if err != nil {
+		slog.Error("創建用戶失敗", "username", user.Username, "error", err)
 		return &models.MessageOptions{
 			Code:    models.ErrInternalServer,
 			Details: err,
@@ -182,20 +188,16 @@ func (us *userService) GetUserResponseById(userID string) (*models.UserResponse,
 
 // Login 處理用戶登入邏輯
 func (us *userService) Login(loginUser models.User) (*models.LoginResponse, *models.MessageOptions) {
-	// 刪除過期或被註銷的 refresh token
-	err := us.ClearExpiredRefreshTokens()
-	if err != nil {
-		return nil, &models.MessageOptions{
-			Code:    models.ErrInternalServer,
-			Details: err,
-			Message: "清除過期刷新令牌失敗",
-		}
-	}
-
 	// 查找用戶
 	var user models.User
-	err = us.odm.FindOne(context.Background(), bson.M{"email": loginUser.Email}, &user)
+	err := us.odm.FindOne(context.Background(), bson.M{"email": loginUser.Email}, &user)
 	if err != nil {
+		if errors.Is(err, providers.ErrDocumentNotFound) {
+			return nil, &models.MessageOptions{
+				Code:    models.ErrLoginFailed,
+				Message: "電子郵件或密碼無效",
+			}
+		}
 		return nil, &models.MessageOptions{
 			Code:    models.ErrInternalServer,
 			Details: err,
@@ -232,6 +234,7 @@ func (us *userService) Login(loginUser models.User) (*models.LoginResponse, *mod
 
 	err = us.odm.Create(context.Background(), &refreshTokenDoc)
 	if err != nil {
+		slog.Error("創建刷新令牌失敗", "user_id", user.BaseModel.GetID().Hex(), "error", err)
 		return nil, &models.MessageOptions{
 			Code:    models.ErrInternalServer,
 			Details: err,

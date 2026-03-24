@@ -214,10 +214,22 @@ func initProviders(
 		fileProvider = providers.NewFileProvider(cfg)
 	}
 
+	var cacheProvider providers.CacheProvider
+	switch cfg.Cache.Type {
+	case config.CacheTypeMemory:
+		cacheProvider = providers.NewInMemoryCacheProvider()
+	case config.CacheTypeNone:
+		cacheProvider = providers.NewNoopCacheProvider()
+	case config.CacheTypeRedis:
+		fallthrough
+	default:
+		cacheProvider = providers.NewRedisCacheProvider(redis.Client)
+	}
+
 	return &ProviderContainer{
 		ODM:          providers.NewODM(mongodb.DB),
 		FileProvider: fileProvider,
-		Cache:        providers.NewRedisCacheProvider(redis.Client),
+		Cache:        cacheProvider,
 	}
 }
 

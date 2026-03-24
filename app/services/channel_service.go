@@ -95,9 +95,22 @@ func (cs *channelService) GetChannelsByServerID(userID string, serverID string) 
 	}
 
 	if !hasAccess {
-		return nil, &models.MessageOptions{
-			Code:    models.ErrUnauthorized,
-			Message: "用戶沒有權限訪問該伺服器",
+		// 回退機制：如果快取中找不到，可能是快取延遲，直接查一次資料庫
+		members, err := cs.serverMemberRepo.GetUserServers(userID)
+		if err == nil {
+			for _, member := range members {
+				if member.ServerID.Hex() == serverID {
+					hasAccess = true
+					break
+				}
+			}
+		}
+
+		if !hasAccess {
+			return nil, &models.MessageOptions{
+				Code:    models.ErrUnauthorized,
+				Message: "用戶沒有權限訪問該伺服器",
+			}
 		}
 	}
 

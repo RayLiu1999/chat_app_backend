@@ -17,6 +17,7 @@ type Config struct {
 	JWT      JWTConfig
 	Upload   UploadConfig
 	MinIO    MinIOConfig
+	Cache    CacheConfig
 }
 type ModeConfig string
 
@@ -27,13 +28,14 @@ const (
 )
 
 type ServerConfig struct {
-	MainDomain     string
-	Port           string
-	BaseURL        string
-	Mode           ModeConfig
-	Timezone       string
-	AllowedOrigins []string
-	TrustedProxies []string
+	MainDomain       string
+	Port             string
+	BaseURL          string
+	Mode             ModeConfig
+	Timezone         string
+	AllowedOrigins   []string
+	TrustedProxies   []string
+	DisableRateLimit bool
 }
 
 type DatabaseConfig struct {
@@ -47,6 +49,18 @@ type DatabaseConfig struct {
 type RedisConfig struct {
 	Addr     string
 	Password string
+}
+
+type CacheType string
+
+const (
+	CacheTypeNone   CacheType = "none"
+	CacheTypeMemory CacheType = "memory"
+	CacheTypeRedis  CacheType = "redis"
+)
+
+type CacheConfig struct {
+	Type CacheType
 }
 
 type JWTConfig struct {
@@ -91,13 +105,14 @@ func LoadConfig() {
 
 	AppConfig = &Config{
 		Server: ServerConfig{
-			MainDomain:     getEnv("SERVER_MAIN_DOMAIN", "localhost"),
-			Port:           getEnv("SERVER_PORT", "8080"),
-			BaseURL:        getEnv("SERVER_BASE_URL", "http://localhost"),
-			Mode:           ModeConfig(getEnv("ENV", "development")),
-			Timezone:       getEnv("TIMEZONE", "Asia/Taipei"),
-			AllowedOrigins: strings.Split(getEnv("ALLOWED_ORIGINS", "http://localhost:3000"), ","),
-			TrustedProxies: strings.Split(getEnv("TRUSTED_PROXIES", "127.0.0.1,::1,172.16.0.0/12,10.0.0.0/8,192.168.0.0/16"), ","),
+			MainDomain:       getEnv("SERVER_MAIN_DOMAIN", "localhost"),
+			Port:             getEnv("SERVER_PORT", "8080"),
+			BaseURL:          getEnv("SERVER_BASE_URL", "http://localhost"),
+			Mode:             ModeConfig(getEnv("ENV", "development")),
+			Timezone:         getEnv("TIMEZONE", "Asia/Taipei"),
+			AllowedOrigins:   strings.Split(getEnv("ALLOWED_ORIGINS", "http://localhost:3000"), ","),
+			TrustedProxies:   strings.Split(getEnv("TRUSTED_PROXIES", "127.0.0.1,::1,172.16.0.0/12,10.0.0.0/8,192.168.0.0/16"), ","),
+			DisableRateLimit: getEnv("DISABLE_RATE_LIMITER", "false") == "true",
 		},
 		Database: DatabaseConfig{
 			MongoURI:        getEnv("MONGO_URI", "localhost:27017"),
@@ -127,6 +142,9 @@ func LoadConfig() {
 			UseSSL:          getEnv("MINIO_USE_SSL", "false") == "true",
 			BucketName:      getEnv("MINIO_BUCKET_NAME", "chat-app-uploads"),
 			PublicURL:       getEnv("MINIO_PUBLIC_URL", "http://localhost:9000"),
+		},
+		Cache: CacheConfig{
+			Type: CacheType(getEnv("CACHE_TYPE", "redis")),
 		},
 	}
 

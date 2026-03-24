@@ -201,6 +201,11 @@ func (ss *serverService) CreateServer(userID string, name string, file multipart
 		fmt.Printf("添加擁有者到成員列表失敗: %v\n", err)
 	}
 
+	// 清除用戶的伺服器成員快取（因為已創建並自動加入新伺服器）
+	if ss.cache != nil {
+		ss.cache.Delete(utils.UserServersCacheKey(userID))
+	}
+
 	// 創建預設頻道
 	err = ss.createDefaultChannels(createdServer.BaseModel.GetID())
 	if err != nil {

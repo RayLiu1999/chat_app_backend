@@ -46,8 +46,14 @@ return 1
 //   - route: 用於區分不同路由的 key 前綴（e.g. "login"）
 //   - limit: 時間視窗內允許的最大請求數
 //   - window: 時間視窗大小（e.g. time.Minute）
-func RateLimiter(client *redis.Client, route string, limit int, window time.Duration) gin.HandlerFunc {
+//
+// func RateLimiter(client *redis.Client, route string, limit int, window time.Duration, disable bool) gin.HandlerFunc {
+func RateLimiter(client *redis.Client, route string, limit int, window time.Duration, disable bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if disable {
+			c.Next()
+			return
+		}
 		// 取得客戶端 IP
 		ip := c.ClientIP()
 

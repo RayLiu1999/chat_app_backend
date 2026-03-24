@@ -113,6 +113,12 @@ func (m *UserService) CheckAndSetOfflineUsers(offlineThresholdMinutes int) error
 	return args.Error(0)
 }
 
+// ClearExpiredRefreshTokens 清除過期刷新令牌
+func (m *UserService) ClearExpiredRefreshTokens() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
 // GetUserProfile 獲取用戶個人資料
 func (m *UserService) GetUserProfile(userID string) (*models.UserProfileResponse, error) {
 	args := m.Called(userID)

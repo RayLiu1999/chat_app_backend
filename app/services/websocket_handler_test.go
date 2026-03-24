@@ -181,6 +181,10 @@ func (m *mockUserService) CheckAndSetOfflineUsers(offlineThresholdMinutes int) e
 	return nil
 }
 
+func (m *mockUserService) ClearExpiredRefreshTokens() error {
+	return nil
+}
+
 func (m *mockUserService) GetUserProfile(userID string) (*models.UserProfileResponse, error) {
 	return nil, nil
 }

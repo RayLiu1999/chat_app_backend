@@ -48,7 +48,11 @@ func (cc *ChannelController) GetChannelsByServerID(c *gin.Context) {
 	// 獲取頻道列表
 	channels, msgOpt := cc.channelService.GetChannelsByServerID(userID, serverID)
 	if msgOpt != nil {
-		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
+		statusCode := http.StatusInternalServerError
+		if msgOpt.Code == models.ErrUnauthorized {
+			statusCode = http.StatusForbidden
+		}
+		ErrorResponse(c, statusCode, *msgOpt)
 		return
 	}
 
@@ -87,7 +91,11 @@ func (cc *ChannelController) GetChannelByID(c *gin.Context) {
 	// 獲取頻道信息
 	channel, msgOpt := cc.channelService.GetChannelByID(userID, channelID)
 	if msgOpt != nil {
-		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
+		statusCode := http.StatusInternalServerError
+		if msgOpt.Code == models.ErrUnauthorized {
+			statusCode = http.StatusForbidden
+		}
+		ErrorResponse(c, statusCode, *msgOpt)
 		return
 	}
 
@@ -182,7 +190,11 @@ func (cc *ChannelController) CreateChannel(c *gin.Context) {
 	// 創建頻道
 	createdChannel, msgOpt := cc.channelService.CreateChannel(userID, channel)
 	if msgOpt != nil {
-		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
+		statusCode := http.StatusInternalServerError
+		if msgOpt.Code == models.ErrUnauthorized {
+			statusCode = http.StatusForbidden
+		}
+		ErrorResponse(c, statusCode, *msgOpt)
 		return
 	}
 
@@ -267,7 +279,11 @@ func (cc *ChannelController) UpdateChannel(c *gin.Context) {
 	// 更新頻道
 	updatedChannel, msgOpt := cc.channelService.UpdateChannel(userID, channelID, updates)
 	if msgOpt != nil {
-		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
+		statusCode := http.StatusInternalServerError
+		if msgOpt.Code == models.ErrUnauthorized {
+			statusCode = http.StatusForbidden
+		}
+		ErrorResponse(c, statusCode, *msgOpt)
 		return
 	}
 
@@ -307,7 +323,11 @@ func (cc *ChannelController) DeleteChannel(c *gin.Context) {
 	// 刪除頻道
 	msgOpt := cc.channelService.DeleteChannel(userID, channelID)
 	if msgOpt != nil {
-		ErrorResponse(c, http.StatusInternalServerError, *msgOpt)
+		statusCode := http.StatusInternalServerError
+		if msgOpt.Code == models.ErrUnauthorized {
+			statusCode = http.StatusForbidden
+		}
+		ErrorResponse(c, statusCode, *msgOpt)
 		return
 	}
 

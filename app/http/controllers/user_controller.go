@@ -79,7 +79,7 @@ func (uc *UserController) Login(c *gin.Context) {
 		ErrorResponse(c, statusCode, models.MessageOptions{
 			Code:    appErr.Code,
 			Message: "登入失敗",
-			Details: appErr.Message,
+			Details: appErr.Details,
 		})
 		return
 	}
