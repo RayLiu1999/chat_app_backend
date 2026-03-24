@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/sony/gobreaker"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -142,12 +143,62 @@ func connectMongoDB() (*mongo.Client, *mongo.Database, error) {
 			return
 		}
 
-		// 將全局 client 與 database 都設置好
+		// 將全域 client 與 database 都設置好
 		mongoClient = client
 		mongoDatabase = client.Database(dbName)
-		fmt.Println("Connected to MongoDB!")
+
+		// 建立索引
+		if err := CreateIndexes(mongoDatabase); err != nil {
+			slog.Warn("建立索引失敗", "error", err)
+		}
+
+		fmt.Println("Connected to MongoDB and indexes created!")
 	})
 	return mongoClient, mongoDatabase, mongoErr
+}
+
+// CreateIndexes 為 MongoDB 集合建立索引
+func CreateIndexes(db *mongo.Database) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// 1. Users collection
+	usersColl := db.Collection("users")
+	userIndexes := []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "username", Value: 1}},
+			Options: options.Index().SetUnique(true),
+		},
+		{
+			Keys:    bson.D{{Key: "email", Value: 1}},
+			Options: options.Index().SetUnique(true),
+		},
+	}
+	_, err := usersColl.Indexes().CreateMany(ctx, userIndexes)
+	if err != nil {
+		return fmt.Errorf("users indexes failed: %v", err)
+	}
+
+	// 2. Refresh Tokens collection
+	tokensColl := db.Collection("refresh_tokens")
+	tokenIndexes := []mongo.IndexModel{
+		{
+			Keys: bson.D{{Key: "expires_at", Value: 1}},
+		},
+		{
+			Keys: bson.D{{Key: "revoked", Value: 1}},
+		},
+		{
+			Keys:    bson.D{{Key: "token", Value: 1}},
+			Options: options.Index().SetUnique(true),
+		},
+	}
+	_, err = tokensColl.Indexes().CreateMany(ctx, tokenIndexes)
+	if err != nil {
+		return fmt.Errorf("refresh_tokens indexes failed: %v", err)
+	}
+
+	return nil
 }
 
 // connectPostgreSQL 函數保持不變
