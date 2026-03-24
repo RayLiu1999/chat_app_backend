@@ -1,6 +1,6 @@
 module chat_app_backend
 
-go 1.25.8
+go 1.25.6
 
 require (
 	github.com/gin-contrib/cors v1.7.6
