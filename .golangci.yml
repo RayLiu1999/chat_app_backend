@@ -5,6 +5,17 @@ run:
 
 linters:
   default: none
+  exclusions:
+    rules:
+      # 測試檔案放寬 gosec 與 errcheck 限制
+      - path: "_test\\.go"
+        linters:
+          - gosec
+          - errcheck
+      # mock 檔案放寬所有限制
+      - path: "app/mocks/"
+        linters:
+          - all
   enable:
     # 空指針 / 邏輯錯誤相關
     - nilnil       # 偵測同時回傳 nil, nil 的危險模式
@@ -19,7 +30,7 @@ linters:
     - exhaustive   # 確保 switch 分支涵蓋所有 enum 值
     - ineffassign  # 偵測無效的變數賦值
     - unused       # 偵測未使用的程式碼
-    - gofmt        # 格式化檢查
+
   settings:
     gosec:
       excludes:
@@ -27,14 +38,6 @@ linters:
     exhaustive:
       default-signifies-exhaustive: true  # 有 default 分支的 switch 視為完整
 
-  exclusions:
-    rules:
-      # 測試檔案放寬 gosec 與 errcheck 限制
-      - path: "_test\\.go"
-        linters:
-          - gosec
-          - errcheck
-      # mock 檔案放寬所有限制
-      - path: "app/mocks/"
-        linters:
-          - all
+formatters:
+  enable:
+    - gofmt        # 格式化檢查
