@@ -8,7 +8,8 @@ export const TEST_CONFIG = {
   RESULTS_DIR: "test_results",
   // 增加預設 Header 供所有測試請求使用，解決 ENV=production 時的 VerifyOrigin 驗證問題
   DEFAULT_HEADERS: {
-    "Origin": "http://localhost:3000",
+    Origin: "http://localhost:3000",
+    "X-Loadtest-Bypass": __ENV.ALLOW_RATE_LIMIT_BYPASS || "0",
   },
 
   // 效能閾值
@@ -26,14 +27,16 @@ export const TEST_CONFIG = {
       { duration: "5s", target: 0 }, // 5 秒內降到 0 個 VU
     ],
 
-    // 單體容量測試:使用極度平緩的爬升 (1000 VU)
-    // 目的：徹底避開 Bcrypt 的 CPU 瓶頸，讓伺服器能從容地處理每一位新用戶的註冊/登入
+    // 單體容量測試: 逐步增加負載 (300 -> 2000 VU)
+    // 目的：驗證單體基線，並測試 Redis/In-Memory 的容量極限
     monolith_capacity: [
-      { duration: "3m", target: 500 },    // 3 分鐘先到 500 VU (熱身)
-      { duration: "5m", target: 1000 },   // 5 分鐘到 1000 VU
-      { duration: "12m", target: 5000 },  // 12 分鐘快速衝刺到 5000 VU (考驗極限)
-      { duration: "10m", target: 5000 },  // 維持 10 分鐘高壓測試
-      { duration: "3m", target: 0 },     // 快速結束
+      { duration: "2m", target: 300 }, // 階梯 1: 300 VU
+      { duration: "2m", target: 500 }, // 階梯 2: 500 VU (熱身)
+      { duration: "5m", target: 1000 }, // 階梯 3: 1000 VU (中等負載)
+      { duration: "5m", target: 1500 }, // 階梯 4: 1500 VU (重負載)
+      { duration: "5m", target: 2000 }, // 階梯 5: 2000 VU (極限測試)
+      { duration: "3m", target: 2000 }, // 維持 3 分鐘
+      { duration: "2m", target: 0 }, // 結束
     ],
   },
 };

@@ -4,13 +4,14 @@
 # 預設擴展實例數
 N ?= 3
 # 預設測試用戶數
-USER_COUNT ?= 100
+USER_COUNT ?= 2000
 # 預設環境
 ENV ?= development
 
 .PHONY: help dev dev-logs dev-down dev-restart build logs status ps restart stop start
 .PHONY: shell test test-coverage test-env test-env-down test-smoke test-prepare-users test-capacity test-capacity-prepared rebuild
 .PHONY: clean clean-dev fmt lint tidy run env-check install-deps init mongo-init
+.PHONY: db-shell db-migrate db-seed db-fresh
 .PHONY: scale scale-up scale-down scale-logs scale-status
 .PHONY: k8s-build k8s-deploy k8s-redeploy k8s-delete k8s-scale k8s-status k8s-logs k8s-pods k8s-health
 
@@ -51,6 +52,12 @@ help:
 	@echo "🐚 容器互動:"
 	@echo "  make shell            - 進入應用容器 shell"
 	@echo ""
+	@echo "🗄️  資料庫管理 (Database):"
+	@echo "  make db-shell         - 進入 MongoDB Shell"
+	@echo "  make db-migrate       - 執行資料庫初始化與遷移"
+	@echo "  make db-seed          - 寫入預設/測試資料 (seed.js)"
+	@echo "  make db-fresh         - 清空資料庫並重新執行遷移與 Seed"
+	@echo ""
 	@echo "🏗️  Go 開發:"
 	@echo "  make run              - 本地執行應用"
 	@echo "  make fmt              - 格式化程式碼"
@@ -64,21 +71,21 @@ help:
 
 dev:
 	@echo "🚀 啟動開發環境..."
-	docker-compose --env-file .env.development up -d
+	ENV_FILE=.env.development docker-compose -f docker-compose.dev.yml --env-file .env.development up -d
 	@echo "✅ 開發環境已啟動"
 	@echo "📍 API: http://localhost:80"
 
 dev-logs:
 	@echo "🚀 啟動開發環境並顯示日誌..."
-	docker-compose --env-file .env.development up
+	ENV_FILE=.env.development docker-compose -f docker-compose.dev.yml --env-file .env.development up
 
 dev-down:
 	@echo "🛑 停止開發環境..."
-	docker-compose --env-file .env.development down
+	ENV_FILE=.env.development docker-compose -f docker-compose.dev.yml --env-file .env.development down
 
 dev-restart:
 	@echo "🔄 重啟開發環境..."
-	docker-compose restart
+	docker-compose -f docker-compose.dev.yml restart
 	@echo "✅ 開發環境已重啟"
 
 # ============================================
@@ -87,12 +94,23 @@ dev-restart:
 
 test-env:
 	@echo "🚀 啟動壓測環境..."
-	docker-compose --profile test --env-file .env.development up -d
+	ENV_FILE=.env.development docker-compose -f docker-compose.yml --env-file .env.development up -d
+	@echo "✅ 壓測環境已啟動"
+
+test-env-build:
+	@echo "🏗️  建置 Docker 映像..."
+	ENV_FILE=.env.development docker-compose -f docker-compose.yml --env-file .env.development up -d --build
+	docker image prune -f
+	@echo "✅ Docker 映像已建置"
+
+test-env-logs:
+	@echo "🚀 啟動壓測環境並顯示日誌..."
+	ENV_FILE=.env.development docker-compose -f docker-compose.yml --env-file .env.development up
 	@echo "✅ 壓測環境已啟動"
 
 test-env-down:
 	@echo "🛑 停止壓測環境..."
-	docker-compose --profile test --env-file .env.development down
+	ENV_FILE=.env.development docker-compose -f docker-compose.yml --env-file .env.development down
 
 # ============================================
 # 建置與日誌
@@ -100,34 +118,36 @@ test-env-down:
 
 build:
 	@echo "🏗️  建置 Docker 映像..."
-	docker-compose build
+	docker-compose -f docker-compose.dev.yml build
+	docker-compose -f docker-compose.yml build
 
 rebuild:
 	@echo "🏗️  強制重新建置 (無快取)..."
-	docker-compose build --no-cache
-
+	docker-compose -f docker-compose.dev.yml build --no-cache
+	docker-compose -f docker-compose.yml build --no-cache
 
 logs:
-	docker-compose logs -f
+	docker-compose -f docker-compose.dev.yml logs -f
 
 ps:
-	docker-compose ps
+	docker-compose -f docker-compose.dev.yml ps
 
 stats:
 	docker stats
 
 stop:
-	docker-compose stop
+	docker-compose -f docker-compose.dev.yml stop
 
 start:
-	docker-compose start
+	docker-compose -f docker-compose.dev.yml start
 
 restart:
-	docker-compose restart
+	docker-compose -f docker-compose.dev.yml restart
 
 clean:
 	@echo "🧹 清理環境..."
-	docker-compose down -v --remove-orphans
+	docker-compose -f docker-compose.dev.yml down -v --remove-orphans
+	docker-compose -f docker-compose.yml down -v --remove-orphans
 	docker-compose -f docker-compose.scale.yml down -v --remove-orphans
 	@echo "✅ 環境已清理"
 
@@ -137,7 +157,33 @@ clean:
 
 shell:
 	@echo "🐚 進入應用容器..."
-	docker exec -it chat_app_backend sh
+	docker exec -it chat_app_backend_dev sh
+
+# ============================================
+# 資料庫管理指令 (MongoDB)
+# ============================================
+
+db-shell:
+	@echo "🐚 進入 MongoDB Shell..."
+	docker exec --env-file .env.development -it mongodb sh -c 'mongosh -u $$MONGO_USERNAME -p $$MONGO_PASSWORD --authenticationDatabase admin $$MONGO_DB_NAME'
+
+db-migrate:
+	@echo "🚀 執行資料庫初始化/遷移 (Migrate)..."
+	docker exec --env-file .env.development -i mongodb sh -c 'mongosh -u $$MONGO_USERNAME -p $$MONGO_PASSWORD --authenticationDatabase admin $$MONGO_DB_NAME' < scripts/mongo/mongo-init.js
+
+db-seed:
+	@echo "🌱 寫入初始資料 (Seed)..."
+	@if [ -f scripts/mongo/seed.js ]; then \
+		docker exec --env-file .env.development -i mongodb sh -c 'mongosh -u $$MONGO_USERNAME -p $$MONGO_PASSWORD --authenticationDatabase admin $$MONGO_DB_NAME' < scripts/mongo/seed.js; \
+	else \
+		echo "❌ 找不到 scripts/mongo/seed.js，若需要請先建立該檔案。"; \
+	fi
+
+db-fresh:
+	@echo "🔥 清空並重建資料庫 (Fresh)..."
+	docker exec --env-file .env.development -i mongodb sh -c 'mongosh -u $$MONGO_USERNAME -p $$MONGO_PASSWORD --authenticationDatabase admin $$MONGO_DB_NAME --eval "db.dropDatabase()"'
+	$(MAKE) db-migrate
+	$(MAKE) db-seed
 
 # ============================================
 # 水平擴展測試
@@ -145,24 +191,24 @@ shell:
 
 scale:
 	@echo "🔄 啟動水平擴展環境 ($(N) 個實例)..."
-	docker-compose -f docker-compose.scale.yml --env-file .env.development up -d --scale app=$(N) --no-recreate
+	ENV_FILE=.env.development docker-compose -f docker-compose.scale.yml --env-file .env.development up -d --scale app=$(N) --no-recreate
 	@echo "✅ 擴展環境已啟動"
 	@echo "📍 API (via nginx): http://localhost:80"
 
 scale-up:
 	@echo "📈 擴展到 $(N) 個實例..."
-	docker-compose -f docker-compose.scale.yml --env-file .env.development up -d --scale app=$(N) --no-recreate
+	ENV_FILE=.env.development docker-compose -f docker-compose.scale.yml --env-file .env.development up -d --scale app=$(N) --no-recreate
 	@echo "✅ 已擴展到 $(N) 個實例"
 
 scale-down:
 	@echo "🛑 停止擴展環境..."
-	docker-compose -f docker-compose.scale.yml --env-file .env.development down
+	ENV_FILE=.env.development docker-compose -f docker-compose.scale.yml --env-file .env.development down
 
 scale-logs:
-	docker-compose -f docker-compose.scale.yml --env-file .env.development logs -f
+	ENV_FILE=.env.development docker-compose -f docker-compose.scale.yml --env-file .env.development logs -f
 
 scale-status:
-	docker-compose -f docker-compose.scale.yml --env-file .env.development ps
+	ENV_FILE=.env.development docker-compose -f docker-compose.scale.yml --env-file .env.development ps
 
 # ============================================
 # Go 開發指令
@@ -191,26 +237,26 @@ test-coverage:
 
 test-smoke:
 	@echo "🧪 執行冒煙測試..."
-	cd loadtest && k6 run run.js --env SCENARIO=smoke
+	cd scripts/k6 && ALLOW_RATE_LIMIT_BYPASS=1 k6 run run.js --env SCENARIO=smoke
 
 test-prepare-users:
 	@echo "🧪 預先建立測試用戶..."
-	cd loadtest && k6 run prepare_users.js --env USER_COUNT=$(USER_COUNT)
+	cd scripts/k6 && ALLOW_RATE_LIMIT_BYPASS=1 k6 run prepare_users.js --env USER_COUNT=$(USER_COUNT)
 
 test-capacity:
 	@echo "🧪 執行容量測試..."
-	cd loadtest && k6 run run.js --env SCENARIO=monolith_capacity
+	cd scripts/k6 && ALLOW_RATE_LIMIT_BYPASS=1 k6 run run.js --env SCENARIO=monolith_capacity
 
 test-capacity-prepared:
 	@echo "🧪 先準備用戶，再執行容量測試..."
-	cd loadtest && k6 run prepare_users.js --env USER_COUNT=$(USER_COUNT)
-	cd loadtest && k6 run run.js --env SCENARIO=monolith_capacity --env PREPARE_USERS=1 --env PREPARE_USER_COUNT=$(USER_COUNT)
+	cd scripts/k6 && ALLOW_RATE_LIMIT_BYPASS=1 k6 run prepare_users.js --env USER_COUNT=$(USER_COUNT)
+	cd scripts/k6 && ALLOW_RATE_LIMIT_BYPASS=1 k6 run run.js --env SCENARIO=monolith_capacity --env PREPARE_USERS=1 --env PREPARE_USER_COUNT=$(USER_COUNT)
 
 mongo-init:
 	@echo "🗄️  初始化 MongoDB (ENV=$(ENV))..."
 	ADMIN_USERNAME="$(ADMIN_USERNAME)" \
 	ADMIN_PASSWORD="$(ADMIN_PASSWORD)" \
-	bash scripts/mongo-init.sh $(ENV)
+	bash scripts/mongo/mongo-init.sh $(ENV)
 
 env-check:
 	@if [ ! -f .env.development ]; then \

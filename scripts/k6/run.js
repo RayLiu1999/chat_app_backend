@@ -146,7 +146,7 @@ export default function (data) {
   // 同步 CSRF Cookie 到當前 VU 的 Cookie Jar (解決 setup() 資料不會自動同步 Cookie 的問題)
   if (session && session.csrfToken) {
     const jar = http.cookieJar();
-    jar.set(data.config.BASE_URL, "csrf_token", session.csrfToken);
+    jar.set(data.config.BASE_URL, "csrf_token", session.csrfToken, { path: "/" });
   }
 
   logInfo(`開始執行迭代 - 場景: ${data?.scenario || scenarioName}`);
