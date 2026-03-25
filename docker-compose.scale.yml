@@ -1,4 +1,4 @@
-# Docker Compose - 水平擴展測試環境
+# Docker Compose - 水平擴展測試環境 (基於生產環境標準)
 # 使用方式: docker-compose -f docker-compose.scale.yml up -d --scale app=3
 
 services:
@@ -28,29 +28,35 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: dev
+      target: prod # 使用與生產環境相同的建構階段
+      args:
+        VERSION: ${VERSION:-1.0.0}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+        GIT_BRANCH: ${GIT_BRANCH:-unknown}
     restart: unless-stopped
     # 不暴露固定端口，由 nginx 負載均衡
     expose:
       - "${SERVER_PORT:-80}"
     env_file:
-      - ${ENV_FILE:-.env.development}
+      - ${ENV_FILE:-.env}
     environment:
       DOCKER_ENV: "true"
-      ENV: "development"
-      GIN_MODE: "debug"
+      ENV: ${ENV:-production}
+      GIN_MODE: release
       # 用於識別不同實例
       INSTANCE_ID: "${HOSTNAME:-unknown}"
-      # Go Runtime 效能調校參數
-      GOMEMLIMIT: "900MiB"
-      GOMAXPROCS: "1"
+      # Go Runtime 效能調校參數 (同步生產環境)
+      GOMEMLIMIT: ${GOMEMLIMIT:-900MiB}
+      GOMAXPROCS: ${GOMAXPROCS:-2}
     volumes:
-      - .:/app
-      - go-modules-scale:/go/pkg/mod:ro
-      - /root/.cache/go-build
+      # 去除開發環境掛載，僅保留上傳目錄
       - ./uploads:/app/uploads
     networks:
       - chat-network
+      - mongodb_default
+      - redis_default
+      - prometheus-grafana_default
     healthcheck:
       test:
         [
@@ -68,16 +74,18 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "1"
-          memory: 1G
+          cpus: ${CPU_LIMIT:-2}
+          memory: ${MEMORY_LIMIT:-1G}
         reservations:
-          cpus: "0.25"
-          memory: 512M
-
-volumes:
-  go-modules-scale:
-    driver: local
+          cpus: ${CPU_RESERVATION:-0.5}
+          memory: ${MEMORY_RESERVATION:-512M}
 
 networks:
   chat-network:
     driver: bridge
+  mongodb_default:
+    external: true
+  redis_default:
+    external: true
+  prometheus-grafana_default:
+    external: true

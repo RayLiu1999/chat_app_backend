@@ -7,6 +7,8 @@
 [![Service Coverage](https://img.shields.io/badge/service-66.9%25-green)](./app/services)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](.)
 
+**Live Demo: [https://chat-app.liu-yucheng.com/](https://chat-app.liu-yucheng.com/)**
+
 ## 專案簡介
 
 本專案為一個即時聊天室後端，模仿 Discord 架構，支援伺服器（Server/Guild）、頻道（Channel/Room）、私訊（DM）、好友系統、檔案上傳等功能。採用 Go 語言開發，資料儲存採用 MongoDB，並整合 Redis 資料快取。
