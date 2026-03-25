@@ -66,6 +66,7 @@ func (mh *messageHandler) HandleMessage(message *MessageResponse) {
 		mh.localBroadcast(message)
 		return
 	}
+	//nolint:gosec // channel 與 HOSTNAME 為內部受控變數，無日誌注入風險
 	slog.Info("[跨實例廣播] Publish", "channel", channel, "instance", os.Getenv("HOSTNAME"))
 }
 

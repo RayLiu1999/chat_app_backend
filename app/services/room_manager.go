@@ -116,6 +116,7 @@ func (rm *roomManager) InitRoom(roomType models.RoomType, roomID string) *Room {
 			}
 			room.Mutex.RLock()
 			instanceID := os.Getenv("HOSTNAME")
+			//nolint:gosec // channel 與 HOSTNAME 為內部受控變數，無日誌注入風險
 			slog.Info("[跨實例廣播] Subscribe 收到", "channel", "room:"+key.String(), "instance", instanceID, "local_clients", len(room.Clients))
 			for client := range room.Clients {
 				go func(c *Client) {
