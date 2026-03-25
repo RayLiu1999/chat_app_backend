@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"os"
 	"sync"
 	"time"
 
@@ -73,6 +74,7 @@ func (rm *roomManager) InitRoom(roomType models.RoomType, roomID string) *Room {
 		Broadcast: make(chan *WsMessage[MessageResponse], 1000),
 	}
 	rm.rooms[keyStr] = room
+	ActiveRooms.Inc()
 	rm.mutex.Unlock()
 
 	// 根據房間類型設定工作池大小
@@ -113,6 +115,8 @@ func (rm *roomManager) InitRoom(roomType models.RoomType, roomID string) *Room {
 				continue
 			}
 			room.Mutex.RLock()
+			instanceID := os.Getenv("HOSTNAME")
+			slog.Info("[跨實例廣播] Subscribe 收到", "channel", "room:"+key.String(), "instance", instanceID, "local_clients", len(room.Clients))
 			for client := range room.Clients {
 				go func(c *Client) {
 					outMsg := &WsMessage[MessageResponse]{
@@ -265,6 +269,7 @@ func (rm *roomManager) cleanupRoom(roomKey string) {
 		rm.pubSubMutex.Unlock()
 
 		delete(rm.rooms, roomKey)
+		ActiveRooms.Dec()
 	}
 }
 

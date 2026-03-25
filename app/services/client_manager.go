@@ -60,6 +60,7 @@ func (cm *clientManager) Register(client *Client) {
 	cm.clients[client] = true
 	cm.clientsByUserID[client.UserID] = client
 
+	WsActiveConnections.Inc()
 	slog.Info("客戶端已註冊", "user_id", client.UserID, "total_connections", len(cm.clients))
 }
 
@@ -99,6 +100,7 @@ func (cm *clientManager) Unregister(client *Client) {
 	delete(cm.clients, client)
 	delete(cm.clientsByUserID, client.UserID)
 
+	WsActiveConnections.Dec()
 	// 關閉 WebSocket 連線 (必須由 Hub 負責清理)
 	if client.Conn != nil {
 		if err := client.Conn.Close(); err != nil {

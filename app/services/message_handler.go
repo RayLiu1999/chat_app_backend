@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"os"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -65,6 +66,7 @@ func (mh *messageHandler) HandleMessage(message *MessageResponse) {
 		mh.localBroadcast(message)
 		return
 	}
+	slog.Info("[跨實例廣播] Publish", "channel", channel, "instance", os.Getenv("HOSTNAME"))
 }
 
 // localBroadcast 本地廣播（Redis 失敗時的回退方案）
@@ -134,6 +136,7 @@ func (mh *messageHandler) saveMessageToDB(data *MessageResponse) error {
 		return err
 	}
 
+	MessagesSavedTotal.WithLabelValues(string(data.RoomType)).Inc()
 	mh.updateRoomLastMessage(data.RoomID, data.RoomType)
 	return nil
 }
