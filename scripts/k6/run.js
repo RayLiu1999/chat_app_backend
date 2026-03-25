@@ -17,6 +17,7 @@ import { Counter, Rate } from 'k6/metrics';
 import * as config from './config.js';
 import smokeTest from './scenarios/smoke.js';
 import monolithCapacityTest from './scenarios/monolith_capacity.js';
+import wsBroadcastTest from './scenarios/ws_broadcast.js';
 import { getAuthenticatedSessionWithOptions } from './scripts/common/auth.js';
 import { logInfo, logSuccess, logError } from './scripts/common/logger.js';
 
@@ -35,6 +36,7 @@ const PREPARE_USER_COUNT = parseInt(__ENV.PREPARE_USER_COUNT || '0', 10);
 const scenarios = {
   smoke: smokeTest,
   monolith_capacity: monolithCapacityTest,
+  ws_broadcast: wsBroadcastTest,
 };
 
 if (!scenarios[scenarioName]) {
@@ -123,14 +125,179 @@ export function setup() {
     }
   }
 
+  // 3) ws_broadcast 場景：額外建立共用廣播頻道
+  let broadcastChannelId = null;
+  if (scenarioName === 'ws_broadcast') {
+    // ws_broadcast 需要大量 VU，確保至少準備 100 個 session
+    const broadcastUserCount = Math.max(sessions.length, 100);
+    if (sessions.length < broadcastUserCount) {
+      for (let i = sessions.length + 1; i <= broadcastUserCount; i++) {
+        try {
+          const s = getAuthenticatedSessionWithOptions(baseUrl, {
+            userIndex: i,
+            registerIfMissing: true,
+          });
+          if (s && s.token) sessions.push(s);
+        } catch (_) {}
+      }
+    }
+    console.log(`🔌 [Broadcast Setup] 準備 ${sessions.length} 個 session`);
+    // 還原 session[0] 的 CSRF cookie（準備 100 個 session 後 jar 被最後一個覆蓋）
+    if (session && session.csrfToken) {
+      const jar = http.cookieJar();
+      jar.set(config.TEST_CONFIG.BASE_URL, "csrf_token", session.csrfToken, { path: "/" });
+    }
+    const broadcastSetup = setupBroadcastChannel(baseUrl, session);
+    if (broadcastSetup) {
+      broadcastChannelId = broadcastSetup.channelId;
+      console.log(`✅ [Broadcast Setup] 共用 Channel 建立成功: ${broadcastChannelId}`);
+
+      // 讓所有 session 加入 server，否則非成員無法 join_room
+      const joinUrl = `${baseUrl}/servers/${broadcastSetup.serverId}/join`;
+      let joinedCount = 0;
+      for (let i = 1; i < sessions.length; i++) {
+        const s = sessions[i];
+        if (!s || !s.token) continue;
+        // 還原每個 session 的 CSRF cookie
+        if (s.csrfToken) {
+          const jar = http.cookieJar();
+          jar.set(config.TEST_CONFIG.BASE_URL, "csrf_token", s.csrfToken, { path: "/" });
+        }
+        const res = http.post(joinUrl, null, {
+          headers: {
+            ...s.headers,
+            'X-CSRF-TOKEN': s.csrfToken || '',
+            'Origin': 'http://localhost:3000',
+          },
+        });
+        if (res.status === 200 || res.status === 409) {
+          joinedCount++;
+        }
+      }
+      console.log(`✅ [Broadcast Setup] ${joinedCount}/${sessions.length - 1} 個用戶加入 Server`);
+    } else {
+      console.error(`❌ [Broadcast Setup] 共用 Channel 建立失敗，測試可能無法正常執行`);
+    }
+  }
+
   return {
     startTime: Date.now(),
     scenario: scenarioName,
     verbose: VERBOSE_MODE,
     sessions: sessions,
     session: session,
-    config: config.TEST_CONFIG
+    config: config.TEST_CONFIG,
+    broadcastChannelId: broadcastChannelId,
   };
+}
+
+/**
+ * 為 ws_broadcast 場景在 setup 完成後建立共用廣播頻道
+ * 回傳 { serverId, channelId } 或 null
+ */
+function setupBroadcastChannel(baseUrl, session) {
+  if (!session || !session.token) return null;
+
+  const commonHeaders = {
+    ...session.headers,
+    'Content-Type': 'application/json',
+    'Origin': 'http://localhost:3000',
+  };
+
+  // 1) 建立專屬測試 Server（multipart/form-data 手工拼接）
+  let serverId = null;
+  let channelId = null;
+
+  try {
+    const formHeaders = {
+      ...session.headers,
+      'Origin': 'http://localhost:3000',
+    };
+    // multipart/form-data 需要手工拼接
+    const boundary = `----k6Boundary${Date.now()}`;
+    const serverName = `BroadcastTestServer-${Date.now()}`;
+    const body = [
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="name"',
+      '',
+      serverName,
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="description"',
+      '',
+      'k6 WS broadcast test server',
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="is_public"',
+      '',
+      'false',
+      `--${boundary}--`,
+    ].join('\r\n');
+
+    const csrfHeaders = {};
+    if (session.csrfToken) {
+      csrfHeaders['X-CSRF-TOKEN'] = session.csrfToken;
+    }
+
+    const res = http.post(`${baseUrl}/servers`, body, {
+      headers: {
+        ...formHeaders,
+        ...csrfHeaders,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+      },
+    });
+
+    if (res.status === 200) {
+      const data = res.json('data');
+      serverId = data && data.id;
+      console.log(`🏠 [Broadcast Setup] 建立 Server: ${serverId}`);
+    } else {
+      console.error(`❌ [Broadcast Setup] 建立 Server 失敗: ${res.status} ${res.body}`);
+      return null;
+    }
+  } catch (e) {
+    console.error(`❌ [Broadcast Setup] Server 建立例外: ${e.message}`);
+    return null;
+  }
+
+  if (!serverId) return null;
+
+  // 2) 在 Server 建立頻道
+  try {
+    const csrfHeaders = {};
+    if (session.csrfToken) {
+      csrfHeaders['X-CSRF-TOKEN'] = session.csrfToken;
+    }
+    const res = http.post(
+      `${baseUrl}/servers/${serverId}/channels`,
+      JSON.stringify({ name: 'broadcast-test', type: 'text' }),
+      {
+        headers: {
+          ...commonHeaders,
+          ...csrfHeaders,
+        },
+      }
+    );
+
+    if (res.status === 200 || res.status === 201) {
+      channelId = res.json('data.id');
+      console.log(`📺 [Broadcast Setup] 建立 Channel: ${channelId}`);
+    } else {
+      // Fallback：嘗試抓現有 channel
+      const chRes = http.get(`${baseUrl}/servers/${serverId}/channels`, {
+        headers: { ...commonHeaders },
+      });
+      if (chRes.status === 200) {
+        const chData = chRes.json('data');
+        if (Array.isArray(chData) && chData.length > 0) {
+          channelId = chData[0].id;
+          console.log(`📺 [Broadcast Setup] 使用現有 Channel: ${channelId}`);
+        }
+      }
+    }
+  } catch (e) {
+    console.error(`❌ [Broadcast Setup] Channel 建立例外: ${e.message}`);
+  }
+
+  return channelId ? { serverId, channelId } : null;
 }
 
 // 主執行函數
@@ -152,9 +319,13 @@ export default function (data) {
   logInfo(`開始執行迭代 - 場景: ${data?.scenario || scenarioName}`);
   
   try {
-    // 傳入 config 和 session，保持腳本相容性
-    // 注意: session 可能為 null，由各場景自行處理
-    scenarios[scenarioName](data.config, session);
+    if (data.scenario === 'ws_broadcast') {
+      // ws_broadcast 需要 broadcastChannelId，傳入完整的 data 物件
+      scenarios[scenarioName](data.config, data);
+    } else {
+      // 其他場景維持原有介面：(config, session)
+      scenarios[scenarioName](data.config, session);
+    }
     
     const duration = Date.now() - iterationStart;
     logSuccess(`迭代完成`, null, duration);
@@ -215,6 +386,26 @@ export function handleSummary(data) {
   if (data.metrics.ws_connecting && data.metrics.ws_connecting.values) {
     const wsP95 = data.metrics.ws_connecting.values['p(95)'] || 0;
     report += `* **WebSocket p(95) 連接時間:** ${wsP95.toFixed(2)}ms\n`;
+  }
+
+  // ws_broadcast 場景專屬指標
+  if (scenario === 'ws_broadcast') {
+    const sent = getMetricValue('ws_broadcast_sent', 'count');
+    const received = getMetricValue('ws_broadcast_received', 'count');
+    const joinSuccess = getMetricValue('ws_room_join_success', 'count');
+    const joinFailed = getMetricValue('ws_room_join_failed', 'count');
+    const latencyTotal = getMetricValue('ws_broadcast_latency_ms_total', 'count');
+    const avgLatency = sent > 0 ? (latencyTotal / received).toFixed(2) : 'N/A';
+
+    report += '\n## WebSocket 廣播測試\n\n';
+    report += `* **訊息發送總數 (Sender):** ${sent}\n`;
+    report += `* **訊息接收總數 (所有 Listener):** ${received}\n`;
+    report += `* **房間加入成功:** ${joinSuccess}\n`;
+    report += `* **房間加入失敗:** ${joinFailed}\n`;
+    report += `* **平均廣播延遲:** ${avgLatency}ms\n`;
+    if (sent > 0 && received > 0) {
+      report += `* **廣播倍率 (接收/發送):** ${(received / sent).toFixed(1)}x (= 平均每則廣播到達的 VU 數)\n`;
+    }
   }
 
   return {

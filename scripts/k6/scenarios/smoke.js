@@ -9,6 +9,7 @@
  * - 使用真實創建的資源進行測試
  */
 import { group, sleep, check } from "k6";
+import http from "k6/http";
 import { randomSleep } from "../scripts/common/utils.js";
 import { getAuthenticatedSession } from "../scripts/common/auth.js";
 import apiAuth from "../scripts/api/auth.js";
@@ -44,6 +45,12 @@ export default function (config, session) {
     if (!session) {
       logError("⚠️  無法建立認證會話，跳過需要認證的測試");
       return;
+    }
+
+    // 還原當前 session 的 CSRF cookie，避免 Phase 1 的登入流程覆蓋 cookie jar。
+    if (session.csrfToken) {
+      const jar = http.cookieJar();
+      jar.set(config.BASE_URL, "csrf_token", session.csrfToken, { path: "/" });
     }
 
     logInfo(`✅ 會話建立成功，用戶: ${session.user.email}`);

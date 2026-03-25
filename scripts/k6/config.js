@@ -27,15 +27,25 @@ export const TEST_CONFIG = {
       { duration: "5s", target: 0 }, // 5 秒內降到 0 個 VU
     ],
 
-    // 單體容量測試: 逐步增加負載 (300 -> 2000 VU)
-    // 目的：驗證單體基線，並測試 Redis/In-Memory 的容量極限
+    // WebSocket 廣播正確性測試：多 VU 同聚一室，驗證 Redis Pub/Sub 廣播
+    // 10% Sender + 90% Listener，觀察廣播到達率與延遲
+    ws_broadcast: [
+      { duration: "1m",  target: 20  }, // 熱身：20 VU
+      { duration: "2m",  target: 50  }, // 中等：50 VU (5 senders, 45 listeners)
+      { duration: "3m",  target: 100 }, // 壓力：100 VU (10 senders, 90 listeners)
+      { duration: "1m",  target: 0   }, // 收尾
+    ],
+
+    // 單體容量測試: 分級壓測 (100 -> 1000 VU)
+    // 目的：建立本地基線、觀察趨勢與迴歸驗證
+    // 注意：本地環境（Docker/OS）可能先於服務本身成為瓶頸，數字僅供趨勢參考
     monolith_capacity: [
-      { duration: "2m", target: 300 }, // 階梯 1: 300 VU
-      { duration: "2m", target: 500 }, // 階梯 2: 500 VU (熱身)
-      { duration: "5m", target: 1000 }, // 階梯 3: 1000 VU (中等負載)
-      { duration: "5m", target: 1500 }, // 階梯 4: 1500 VU (重負載)
-      { duration: "5m", target: 2000 }, // 階梯 5: 2000 VU (極限測試)
-      { duration: "3m", target: 2000 }, // 維持 3 分鐘
+      { duration: "2m", target: 100 }, // 階梯 1: 100 VU (功能驗證)
+      { duration: "2m", target: 200 }, // 階梯 2: 200 VU (功能驗證)
+      { duration: "3m", target: 500 }, // 階梯 3: 500 VU (趨勢觀察)
+      { duration: "3m", target: 800 }, // 階梯 4: 800 VU (趨勢觀察)
+      { duration: "5m", target: 1000 }, // 階梯 5: 1000 VU (本地壓力上限)
+      { duration: "3m", target: 1000 }, // 維持 3 分鐘
       { duration: "2m", target: 0 }, // 結束
     ],
   },
