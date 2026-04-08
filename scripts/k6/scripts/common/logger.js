@@ -19,8 +19,8 @@ const VERBOSE_MODE = __ENV.VERBOSE === "1";
  */
 export function logHttpResponse(apiName, response, options = {}) {
   const timestamp = new Date().toISOString().slice(11, 23); // 只顯示時間部分
-  const vu = (typeof __VU !== 'undefined') ? __VU : 0;
-  const iter = (typeof __ITER !== 'undefined') ? __ITER : 0;
+  const vu = typeof __VU !== "undefined" ? __VU : 0;
+  const iter = typeof __ITER !== "undefined" ? __ITER : 0;
 
   // 增加計數器
   apiRequestCounter.add(1);
@@ -52,7 +52,7 @@ export function logHttpResponse(apiName, response, options = {}) {
       const responseData = response.json();
       logMessage += ` | Response: ${JSON.stringify(responseData).substring(
         0,
-        200
+        200,
       )}`;
       if (JSON.stringify(responseData).length > 200) {
         logMessage += "...";
@@ -95,8 +95,8 @@ export function logHttpResponse(apiName, response, options = {}) {
  */
 export function logWebSocketEvent(event, details, data = null) {
   const timestamp = new Date().toISOString().slice(11, 23);
-  const vu = (typeof __VU !== 'undefined') ? __VU : 0;
-  const iter = (typeof __ITER !== 'undefined') ? __ITER : 0;
+  const vu = typeof __VU !== "undefined" ? __VU : 0;
+  const iter = typeof __ITER !== "undefined" ? __ITER : 0;
 
   let logMessage = `[${timestamp}] [VU:${vu}] [Iter:${iter}] 🔌 WebSocket ${event}`;
 
@@ -121,8 +121,8 @@ export function logWebSocketEvent(event, details, data = null) {
  */
 export function logInfo(message, data = null) {
   const timestamp = new Date().toISOString().slice(11, 23);
-  const vu = (typeof __VU !== 'undefined') ? __VU : 0;
-  const iter = (typeof __ITER !== 'undefined') ? __ITER : 0;
+  const vu = typeof __VU !== "undefined" ? __VU : 0;
+  const iter = typeof __ITER !== "undefined" ? __ITER : 0;
 
   let logMessage = `[${timestamp}] [VU:${vu}] [Iter:${iter}] ℹ️  ${message}`;
 
@@ -141,19 +141,20 @@ export function logInfo(message, data = null) {
  */
 export function logSuccess(message, data = null, duration = null) {
   const timestamp = new Date().toISOString().slice(11, 23);
-  const vu = (typeof __VU !== 'undefined') ? __VU : 0;
-  const iter = (typeof __ITER !== 'undefined') ? __ITER : 0;
+  const vu = typeof __VU !== "undefined" ? __VU : 0;
+  const iter = typeof __ITER !== "undefined" ? __ITER : 0;
 
   let logMessage = `[${timestamp}] [VU:${vu}] [Iter:${iter}] ✅ SUCCESS: ${message}`;
 
   if (duration !== null) {
     logMessage += ` | Duration: ${duration}ms`;
   }
-  
+
   if (data && VERBOSE_MODE) {
     logMessage += ` | ${JSON.stringify(data)}`;
   }
 
+  console.log(logMessage);
 }
 
 /**
@@ -163,8 +164,8 @@ export function logSuccess(message, data = null, duration = null) {
  */
 export function logError(message, error = null) {
   const timestamp = new Date().toISOString().slice(11, 23);
-  const vu = (typeof __VU !== 'undefined') ? __VU : 0;
-  const iter = (typeof __ITER !== 'undefined') ? __ITER : 0;
+  const vu = typeof __VU !== "undefined" ? __VU : 0;
+  const iter = typeof __ITER !== "undefined" ? __ITER : 0;
 
   let logMessage = `[${timestamp}] [VU:${vu}] [Iter:${iter}] 🚨 ERROR: ${message}`;
 
@@ -187,7 +188,7 @@ export function logError(message, error = null) {
  */
 export function logGroupStart(groupName) {
   const timestamp = new Date().toISOString().slice(11, 23);
-  const vu = (typeof __VU !== 'undefined') ? __VU : 0;
+  const vu = typeof __VU !== "undefined" ? __VU : 0;
 
   console.log(`[${timestamp}] [VU:${vu}] 📂 開始測試群組: ${groupName}`);
   console.log("─".repeat(50));
@@ -200,12 +201,12 @@ export function logGroupStart(groupName) {
  */
 export function logGroupEnd(groupName, startTime) {
   const timestamp = new Date().toISOString().slice(11, 23);
-  const vu = (typeof __VU !== 'undefined') ? __VU : 0;
+  const vu = typeof __VU !== "undefined" ? __VU : 0;
   const duration = Date.now() - startTime;
 
   console.log("─".repeat(50));
   console.log(
-    `[${timestamp}] [VU:${vu}] 📂 完成測試群組: ${groupName} | 耗時: ${duration}ms`
+    `[${timestamp}] [VU:${vu}] 📂 完成測試群組: ${groupName} | 耗時: ${duration}ms`,
   );
   console.log("");
 }

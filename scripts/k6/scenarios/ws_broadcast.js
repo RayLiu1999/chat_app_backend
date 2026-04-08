@@ -18,7 +18,7 @@
  * - ws_room_join_success:  加入房間成功率
  */
 import ws from "k6/ws";
-import { check } from "k6";
+import { check, sleep } from "k6";
 import { Counter } from "k6/metrics";
 import http from "k6/http";
 import { getAuthenticatedSessionWithOptions } from "../scripts/common/auth.js";
@@ -32,9 +32,9 @@ export const wsRoomJoinFailed = new Counter("ws_room_join_failed");
 export const wsBroadcastLatency = new Counter("ws_broadcast_latency_ms_total");
 
 // ── 場景常數 ─────────────────────────────────────────────
-const SENDER_RATIO = 0.1;        // 10% VU 為 sender
+const SENDER_RATIO = 0.1; // 10% VU 為 sender
 const SOAK_DURATION_MS = 3 * 60 * 1000; // 每個 VU 掛網 3 分鐘
-const SEND_INTERVAL_MS = 3000;   // Sender 每 3 秒發一則訊息
+const SEND_INTERVAL_MS = 3000; // Sender 每 3 秒發一則訊息
 const ROOM_JOIN_TIMEOUT_MS = 5000;
 
 /**
@@ -75,7 +75,7 @@ export default function (config, setupData) {
   const isSender = __VU <= senderCount;
 
   logInfo(
-    `[Broadcast] VU ${__VU} 角色: ${isSender ? "SENDER" : "LISTENER"} | 房間: ${broadcastChannelId}`
+    `[Broadcast] VU ${__VU} 角色: ${isSender ? "SENDER" : "LISTENER"} | 房間: ${broadcastChannelId}`,
   );
 
   const fullUrl = `${config.WS_URL}?token=${session.token}`;
@@ -110,7 +110,7 @@ export default function (config, setupData) {
               JSON.stringify({
                 action: "leave_room",
                 data: { room_id: broadcastChannelId, room_type: "channel" },
-              })
+              }),
             );
             socket.close();
           }, SOAK_DURATION_MS);
@@ -129,7 +129,7 @@ export default function (config, setupData) {
                     room_type: "channel",
                     content: content,
                   },
-                })
+                }),
               );
               wsBroadcastSent.add(1);
             }, SEND_INTERVAL_MS);
@@ -185,7 +185,7 @@ export default function (config, setupData) {
       JSON.stringify({
         action: "join_room",
         data: { room_id: broadcastChannelId, room_type: "channel" },
-      })
+      }),
     );
 
     // join 逾時計時器：若在 ROOM_JOIN_TIMEOUT_MS 內未收到 room_joined，關閉連線
