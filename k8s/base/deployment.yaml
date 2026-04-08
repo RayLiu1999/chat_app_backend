@@ -1,61 +1,78 @@
-# Chat App Deployment
+# Chat Backend Deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: chat-app
+  name: chat-backend
   namespace: chat-app
   labels:
-    app: chat-app
+    app: chat-backend
 spec:
-  replicas: 3
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   selector:
     matchLabels:
-      app: chat-app
+      app: chat-backend
   template:
     metadata:
       labels:
-        app: chat-app
+        app: chat-backend
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - chat-backend
+                topologyKey: "kubernetes.io/hostname"
       containers:
-        - name: chat-app
+        - name: chat-backend
           image: chat_app_backend:latest
-          imagePullPolicy: Never # 使用本地 image
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
+              name: http
           envFrom:
             - configMapRef:
-                name: chat-app-config
+                name: chat-backend-config
             - secretRef:
-                name: chat-app-secret
+                name: chat-backend-secret
           env:
             - name: DOCKER_ENV
               value: "true"
-            # 用於識別 pod
             - name: INSTANCE_ID
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
           resources:
-            limits:
-              cpu: "1"
-              memory: 512Mi
             requests:
-              cpu: "250m"
-              memory: 256Mi
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
           livenessProbe:
             httpGet:
               path: /health
               port: 80
             initialDelaySeconds: 30
-            periodSeconds: 10
+            periodSeconds: 60
             timeoutSeconds: 5
             failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /health
               port: 80
-            initialDelaySeconds: 5
-            periodSeconds: 5
+            initialDelaySeconds: 10
+            periodSeconds: 30
             timeoutSeconds: 3
             failureThreshold: 3
           volumeMounts:

@@ -1,5 +1,4 @@
 # Local Overlay (OrbStack)
-# 使用 LoadBalancer 與本地 image
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -7,3 +6,4 @@ resources:
   - ../../base
   - service.yaml
   - ingress.yaml
+  - secret.yaml

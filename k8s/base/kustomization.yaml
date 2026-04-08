@@ -6,9 +6,6 @@ namespace: chat-app
 
 resources:
   - namespace.yaml
-  - secret.yaml
   - configmap.yaml
-  - mongodb.yaml
-  - redis.yaml
-  - app.yaml
+  - deployment.yaml
   - hpa.yaml

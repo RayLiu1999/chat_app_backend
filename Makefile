@@ -242,7 +242,7 @@ env-check:
 # ============================================
 
 k8s-build:
-	@echo "🏗️  建置 Docker 映像 (for K8s)..."
+	@echo "🏗️  建置 Docker 映像 (for K8s prod target)..."
 	docker build --target prod -t chat_app_backend:latest .
 	@echo "✅ 映像建置完成: chat_app_backend:latest"
 
@@ -251,12 +251,12 @@ k8s-deploy: k8s-build
 	kubectl apply -k k8s/overlays/local
 	@echo "✅ K8s 部署完成"
 	@echo "⏳ 等待 pods 就緒..."
-	kubectl -n chat-app wait --for=condition=ready pod -l app=chat-app --timeout=120s || true
+	kubectl -n chat-app wait --for=condition=ready pod -l app=chat-backend --timeout=120s || true
 	@make k8s-status
 
 k8s-redeploy: k8s-build
-	@echo "🔄 重新部署到 Kubernetes..."
-	kubectl rollout restart deployment/chat-app -n chat-app
+	@echo "🔄 重新部署到 Kubernetes (chat-backend)..."
+	kubectl rollout restart deployment/chat-backend -n chat-app
 	@echo "✅ 重啟指令已發送"
 	@make k8s-status
 
@@ -267,12 +267,12 @@ k8s-delete:
 
 k8s-scale:
 	@echo "📈 擴展到 $(N) 個 pods..."
-	kubectl -n chat-app scale deployment chat-app --replicas=$(N)
+	kubectl -n chat-app scale deployment chat-backend --replicas=$(N)
 	@echo "✅ 已擴展到 $(N) 個 pods"
 	kubectl -n chat-app get pods -w
 
 k8s-status:
-	@echo "📊 K8s 部署狀態:"
+	@echo "📊 K8s 部署狀態 (chat-backend):"
 	@echo ""
 	@echo "=== Pods ==="
 	@kubectl -n chat-app get pods -o wide 2>/dev/null || echo "Namespace 不存在"
@@ -287,11 +287,11 @@ k8s-status:
 	@kubectl -n chat-app get ingress 2>/dev/null || true
 
 k8s-logs:
-	kubectl -n chat-app logs -f -l app=chat-app --max-log-requests=10
+	kubectl -n chat-app logs -f -l app=chat-backend --max-log-requests=10
 
 k8s-pods:
 	kubectl -n chat-app get pods -w
 
 k8s-health:
-	@echo "🏥 檢查 K8s 服務健康狀態..."
-	@curl -s http://localhost/health | jq . || echo "❌ 健康檢查失敗 (請確認 Ingress 或 Port Forwarding)"
+	@echo "🏥 檢查 K8s 服務健康狀態 (via Ingress host)..."
+	@curl -s -H "Host: chat.local" http://localhost/health | jq . || echo "❌ 健康檢查失敗 (請確認 Ingress 或 /etc/hosts 是否設定 chat.local)"
