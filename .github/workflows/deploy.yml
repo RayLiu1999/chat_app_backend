@@ -5,12 +5,6 @@ on:
     branches: ["main"]
   workflow_dispatch:
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ghcr.io/${{ github.repository }}
-  OPS_REPO: rayliu1999/side_project_ops
-  KUSTOMIZATION_PATH: projects/chat-app/backend
-
 permissions:
   contents: read
   packages: write
@@ -29,55 +23,3 @@ jobs:
       version: ${{ github.run_number }}
     secrets:
       registry_token: ${{ secrets.GITHUB_TOKEN }}
-
-  update-gitops:
-    needs: build-and-push
-    name: Update GitOps Repository
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Get short SHA
-        id: sha
-        run: echo "short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-
-      - name: Checkout Ops Repo
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.OPS_REPO }}
-          token: ${{ secrets.OPS_REPO_PAT }}
-          path: ops-repo
-
-      - name: Update Image Tag in Ops Repo
-        run: |
-          cd ops-repo/${{ env.KUSTOMIZATION_PATH }}
-
-          # 使用 sed 更新 image tag（假設使用 kustomization.yaml）
-          if [ -f kustomization.yaml ]; then
-            # 更新 newTag
-            sed -i "s|newTag:.*|newTag: ${{ steps.sha.outputs.short }}|g" kustomization.yaml
-          elif [ -f deployment.yaml ]; then
-            # 直接更新 deployment 中的 image tag
-            sed -i "s|image: ${{ env.IMAGE_NAME }}:.*|image: ${{ env.IMAGE_NAME }}:${{ steps.sha.outputs.short }}|g" deployment.yaml
-          fi
-
-          # 更新 timestamp 以觸發滾動更新
-          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          if [ -f deployment.yaml ]; then
-            sed -i "s/deploy-timestamp:.*/deploy-timestamp: \"$TIMESTAMP\"/g" deployment.yaml
-          fi
-
-          # 設定 git 使用者
-          git config user.name "GitHub Actions Bot"
-          git config user.email "actions@github.com"
-
-          # 提交變更
-          git add -A
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "ci(chat-backend): update image tag to ${{ steps.sha.outputs.short }}"
-            git push
-          fi
