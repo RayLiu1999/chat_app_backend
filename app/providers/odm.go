@@ -105,7 +105,7 @@ func (o *odm) Collection(model Model) *mongo.Collection {
 
 // Create 創建新文檔
 func (o *odm) Create(ctx context.Context, model Model) error {
-	if reflect.ValueOf(model).Kind() != reflect.Ptr {
+	if reflect.ValueOf(model).Kind() != reflect.Pointer {
 		return ErrInvalidModel
 	}
 
@@ -149,7 +149,7 @@ func (o *odm) InsertMany(ctx context.Context, models []Model) error {
 
 // FindByID 通過ID查找文檔
 func (o *odm) FindByID(ctx context.Context, ID string, model Model) error {
-	if reflect.ValueOf(model).Kind() != reflect.Ptr {
+	if reflect.ValueOf(model).Kind() != reflect.Pointer {
 		return ErrInvalidModel
 	}
 
@@ -173,7 +173,7 @@ func (o *odm) FindByID(ctx context.Context, ID string, model Model) error {
 
 // FindOne 查找單個文檔
 func (o *odm) FindOne(ctx context.Context, filter bson.M, model Model) error {
-	if reflect.ValueOf(model).Kind() != reflect.Ptr {
+	if reflect.ValueOf(model).Kind() != reflect.Pointer {
 		return ErrInvalidModel
 	}
 
@@ -192,7 +192,7 @@ func (o *odm) FindOne(ctx context.Context, filter bson.M, model Model) error {
 func (o *odm) Find(ctx context.Context, filter bson.M, models any) error {
 	// 確保models是指向切片的指針
 	modelsValue := reflect.ValueOf(models)
-	if modelsValue.Kind() != reflect.Ptr || modelsValue.Elem().Kind() != reflect.Slice {
+	if modelsValue.Kind() != reflect.Pointer || modelsValue.Elem().Kind() != reflect.Slice {
 		return ErrInvalidModel
 	}
 
@@ -224,7 +224,7 @@ func (o *odm) Find(ctx context.Context, filter bson.M, models any) error {
 
 // Update 更新文檔
 func (o *odm) Update(ctx context.Context, model Model) error {
-	if reflect.ValueOf(model).Kind() != reflect.Ptr {
+	if reflect.ValueOf(model).Kind() != reflect.Pointer {
 		return ErrInvalidModel
 	}
 
@@ -243,7 +243,7 @@ func (o *odm) Update(ctx context.Context, model Model) error {
 
 // UpdateFields 更新文檔的特定欄位
 func (o *odm) UpdateFields(ctx context.Context, model Model, fields bson.M) error {
-	if reflect.ValueOf(model).Kind() != reflect.Ptr {
+	if reflect.ValueOf(model).Kind() != reflect.Pointer {
 		return ErrInvalidModel
 	}
 
@@ -280,7 +280,7 @@ func (o *odm) UpdateMany(ctx context.Context, model Model, filter bson.M, update
 
 // Delete 刪除文檔
 func (o *odm) Delete(ctx context.Context, model Model) error {
-	if reflect.ValueOf(model).Kind() != reflect.Ptr {
+	if reflect.ValueOf(model).Kind() != reflect.Pointer {
 		return ErrInvalidModel
 	}
 
@@ -345,7 +345,7 @@ func (o *odm) ExistsByID(ctx context.Context, ID string, model Model) (bool, err
 func (o *odm) FindWithOptions(ctx context.Context, filter bson.M, models any, options *QueryOptions) error {
 	// 確保models是指向切片的指針
 	modelsValue := reflect.ValueOf(models)
-	if modelsValue.Kind() != reflect.Ptr || modelsValue.Elem().Kind() != reflect.Slice {
+	if modelsValue.Kind() != reflect.Pointer || modelsValue.Elem().Kind() != reflect.Slice {
 		return ErrInvalidModel
 	}
 
