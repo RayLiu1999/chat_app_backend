@@ -24,6 +24,7 @@ func NewMinIOProvider(cfg *config.Config) (*minioProvider, error) {
 	client, err := minio.New(cfg.MinIO.Endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(cfg.MinIO.AccessKeyID, cfg.MinIO.SecretAccessKey, ""),
 		Secure: cfg.MinIO.UseSSL,
+		Region: cfg.MinIO.Region,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("初始化 MinIO 客戶端失敗: %w", err)
@@ -88,9 +89,11 @@ func (mp *minioProvider) GetFileInfo(filepath string) (os.FileInfo, error) {
 }
 
 func (mp *minioProvider) GetFileURL(filePath string) string {
-	baseURL := mp.cfg.MinIO.PublicURL
-	baseURL = strings.TrimRight(baseURL, "/")
 	cleanFilePath := strings.TrimLeft(filePath, "/")
+	if baseURL := strings.TrimRight(mp.cfg.MinIO.PublicBaseURL, "/"); baseURL != "" {
+		return fmt.Sprintf("%s/%s", baseURL, cleanFilePath)
+	}
+	baseURL := strings.TrimRight(mp.cfg.MinIO.PublicURL, "/")
 	return fmt.Sprintf("%s/%s/%s", baseURL, mp.bucket, cleanFilePath)
 }
 

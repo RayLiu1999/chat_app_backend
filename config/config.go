@@ -82,6 +82,10 @@ type MinIOConfig struct {
 	UseSSL          bool
 	BucketName      string
 	PublicURL       string
+	// Region 為空時由 SDK 查詢 bucket 所在區域；Cloudflare R2 設為 "auto"
+	Region string
+	// PublicBaseURL 設定時，檔案網址為 PublicBaseURL/<path>，不附加 bucket 名稱（R2 自訂網域對應 bucket 根目錄）
+	PublicBaseURL string
 }
 
 var AppConfig *Config
@@ -137,6 +141,8 @@ func LoadConfig() {
 			UseSSL:          getEnv("MINIO_USE_SSL", "false") == "true",
 			BucketName:      getEnv("MINIO_BUCKET_NAME", "chat-app-uploads"),
 			PublicURL:       getEnv("MINIO_PUBLIC_URL", "http://localhost:9000"),
+			Region:          getEnv("MINIO_REGION", ""),
+			PublicBaseURL:   getEnv("MINIO_PUBLIC_BASE_URL", ""),
 		},
 		Cache: CacheConfig{
 			Type: CacheType(getEnv("CACHE_TYPE", "redis")),
